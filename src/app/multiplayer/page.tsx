@@ -227,14 +227,20 @@ export default function Multiplayer() {
                 {isPublic ? (
                   <>
                     <button
-                      onClick={requestPublicLobbies}
+                      onClick={() => {
+                        console.log('Browse Lobbies clicked!');
+                        requestPublicLobbies();
+                      }}
                       disabled={!playerName.trim()}
                       className="px-8 py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all text-lg font-bold disabled:opacity-50"
                     >
                       Browse Lobbies
                     </button>
                     <button
-                      onClick={createRoom}
+                      onClick={() => {
+                        console.log('Create Public Room clicked!');
+                        createRoom();
+                      }}
                       disabled={!playerName.trim()}
                       className="px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-lg font-bold disabled:opacity-50"
                     >
@@ -244,14 +250,20 @@ export default function Multiplayer() {
                 ) : (
                   <>
                     <button
-                      onClick={() => joinRoom()}
+                      onClick={() => {
+                        console.log('Join Private Room clicked!');
+                        joinRoom();
+                      }}
                       disabled={!playerName.trim() || !roomId.trim()}
                       className="px-8 py-4 bg-white text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-lg font-bold disabled:opacity-50"
                     >
                       Join Private Room
                     </button>
                     <button
-                      onClick={createRoom}
+                      onClick={() => {
+                        console.log('Create Private Room clicked!');
+                        createRoom();
+                      }}
                       disabled={!playerName.trim()}
                       className="px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-lg font-bold disabled:opacity-50"
                     >
