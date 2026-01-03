@@ -851,6 +851,75 @@ function dealBlackjackCards(roomId) {
   });
 }
 
+function evaluatePerfectPairs(playerHand) {
+  if (playerHand.length < 2) return { name: '', payout: 0 };
+  
+  const card1 = playerHand[0];
+  const card2 = playerHand[1];
+  
+  // Perfect Pair - same rank and suit
+  if (card1.value === card2.value && card1.suit === card2.suit) {
+    return { name: 'Perfect Pair', payout: 25 };
+  }
+  
+  // Colored Pair - same rank and color (both red or both black)
+  const card1Red = card1.suit === '♥️' || card1.suit === '♦️';
+  const card2Red = card2.suit === '♥️' || card2.suit === '♦️';
+  if (card1.value === card2.value && card1Red === card2Red) {
+    return { name: 'Colored Pair', payout: 12 };
+  }
+  
+  // Mixed Pair - same rank, different colors
+  if (card1.value === card2.value) {
+    return { name: 'Mixed Pair', payout: 6 };
+  }
+  
+  return { name: '', payout: 0 };
+}
+
+function evaluate21Plus3(playerHand, dealerUpCard) {
+  if (playerHand.length < 2 || !dealerUpCard) return { name: '', payout: 0 };
+  
+  const cards = [playerHand[0], playerHand[1], dealerUpCard];
+  const values = cards.map(c => c.value);
+  const suits = cards.map(c => c.suit);
+  
+  // Suited Trips - all same rank and suit
+  if (values[0] === values[1] && values[1] === values[2] && 
+      suits[0] === suits[1] && suits[1] === suits[2]) {
+    return { name: 'Suited Trips', payout: 100 };
+  }
+  
+  // Straight Flush - consecutive ranks, same suit
+  const allSameSuit = suits[0] === suits[1] && suits[1] === suits[2];
+  const valueOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const indices = values.map(v => valueOrder.indexOf(v));
+  const sortedIndices = [...indices].sort((a, b) => a - b);
+  const isStraight = (sortedIndices[2] - sortedIndices[1] === 1 && sortedIndices[1] - sortedIndices[0] === 1) ||
+                     (sortedIndices[0] === 0 && sortedIndices[1] === 11 && sortedIndices[2] === 12); // A-Q-K
+  
+  if (allSameSuit && isStraight) {
+    return { name: 'Straight Flush', payout: 40 };
+  }
+  
+  // Three of a Kind - all same rank
+  if (values[0] === values[1] && values[1] === values[2]) {
+    return { name: 'Three of a Kind', payout: 30 };
+  }
+  
+  // Straight - consecutive ranks
+  if (isStraight) {
+    return { name: 'Straight', payout: 10 };
+  }
+  
+  // Flush - all same suit
+  if (allSameSuit) {
+    return { name: 'Flush', payout: 5 };
+  }
+  
+  return { name: '', payout: 0 };
+}
+
 function moveToNextPlayer(roomId) {
   const room = rooms.get(`casino_${roomId}`);
   if (!room) return;
@@ -889,6 +958,35 @@ function checkBlackjackRoundEnd(roomId) {
       let winAmount = 0;
       let message = '';
       
+      // Evaluate side bets
+      let sideBetWinnings = 0;
+      let sideBetMessages = [];
+      
+      if (player.sideBets) {
+        // Perfect Pairs
+        if (player.sideBets.perfectPairs > 0) {
+          const ppResult = evaluatePerfectPairs(player.hand);
+          if (ppResult.payout > 0) {
+            const ppWin = player.sideBets.perfectPairs * ppResult.payout;
+            sideBetWinnings += ppWin;
+            sideBetMessages.push(`${ppResult.name}: +${ppWin}`);
+            player.balance += ppWin;
+          }
+        }
+        
+        // 21+3
+        if (player.sideBets.twentyOnePlus3 > 0 && room.dealer.hand.length > 0) {
+          const tp3Result = evaluate21Plus3(player.hand, room.dealer.hand[0]);
+          if (tp3Result.payout > 0) {
+            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout;
+            sideBetWinnings += tp3Win;
+            sideBetMessages.push(`${tp3Result.name}: +${tp3Win}`);
+            player.balance += tp3Win;
+          }
+        }
+      }
+      
+      // Main hand results
       if (player.isBusted) {
         message = `Bust! Lost ${betAmount} LosBucks`;
         winAmount = 0;
@@ -907,6 +1005,11 @@ function checkBlackjackRoundEnd(roomId) {
         message = `Push! ${betAmount} LosBucks returned`;
         winAmount = betAmount;
         player.balance += betAmount;
+      }
+      
+      // Add side bet results to message
+      if (sideBetMessages.length > 0) {
+        message += ' | ' + sideBetMessages.join(', ');
       }
 
       results[player.id] = message;

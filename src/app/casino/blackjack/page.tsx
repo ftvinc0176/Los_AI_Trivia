@@ -36,7 +36,7 @@ function BlackjackGame() {
   const [myPlayerId, setMyPlayerId] = useState('');
   const [balance, setBalance] = useState(1000);
   const [currentBet, setBetAmount] = useState(0);
-  const [betInput, setBetInput] = useState('100');
+  const [betInput, setBetInput] = useState('');
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
   const [dealerHandValue, setDealerHandValue] = useState(0);
   const [myHand, setMyHand] = useState<Card[]>([]);
@@ -637,7 +637,7 @@ function BlackjackGame() {
     setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
     setSideBetResults({ perfectPairs: '', twentyOnePlus3: '', perfectPairsWin: 0, twentyOnePlus3Win: 0 });
     setShowDealerHole(false);
-    setBetInput('100');
+    setBetInput('');
     setGameState('betting');
   };
 
@@ -1037,37 +1037,31 @@ function BlackjackGame() {
             <div className="relative">
               {socket && players.length > 1 ? (
                 /* Multiplayer: Show all players */
-                <div className="flex justify-around items-end gap-4">
+                <div className="flex flex-wrap justify-center items-end gap-2 sm:gap-4 max-w-full">
                   {players.map((player) => {
                     const isMe = player.id === myPlayerId;
                     const isTurn = player.id === currentTurn;
                     const result = roundResults[player.id];
                     return (
-                      <div key={player.id} className="flex flex-col items-center">
+                      <div key={player.id} className="flex flex-col items-center min-w-[100px] max-w-[180px]">
                         {/* Result Message Above Hand */}
                         {result && (
-                          <div className={`mb-3 px-4 py-2 rounded-lg font-bold text-center ${
+                          <div className={`mb-2 px-2 py-1 rounded-lg font-bold text-center text-xs sm:text-sm max-w-full ${
                             result.includes('win') || result.includes('Win') 
                               ? 'bg-green-600 text-white' 
                               : result.includes('Push') 
                                 ? 'bg-yellow-600 text-black' 
                                 : 'bg-red-600 text-white'
                           }`}>
-                            <div className="text-sm">{result}</div>
-                            {player.sideBets && (player.sideBets.perfectPairs > 0 || player.sideBets.twentyOnePlus3 > 0) && (
-                              <div className="text-xs mt-1 opacity-90">
-                                {player.sideBets.perfectPairs > 0 && <div>Perfect Pairs bet</div>}
-                                {player.sideBets.twentyOnePlus3 > 0 && <div>21+3 bet</div>}
-                              </div>
-                            )}
+                            <div className="break-words">{result}</div>
                           </div>
                         )}
                         
-                        <div className="flex gap-2 mb-4">
+                        <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4 flex-wrap justify-center max-w-full">
                           {player.hand.map((card, idx) => (
                             <div
                               key={idx}
-                              className="relative w-20 h-28 bg-white rounded-lg shadow-xl border-2 border-gray-400"
+                              className="relative w-12 h-16 sm:w-20 sm:h-28 bg-white rounded-lg shadow-xl border border-gray-400 flex-shrink-0"
                               style={{ 
                                 animation: 'cardDeal 0.3s ease-out forwards',
                                 animationDelay: `${(idx + 2) * 0.15}s`,
@@ -1075,31 +1069,31 @@ function BlackjackGame() {
                                 transform: 'perspective(1000px)'
                               }}
                             >
-                              <div className="absolute top-1 left-1">
-                                <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                              <div className="absolute top-0.5 sm:top-1 left-0.5 sm:left-1">
+                                <div className={`text-xs sm:text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
                                   {card.value}
                                 </div>
-                                <div className={`text-xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                <div className={`text-xs sm:text-xl -mt-0.5 sm:-mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
                                   {card.suit}
                                 </div>
                               </div>
                               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                                <div className={`text-4xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                <div className={`text-xl sm:text-4xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
                                   {card.suit}
                                 </div>
                               </div>
-                              <div className="absolute bottom-1 right-1 rotate-180">
-                                <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                              <div className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1 rotate-180">
+                                <div className={`text-xs sm:text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
                                   {card.value}
                                 </div>
-                                <div className={`text-xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                <div className={`text-xs sm:text-xl -mt-0.5 sm:-mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
                                   {card.suit}
                                 </div>
                               </div>
                             </div>
                           ))}
                         </div>
-                        <div className={`px-6 py-3 rounded-2xl shadow-xl ${
+                        <div className={`px-3 sm:px-6 py-2 sm:py-3 rounded-2xl shadow-xl ${
                           isMe 
                             ? 'bg-yellow-600 border-2 border-yellow-400' 
                             : isTurn 
@@ -1110,22 +1104,22 @@ function BlackjackGame() {
                                   ? 'bg-red-900 border-2 border-red-700' 
                                   : 'bg-black/70 border-2 border-white/30'
                         }`}>
-                          <p className={`font-bold text-lg ${isMe ? 'text-black' : 'text-white'}`}>
+                          <p className={`font-bold text-xs sm:text-lg ${isMe ? 'text-black' : 'text-white'} truncate max-w-full`}>
                             {isMe ? 'YOU' : player.name}
                           </p>
-                          <p className={`text-xl font-bold ${isMe ? 'text-black' : 'text-yellow-300'}`}>
+                          <p className={`text-base sm:text-xl font-bold ${isMe ? 'text-black' : 'text-yellow-300'}`}>
                             {player.handValue}
                           </p>
                           {!result && (
-                            <p className={`text-sm ${isMe ? 'text-black/70' : 'text-white/70'}`}>
+                            <p className={`text-xs sm:text-sm ${isMe ? 'text-black/70' : 'text-white/70'}`}>
                               Bet: {player.currentBet}
                             </p>
                           )}
                           {player.isStanding && !result && (
-                            <p className="text-xs text-white/90 mt-1">STANDING</p>
+                            <p className="text-[10px] sm:text-xs text-white/90 mt-1">STANDING</p>
                           )}
                           {player.isBusted && !result && (
-                            <p className="text-xs text-red-300 mt-1 font-bold">BUSTED!</p>
+                            <p className="text-[10px] sm:text-xs text-red-300 mt-1 font-bold">BUSTED!</p>
                           )}
                         </div>
                       </div>
