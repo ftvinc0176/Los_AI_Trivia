@@ -576,7 +576,7 @@ io.on('connection', (socket) => {
   // CASINO GAME HANDLERS
   // ============================================
 
-  socket.on('casinoCreateLobby', ({ playerName }) => {
+  socket.on('casinoCreateLobby', ({ playerName, isPublic }) => {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const player = {
       id: socket.id,
@@ -594,12 +594,27 @@ io.on('connection', (socket) => {
       dealer: { hand: [], value: 0 },
       deck: [],
       state: 'lobby', // lobby, betting, playing, results
-      isPublic: false
+      isPublic: isPublic || false
     });
 
     socket.join(roomId);
     socket.emit('casinoLobbyCreated', { roomId });
-    console.log(`Casino lobby ${roomId} created by ${playerName}`);
+    console.log(`Casino lobby ${roomId} created by ${playerName} (${isPublic ? 'public' : 'private'})`);
+  });
+
+  socket.on('getCasinoPublicLobbies', () => {
+    const publicLobbies = [];
+    rooms.forEach((room, key) => {
+      if (key.startsWith('casino_') && room.isPublic && room.state === 'lobby') {
+        const roomId = key.replace('casino_', '');
+        publicLobbies.push({
+          roomId,
+          playerCount: room.players.length,
+          maxPlayers: 4
+        });
+      }
+    });
+    socket.emit('casinoPublicLobbies', { lobbies: publicLobbies });
   });
 
   socket.on('casinoJoinLobby', ({ roomId, playerName }) => {
@@ -636,11 +651,13 @@ io.on('connection', (socket) => {
     if (!room) return;
 
     room.state = 'betting';
-    io.to(roomId).emit('casinoGameStarted');
-    console.log(`Casino game started in ${roomId}`);
+    // Assign player positions (right to left)
+    room.playerPositions = room.players.length;
+    io.to(roomId).emit('casinoGameStarted', { playerPositions: room.playerPositions });
+    console.log(`Casino game started in ${roomId} with ${room.playerPositions} players`);
   });
 
-  socket.on('casinoPlaceBet', ({ roomId, bet }) => {
+  socket.on('casinoPlaceBet', ({ roomId, bet, sideBets }) => {
     const room = rooms.get(`casino_${roomId}`);
     if (!room) return;
 
@@ -649,18 +666,18 @@ io.on('connection', (socket) => {
 
     player.currentBet = bet;
     player.balance -= bet;
+    player.sideBets = sideBets || { perfectPairs: 0, twentyOnePlus3: 0 };
 
     // Check if all players have bet
     const allBet = room.players.every(p => p.currentBet > 0);
     if (allBet) {
-      // Deal initial cards
+      // Deal initial cards and set first player's turn (rightmost = last in array)
       dealBlackjackCards(roomId);
+      room.currentTurn = room.players[room.players.length - 1].id;
+      io.to(roomId).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
     }
   });
-
-  socket.on('casinoHit', ({ roomId }) => {
-    const room = rooms.get(`casino_${roomId}`);
-    if (!room || room.state !== 'playing') return;
+ || room.currentTurn !== socket.id) return;
 
     const player = room.players.find(p => p.id === socket.id);
     if (!player || player.isStanding || player.isBusted) return;
@@ -671,6 +688,9 @@ io.on('connection', (socket) => {
 
     if (player.handValue > 21) {
       player.isBusted = true;
+      // Auto-stand on bust and move to next player
+      player.isStanding = true;
+      moveToNextPlayer(roomId);
     }
 
     io.to(roomId).emit('casinoCardDealt', {
@@ -679,12 +699,24 @@ io.on('connection', (socket) => {
       handValue: player.handValue
     });
 
-    // Check if all players done
-    checkBlackjackRoundEnd(roomId);
-  });
+    // Update players state
+    io.to(roomId).emit('casinoPlayerJoined', { players: room.players   playerId: socket.id,
+      card,
+      handValue: player.handValue
+    });
 
-  socket.on('casinoStand', ({ roomId }) => {
-    const room = rooms.get(`casino_${roomId}`);
+    // Check if all players done || room.currentTurn !== socket.id) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player) return;
+
+    player.isStanding = true;
+
+    // Move to next player
+    moveToNextPlayer(roomId);
+
+    // Update players state
+    io.to(roomId).emit('casinoPlayerJoined', { players: room.players })casino_${roomId}`);
     if (!room || room.state !== 'playing') return;
 
     const player = room.players.find(p => p.id === socket.id);
@@ -776,7 +808,20 @@ function dealBlackjackCards(roomId) {
   io.to(roomId).emit('casinoDealCards', {
     players: room.players,
     dealer: {
-      hand: [dealerCard1], // Only show first card
+      hanmoveToNextPlayer(roomId) {
+  const room = rooms.get(`casino_${roomId}`);
+  if (!room) return;
+
+  const currentIndex = room.players.findIndex(p => p.id === room.currentTurn);
+  const nextIndex = currentIndex - 1; // Move left (right to left order)
+  
+  if (nextIndex >= 0) {
+    room.currentTurn = room.players[nextIndex].id;
+    io.to(roomId).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
+  }
+}
+
+function d: [dealerCard1], // Only show first card
       value: dealerCard1.numValue
     }
   });

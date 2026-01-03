@@ -43,6 +43,12 @@ function BlackjackGame() {
   const [isDealing, setIsDealing] = useState(false);
   const [canHit, setCanHit] = useState(true);
   const [resultMessage, setResultMessage] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; playerCount: number; maxPlayers: number }>>([]);
+  const [selectedChip, setSelectedChip] = useState(25);
+  const [sideBets, setSideBets] = useState({ perfectPairs: 0, twentyOnePlus3: 0 });
+  const [currentTurn, setCurrentTurn] = useState<string>('');
+  const [playerPositions, setPlayerPositions] = useState<number>(0);
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -59,8 +65,17 @@ function BlackjackGame() {
         setPlayers(players);
       });
 
-      newSocket.on('casinoGameStarted', () => {
+      newSocket.on('casinoPublicLobbies', ({ lobbies }: { lobbies: Array<{ roomId: string; playerCount: number; maxPlayers: number }> }) => {
+        setPublicLobbies(lobbies);
+      });
+
+      newSocket.on('casinoGameStarted', ({ playerPositions }: { playerPositions: number }) => {
         setGameState('betting');
+        setPlayerPositions(playerPositions);
+      });
+
+      newSocket.on('casinoTurnUpdate', ({ currentTurn }: { currentTurn: string }) => {
+        setCurrentTurn(currentTurn);
       });
 
       newSocket.on('casinoDealCards', ({ players, dealer }: { players: Player[]; dealer: { hand: Card[]; value: number } }) => {
@@ -104,17 +119,24 @@ function BlackjackGame() {
         newSocket.close();
       };
     }
-  }, [mode]);
-
-  const createLobby = () => {
-    if (socket && playerName) {
-      socket.emit('casinoCreateLobby', { playerName });
+  }, [mode]);, isPublic });
       setMyPlayerId(socket.id!);
     }
   };
 
-  const joinLobby = () => {
-    if (socket && playerName && lobbyCode) {
+  const joinLobby = (targetRoomId?: string) => {
+    const joinRoomId = targetRoomId || lobbyCode;
+    if (socket && playerName && joinRoomId) {
+      socket.emit('casinoJoinLobby', { roomId: joinRoomId, playerName });
+      setRoomId(joinRoomId);
+      setMyPlayerId(socket.id!);
+      setGameState('lobby');
+    }
+  };
+
+  const refreshLobbies = () => {
+    if (socket) {
+      socket.emit('getCasinoPublicLobbiesame && lobbyCode) {
       socket.emit('casinoJoinLobby', { roomId: lobbyCode, playerName });
       setRoomId(lobbyCode);
       setMyPlayerId(socket.id!);
@@ -128,16 +150,31 @@ function BlackjackGame() {
     } else {
       // Single player
       setGameState('betting');
+    const totalSideBets = sideBets.perfectPairs + sideBets.twentyOnePlus3;
+    const totalBet = bet + totalSideBets;
+    
+    if (bet > 0 && totalBet <= balance) {
+      setBetAmount(bet);
+      setBalance(balance - totalBet);
+      
+      if (socket) {
+        socket.emit('casinoPlaceBet', { roomId, bet, sideBets });
+      } else {
+        // Single player - deal cards immediately
+        dealInitialCards(bet);
+      }
     }
   };
 
-  const placeBet = () => {
-    const bet = parseInt(betInput);
-    if (bet > 0 && bet <= balance) {
-      setBetAmount(bet);
-      setBalance(balance - bet);
-      
-      if (socket) {
+  const addChipToBet = (area: 'main' | 'perfectPairs' | 'twentyOnePlus3') => {
+    if (selectedChip > balance) return;
+    
+    if (area === 'main') {
+      setBetInput(String(parseInt(betInput || '0') + selectedChip));
+    } else if (area === 'perfectPairs') {
+      setSideBets({ ...sideBets, perfectPairs: sideBets.perfectPairs + selectedChip });
+    } else if (area === 'twentyOnePlus3') {
+      setSideBets({ ...sideBets, twentyOnePlus3: sideBets.twentyOnePlus3 + selectedChip });f (socket) {
         socket.emit('casinoPlaceBet', { roomId, bet });
       } else {
         // Single player - deal cards immediately
@@ -209,9 +246,9 @@ function BlackjackGame() {
     hand.forEach(card => {
       if (card.value === 'A') {
         aces++;
-        value += 11;
-      } else {
-        value += card.numValue;
+        value  && currentTurn === socket.id) {
+      socket.emit('casinoHit', { roomId });
+    } else if (!socket)lue += card.numValue;
       }
     });
     
@@ -245,9 +282,9 @@ function BlackjackGame() {
   const stand = () => {
     setCanHit(false);
     
-    if (socket) {
+    if (socket && currentTurn === socket.id) {
       socket.emit('casinoStand', { roomId });
-    } else {
+    } else if (!socket) {
       // Reveal dealer's hand and play dealer
       const dealerFullHand = (window as any).dealerFullHand as Card[];
       setDealerHand(dealerFullHand);
@@ -308,21 +345,94 @@ function BlackjackGame() {
     setMyHand([]);
     setDealerHand([]);
     setMyHandValue(0);
-    setDealerHandValue(0);
-    setBetAmount(0);
-    setResultMessage('');
-    setCanHit(true);
-    setGameState('betting');
-  };
+    sBrowse Lobbies
+  if (mode === 'browse' && !roomId) {
+    if (!playerName) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
+            <h1 className="text-4xl font-bold text-white mb-8 text-center">👁️ Browse Lobbies</h1>
+            
+            <input
+              type="text"
+              placeholder="Your Name"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-white/40 mb-4"
+            />
+            
+            <button
+              onClick={refreshLobbies}
+              disabled={!playerName}
+              className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-xl font-bold text-lg transition-all disabled:cursor-not-allowed mb-4"
+            >
+              View Public Lobbies
+            </button>
+            
+            <button onClick={() => router.push('/casino')} className="w-full text-white/60 hover:text-white">
+              ← Back
+            </button>
+          </div>
+        </div>
+      );
+    }
 
-  // Lobby State
-  if (mode !== 'single' && gameState === 'lobby' && !roomId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-4xl font-bold text-white">Public Casino Lobbies</h1>
+            <button
+              onClick={refreshLobbies}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            {publicLobbies.length === 0 ? (
+              <div className="text-center py-12 text-white/60">
+                <p className="text-xl mb-2">No public lobbies available</p>
+                <p className="text-sm">Create one to get started!</p>
+              </div>
+            ) : (
+              publicLobbies.map((lobby) => (
+                <div
+                  key={lobby.roomId}
+                  className="bg-white/5 rounded-xl p-4 border border-white/10 flex justify-between items-center hover:bg-white/10 transition-all"
+                >
+                  <div>
+                    <p className="text-white font-bold text-lg">Lobby {lobby.roomId}</p>
+                    <p className="text-white/60">
+                      {lobby.playerCount}/{lobby.maxPlayers} players
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => joinLobby(lobby.roomId)}
+                    className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-all"
+                  >
+                    Join
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <button onClick={() => router.push('/casino')} className="w-full text-white/60 hover:text-white">
+            ← Back to Casino
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Create Lobby State
+  if (mode === 'create' && gameState === 'lobby' && !roomId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
-          <h1 className="text-4xl font-bold text-white mb-8 text-center">
-            {mode === 'create' ? '🎰 Create Casino Lobby' : '🔗 Join Casino Lobby'}
-          </h1>
+          <h1 className="text-4xl font-bold text-white mb-8 text-center">🎰 Create Casino Lobby</h1>
           
           <div className="space-y-4">
             <input
@@ -333,15 +443,27 @@ function BlackjackGame() {
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-white/40"
             />
             
-            {mode === 'join' && (
-              <input
-                type="text"
-                placeholder="Lobby Code"
-                value={lobbyCode}
-                onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-white/40"
-              />
-            )}
+            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-white font-bold">Public Lobby</span>
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-6 h-6"
+                />
+              </label>
+              <p className="text-white/60 text-sm mt-2">
+                {isPublic ? 'Anyone can join' : 'Only players with code can join'}
+              </p>
+            </div>
+            
+            <button
+              onClick={createLobby}
+              disabled={!playerName}
+              className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-xl font-bold text-lg transition-all disabled:cursor-not-allowed"
+            >
+              Create Lobby
             
             <button
               onClick={mode === 'create' ? createLobby : joinLobby}
@@ -403,43 +525,210 @@ function BlackjackGame() {
   // Betting State
   if (gameState === 'betting') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
-          <h1 className="text-4xl font-bold text-white mb-4 text-center">Place Your Bet</h1>
-          <div className="text-center mb-8">
-            <p className="text-white/60 mb-2">Your Balance:</p>
-            <p className="text-4xl font-bold text-yellow-300">{balance} LosBucks</p>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+        <div className="max-w-6xl w-full">
+          {/* Balance Display */}
+          <div className="text-center mb-6">
+            <p className="text-yellow-300 text-3xl font-bold">{balance} LosBucks</p>
           </div>
-          
-          <div className="space-y-4">
-            <input
-              type="number"
-              value={betInput}
-              onChange={(e) => setBetInput(e.target.value)}
-              min="1"
-              max={balance}
-              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-center text-2xl focus:outline-none focus:border-white/40"
-            />
+
+          {/* Betting Table */}
+          <div className="relative bg-green-800 rounded-[200px] border-8 border-yellow-900 p-12 shadow-2xl">
+            <div className="absolute inset-0 rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
             
-            <div className="grid grid-cols-4 gap-2">
-              {[25, 50, 100, 250].map(amount => (
-                <button
-                  key={amount}
-                  onClick={() => setBetInput(String(amount))}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-white transition-all"
-                >
-                  {amount}
-                </button>
-              ))}
+            {/* Table Text */}
+            <div className="relative text-center mb-8">
+              <h1 className="text-4xl font-bold text-yellow-600/40 mb-2">BLACKJACK PAYS 3 TO 2</h1>
+              <p className="text-lg text-yellow-600/30">Dealer stands on all 17 and above</p>
             </div>
+
+            {/* Betting Areas */}
+            <div className="relative flex justify-center items-end gap-8 mb-8">
+              {/* Side Bet: Perfect Pairs */}
+              <div className="flex flex-col items-center">
+                <div 
+                  onClick={() => addChipToBet('perfectPairs')}
+                  className="w-32 h-32 rounded-full border-4 border-yellow-600/50 bg-green-700 flex flex-col items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
+                >
+                  <span className="text-yellow-600/60 text-xs font-bold">PERFECT</span>
+                  <span className="text-yellow-600/60 text-xs font-bold">PAIRS</span>
+                  {sideBets.perfectPairs > 0 && (
+                    <div className="absolute -top-4">
+                      <div className="w-12 h-12 rounded-full bg-red-600 border-4 border-white flex items-center justify-center shadow-lg">
+                        <span className="text-white font-bold text-sm">{sideBets.perfectPairs}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Main Bet */}
+              <div className="flex flex-col items-center">
+                <div 
+                  onClick={() => addChipToBet('main')}
+                  className="w-40 h-40 rounded-full border-4 border-yellow-600 bg-green-700 flex items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
+                >
+                  <span className="text-yellow-600 text-2xl font-bold">{betInput}</span>
+                  {parseInt(betInput) > 0 && (
+    const isMyTurn = !socket || currentTurn === socket.id;
+    const myPlayerIndex = socket ? players.findIndex(p => p.id === socket.id) : 0;
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+        <div className="max-w-6xl w-full">
+          {/* Balance Display */}
+          <div className="text-center mb-6">
+            <p className="text-yellow-300 text-2xl font-bold">{balance} LosBucks</p>
+          </div>
+
+          {/* Game Table */}
+          <div className="relative bg-green-800 rounded-[200px] border-8 border-yellow-900 p-12 shadow-2xl min-h-[600px]">
+            <div className="absolute inset-0 rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
             
-            <button
-              onClick={placeBet}
-              disabled={parseInt(betInput) <= 0 || parseInt(betInput) > balance}
-              className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-xl font-bold text-lg disabled:cursor-not-allowed"
-            >
-              Deal Cards
-            </button>
+            {/* Dealer Area */}
+            <div className="relative mb-16">
+              <div className="text-center mb-4">
+                <span className="text-yellow-300 text-xl font-bold">Dealer: {dealerHandValue}</span>
+              </div>
+              <div className="flex justify-center gap-2">
+                {dealerHand.map((card, idx) => (
+                  <div
+                    key={idx}
+                    className="w-20 h-28 bg-white rounded-lg shadow-2xl flex flex-col items-center justify-center border-2 border-gray-300"
+                    style={{ 
+                      animation: 'cardDeal 0.3s ease-out forwards',
+                      animationDelay: `${idx * 0.1}s`,
+                      opacity: 0
+                    }}
+                  >
+                    <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                      {card.suit}
+                    </div>
+                    <div className={`text-xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                      {card.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Player Positions */}
+            <div className="relative">
+              {socket && players.length > 0 ? (
+                // Multiplayer - show up to 3 players
+                <div className="flex justify-around items-end">
+                  {players.slice(0, 3).map((player, idx) => {
+                    const isMe = player.id === socket.id;
+                    const isCurrentTurn = currentTurn === player.id;
+                    
+                    return (
+                      <div key={player.id} className={`flex flex-col items-center ${isCurrentTurn ? 'scale-105' : 'scale-100'} transition-transform`}>
+                        {/* Player Cards */}
+                        <div className="flex gap-1 mb-3">
+                          {player.hand.map((card, cardIdx) => (
+                            <div
+                              key={cardIdx}
+                              className="w-16 h-24 bg-white rounded-md shadow-xl flex flex-col items-center justify-center border border-gray-300"
+                              style={{ 
+                                animation: 'cardDeal 0.3s ease-out forwards',
+                                animationDelay: `${(cardIdx + 2) * 0.1}s`,
+                                opacity: 0
+                              }}
+                            >
+                              <div className={`text-xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                                {card.suit}
+                              </div>
+                              <div className={`text-lg font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                                {card.value}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {/* Player Info */}
+                        <div className={`px-4 py-2 rounded-lg ${isCurrentTurn ? 'bg-yellow-600' : 'bg-green-700'} border-2 ${isMe ? 'border-yellow-400' : 'border-yellow-800'}`}>
+                          <p className="text-white font-bold text-sm">{player.name} {isMe && '(You)'}</p>
+                          <p className="text-white text-xs">Value: {player.handValue}</p>
+                          <p className="text-yellow-300 text-xs">Bet: {player.currentBet}</p>
+                          {player.isBusted && <p className="text-red-300 text-xs font-bold">BUST!</p>}
+                          {player.isStanding && !player.isBusted && <p className="text-blue-300 text-xs font-bold">STANDING</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                // Single Player
+                <div className="flex flex-col items-center">
+                  <div className="flex gap-2 mb-4">
+                    {myHand.map((card, idx) => (
+                      <div
+                        key={idx}
+                        className="w-20 h-28 bg-white rounded-lg shadow-2xl flex flex-col items-center justify-center border-2 border-gray-300"
+                        style={{ 
+                          animation: 'cardDeal 0.3s ease-out forwards',
+                          animationDelay: `${(idx + 2) * 0.1}s`,
+                          opacity: 0
+                        }}
+                      >
+                        <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                          {card.suit}
+                        </div>
+                        <div className={`text-xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                          {card.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-green-700 px-6 py-3 rounded-lg border-2 border-yellow-600">
+                    <p className="text-yellow-300 text-xl font-bold">Your Hand: {myHandValue}</p>
+                    <p className="text-white text-sm">Bet: {currentBet} LosBucks</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            {canHit && !isDealing && isMyTurn && (
+              <div className="relative flex justify-center gap-4 mt-8">
+                <button
+                  onClick={hit}
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                >
+                  HIT
+                </button>
+                <button
+                  onClick={stand}
+                  className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                >
+                  STAND
+                </button>
+              </div>
+            )}
+            
+            {!isMyTurn && socket && (
+              <div className="relative text-center mt-8">
+                <p className="text-yellow-300 text-xl font-bold animate-pulse">
+                  Waiting for {players.find(p => p.id === currentTurn)?.name || 'other player'}...
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <style jsx>{`
+          @keyframes cardDeal {
+            0% {
+              opacity: 0;
+              transform: translateY(-100px) rotate(-10deg);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) rotate(0);
+            }
+          }
+        `}</style </button>
+            </div>
           </div>
         </div>
       </div>

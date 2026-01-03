@@ -62,15 +62,15 @@ export default function Casino() {
                 <div className="mt-4 text-green-300 text-sm">Up to 4 players</div>
               </button>
 
-              {/* Join Lobby */}
+              {/* See Lobbies */}
               <button
-                onClick={() => router.push('/casino/blackjack?mode=join')}
+                onClick={() => router.push('/casino/blackjack?mode=browse')}
                 className="group relative bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-lg rounded-3xl p-8 border border-white/20 hover:border-white/40 transition-all hover:scale-105"
               >
-                <div className="text-6xl mb-4">🔗</div>
-                <h2 className="text-3xl font-bold text-white mb-2">Join Lobby</h2>
-                <p className="text-white/70 text-lg">Enter a lobby code</p>
-                <div className="mt-4 text-blue-300 text-sm">Play with friends</div>
+                <div className="text-6xl mb-4">👁️</div>
+                <h2 className="text-3xl font-bold text-white mb-2">See Lobbies</h2>
+                <p className="text-white/70 text-lg">Browse public games</p>
+                <div className="mt-4 text-blue-300 text-sm">Join open lobbies</div>
               </button>
             </div>
           </div>
