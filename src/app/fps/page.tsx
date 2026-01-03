@@ -73,6 +73,11 @@ export default function FPS() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       setKeys(prev => ({ ...prev, [e.key.toLowerCase()]: true }));
+      
+      // Shoot on Space
+      if (e.key === ' ' && socket && roomId && gameState?.started) {
+        socket.emit('fpsShoot', { roomId, angle: mouseAngle });
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -86,7 +91,7 @@ export default function FPS() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [socket, roomId, gameState, mouseAngle]);
 
   // Mouse controls for aiming
   useEffect(() => {
@@ -151,76 +156,87 @@ export default function FPS() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const myPlayer = gameState.players.find(p => p.id === myId);
-    if (!myPlayer) return;
+    let animationId: number;
 
-    // Clear canvas
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const render = () => {
+      const myPlayer = gameState.players.find(p => p.id === myId);
+      if (!myPlayer) return;
 
-    // Draw grid floor
-    ctx.strokeStyle = '#2a2a4e';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < canvas.width; i += 50) {
+      // Clear canvas
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw grid floor
+      ctx.strokeStyle = '#2a2a4e';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < canvas.width; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+      }
+      for (let i = 0; i < canvas.height; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(canvas.width, i);
+        ctx.stroke();
+      }
+
+      // Draw all players
+      gameState.players.forEach(player => {
+        if (player.health <= 0) return;
+
+        const screenX = canvas.width / 2 + (player.x - myPlayer.x);
+        const screenY = canvas.height / 2 + (player.y - myPlayer.y);
+
+        // Draw player circle
+        ctx.fillStyle = player.id === myId ? '#00ff00' : player.color;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw player direction
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY);
+        ctx.lineTo(
+          screenX + Math.cos(player.angle) * 30,
+          screenY + Math.sin(player.angle) * 30
+        );
+        ctx.stroke();
+
+        // Draw player name
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(player.name, screenX, screenY - 30);
+
+        // Draw health bar
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(screenX - 25, screenY - 40, 50, 5);
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(screenX - 25, screenY - 40, (player.health / 100) * 50, 5);
+      });
+
+      // Draw crosshair
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, canvas.height);
+      ctx.moveTo(canvas.width / 2 - 10, canvas.height / 2);
+      ctx.lineTo(canvas.width / 2 + 10, canvas.height / 2);
+      ctx.moveTo(canvas.width / 2, canvas.height / 2 - 10);
+      ctx.lineTo(canvas.width / 2, canvas.height / 2 + 10);
       ctx.stroke();
-    }
-    for (let i = 0; i < canvas.height; i += 50) {
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
-      ctx.stroke();
-    }
 
-    // Draw other players
-    gameState.players.forEach(player => {
-      if (player.health <= 0) return;
+      animationId = requestAnimationFrame(render);
+    };
 
-      const screenX = canvas.width / 2 + (player.x - myPlayer.x);
-      const screenY = canvas.height / 2 + (player.y - myPlayer.y);
+    render();
 
-      // Draw player circle
-      ctx.fillStyle = player.id === myId ? '#00ff00' : player.color;
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, 20, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw player direction
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(screenX, screenY);
-      ctx.lineTo(
-        screenX + Math.cos(player.angle) * 30,
-        screenY + Math.sin(player.angle) * 30
-      );
-      ctx.stroke();
-
-      // Draw player name
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(player.name, screenX, screenY - 30);
-
-      // Draw health bar
-      ctx.fillStyle = '#ff0000';
-      ctx.fillRect(screenX - 25, screenY - 40, 50, 5);
-      ctx.fillStyle = '#00ff00';
-      ctx.fillRect(screenX - 25, screenY - 40, (player.health / 100) * 50, 5);
-    });
-
-    // Draw crosshair
-    ctx.strokeStyle = '#ffff00';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(canvas.width / 2 - 10, canvas.height / 2);
-    ctx.lineTo(canvas.width / 2 + 10, canvas.height / 2);
-    ctx.moveTo(canvas.width / 2, canvas.height / 2 - 10);
-    ctx.lineTo(canvas.width / 2, canvas.height / 2 + 10);
-    ctx.stroke();
-
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+    };
   }, [gameState, myId]);
 
   const joinRoom = () => {
@@ -380,8 +396,8 @@ export default function FPS() {
       {/* Game Canvas */}
       <canvas
         ref={canvasRef}
-        width={800}
-        height={600}
+        width={1200}
+        height={700}
         className="border-4 border-white/20 rounded-xl cursor-crosshair"
       />
 
