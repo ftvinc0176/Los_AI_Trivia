@@ -42,6 +42,7 @@ export default function SinglePlayer() {
   const [aiHint, setAiHint] = useState<string>('');
   const [gameOver, setGameOver] = useState(false);
   const [wonGame, setWonGame] = useState(false);
+  const [loadingCountdown, setLoadingCountdown] = useState(10);
 
   const handleAnswerReveal = useCallback(() => {
     setShowAnswer(true);
@@ -70,7 +71,19 @@ export default function SinglePlayer() {
 
   const startGame = async () => {
     setLoading(true);
+    setLoadingCountdown(10);
     setQuestions([]); // Clear old questions immediately
+    
+    // Start countdown animation
+    const countdownInterval = setInterval(() => {
+      setLoadingCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     
     try {
       // Generate all 10 questions in one API call with progressive difficulty
@@ -96,6 +109,17 @@ export default function SinglePlayer() {
         throw new Error('Invalid questions received');
       }
       
+      // Wait for countdown to finish before showing game
+      await new Promise(resolve => {
+        const checkCountdown = setInterval(() => {
+          if (loadingCountdown <= 1) {
+            clearInterval(checkCountdown);
+            clearInterval(countdownInterval);
+            resolve(true);
+          }
+        }, 100);
+      });
+      
       setQuestions(data.questions);
       setGameState('playing');
       setCurrentQuestion(0);
@@ -108,6 +132,7 @@ export default function SinglePlayer() {
       setGameOver(false);
       setWonGame(false);
     } catch (error) {
+      clearInterval(countdownInterval);
       console.error('Error generating questions:', error);
       alert('Failed to generate questions. Please try again.');
       setGameState('setup'); // Return to setup on error
@@ -188,6 +213,51 @@ export default function SinglePlayer() {
   };
 
   if (gameState === 'setup') {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+          <div className="text-center">
+            <h1 className="text-6xl font-bold text-white mb-8 animate-pulse">
+              Generating Questions...
+            </h1>
+            
+            <div className="relative w-64 h-64 mx-auto mb-8">
+              {/* Outer spinning ring */}
+              <div className="absolute inset-0 rounded-full border-8 border-transparent border-t-yellow-400 border-r-orange-500 animate-spin"></div>
+              
+              {/* Inner pulsing ring */}
+              <div className="absolute inset-4 rounded-full border-8 border-transparent border-t-blue-400 border-r-purple-500 animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }}></div>
+              
+              {/* Countdown number */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-9xl font-bold bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent animate-pulse">
+                  {loadingCountdown}
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-white/80 text-lg">
+              <p className="animate-pulse">🧠 Crafting unique questions...</p>
+              <p className="animate-pulse delay-100">🎯 Calibrating difficulty...</p>
+              <p className="animate-pulse delay-200">💼 Preparing your cases...</p>
+            </div>
+            
+            <div className="mt-8 flex justify-center gap-2">
+              {[...Array(10)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    i < (10 - loadingCountdown) ? 'bg-yellow-400 scale-110' : 'bg-white/20'
+                  }`}
+                  style={{ animationDelay: `${i * 100}ms` }}
+                ></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20">
