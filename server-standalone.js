@@ -963,11 +963,13 @@ function moveToNextPlayer(roomId) {
   const room = rooms.get(`casino_${roomId}`);
   if (!room) return;
 
-  const currentIndex = room.players.findIndex(p => p.id === room.currentTurn);
+  // Only consider players who have bet (exclude late joiners)
+  const activePlayers = room.players.filter(p => p.currentBet > 0);
+  const currentIndex = activePlayers.findIndex(p => p.id === room.currentTurn);
   const nextIndex = currentIndex - 1; // Move left (right to left order)
   
   if (nextIndex >= 0) {
-    room.currentTurn = room.players[nextIndex].id;
+    room.currentTurn = activePlayers[nextIndex].id;
     io.to(`casino_${roomId}`).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
   } else {
     // All players done, play dealer
@@ -979,8 +981,9 @@ function checkBlackjackRoundEnd(roomId) {
   const room = rooms.get(`casino_${roomId}`);
   if (!room) return;
 
-  // Check if all players are done (standing or busted)
-  const allDone = room.players.every(p => p.isStanding || p.isBusted);
+  // Only check active players (those who bet) - exclude late joiners
+  const activePlayers = room.players.filter(p => p.currentBet > 0);
+  const allDone = activePlayers.every(p => p.isStanding || p.isBusted);
   
   if (allDone) {
     // Play dealer's hand (hit until 17+)
@@ -990,9 +993,9 @@ function checkBlackjackRoundEnd(roomId) {
       room.dealer.value = calculateBlackjackValue(room.dealer.hand);
     }
 
-    // Determine winners and update balances
+    // Determine winners and update balances (only for active players)
     const results = {};
-    room.players.forEach(player => {
+    activePlayers.forEach(player => {
       const betAmount = player.currentBet;
       let winAmount = 0;
       let message = '';
