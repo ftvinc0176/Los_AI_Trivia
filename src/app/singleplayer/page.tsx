@@ -260,11 +260,11 @@ export default function SinglePlayer() {
     const question = questions[currentQuestion];
     
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-6xl w-full">
-          <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 overflow-x-hidden">
+        <div className="max-w-6xl w-full px-2 sm:px-0">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-8">
             {/* Case Ladder */}
-            <div className="col-span-1 space-y-2">
+            <div className="md:col-span-1 col-span-1 space-y-2 md:space-y-2 flex md:flex-col flex-row md:justify-start justify-around overflow-x-auto md:overflow-x-visible">
               {[...CASE_LADDER].reverse().map((cases) => {
                 const questionNum = cases * 2; // Each case = 2 questions
                 const isCurrent = currentQuestion >= (cases - 1) * 2 && currentQuestion < cases * 2;
@@ -273,7 +273,7 @@ export default function SinglePlayer() {
                 return (
                   <div
                     key={cases}
-                    className={`p-3 rounded-xl text-center font-bold transition-all ${
+                    className={`p-2 sm:p-3 rounded-xl text-center font-bold transition-all text-xs sm:text-base min-w-[60px] md:min-w-0 ${
                       isCurrent
                         ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white scale-110'
                         : isPassed
@@ -288,14 +288,14 @@ export default function SinglePlayer() {
             </div>
 
             {/* Main Game Area */}
-            <div className="col-span-3">
+            <div className="md:col-span-3 col-span-1">
               {/* Timer & Lifelines */}
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex gap-3">
+              <div className="flex flex-wrap justify-between items-center mb-3 sm:mb-6 gap-2">
+                <div className="flex gap-2 sm:gap-3">
                   <button
                     onClick={useFiftyFifty}
                     disabled={fiftyFiftyLeft === 0 || showAnswer}
-                    className={`px-6 py-3 rounded-xl font-bold transition-all ${
+                    className={`px-3 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-xs sm:text-base transition-all ${
                       fiftyFiftyLeft > 0 && !showAnswer
                         ? 'bg-blue-500 hover:bg-blue-600 text-white'
                         : 'bg-gray-500/30 text-gray-400'
@@ -306,16 +306,16 @@ export default function SinglePlayer() {
                   <button
                     onClick={useAiHint}
                     disabled={aiHintLeft === 0 || showAnswer || aiHint !== '' || loadingHint}
-                    className={`px-6 py-3 rounded-xl font-bold transition-all ${
+                    className={`px-3 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-xs sm:text-base transition-all ${
                       aiHintLeft > 0 && !showAnswer && aiHint === '' && !loadingHint
                         ? 'bg-purple-500 hover:bg-purple-600 text-white'
                         : 'bg-gray-500/30 text-gray-400'
                     }`}
                   >
-                    {loadingHint ? 'Loading Hint...' : `🤖 AI Hint (${aiHintLeft})`}
+                    {loadingHint ? 'Loading...' : `🤖 Hint (${aiHintLeft})`}
                   </button>
                 </div>
-                <div className={`text-4xl font-bold ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
+                <div className={`text-2xl sm:text-4xl font-bold ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
                   ⏱️ {timeLeft}s
                 </div>
               </div>

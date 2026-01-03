@@ -805,26 +805,26 @@ function BlackjackGame() {
     const totalBet = parseInt(betInput || '0') + sideBets.perfectPairs + sideBets.twentyOnePlus3;
     
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
         <div className="max-w-6xl w-full">
           {/* Balance Display */}
-          <div className="text-center mb-6">
-            <p className="text-yellow-300 text-3xl font-bold">{balance} LosBucks</p>
+          <div className="text-center mb-3 sm:mb-6">
+            <p className="text-yellow-300 text-xl sm:text-3xl font-bold">{balance} LosBucks</p>
           </div>
 
           {/* Betting Table */}
-          <div className="relative bg-green-800 rounded-[200px] border-8 border-yellow-900 p-12 shadow-2xl">
+          <div className="relative bg-green-800 rounded-[80px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-4 sm:p-8 md:p-12 shadow-2xl">
             <div className="absolute inset-0 rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
             
             {/* Table Text */}
-            <div className="relative text-center mb-8">
-              <h1 className="text-5xl font-bold text-yellow-600/30 mb-2" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>BLACKJACK PAYS 3 TO 2</h1>
-              <p className="text-xl text-yellow-600/25" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>Dealer stands on all 17 and above</p>
-              <p className="text-xl text-yellow-600/25 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>INSURANCE PAYS 2 TO 1</p>
+            <div className="relative text-center mb-4 sm:mb-8">
+              <h1 className="text-xl sm:text-3xl md:text-5xl font-bold text-yellow-600/30 mb-1 sm:mb-2" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>BLACKJACK PAYS 3 TO 2</h1>
+              <p className="text-xs sm:text-base md:text-xl text-yellow-600/25" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>Dealer stands on all 17 and above</p>
+              <p className="text-xs sm:text-base md:text-xl text-yellow-600/25 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>INSURANCE PAYS 2 TO 1</p>
             </div>
 
             {/* Betting Areas */}
-            <div className="relative flex justify-center items-end gap-8 mb-8">
+            <div className="relative flex justify-center items-end gap-2 sm:gap-4 md:gap-8 mb-4 sm:mb-8">
               {/* Side Bet: Perfect Pairs */}
               <div className="flex flex-col items-center">
                 <div 
@@ -948,44 +948,44 @@ function BlackjackGame() {
   // Playing State
   if (gameState === 'playing') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
-        <div className="max-w-6xl w-full">
+      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+        <div className="max-w-6xl w-full px-2 sm:px-0">
           {/* Turn Indicator for Multiplayer */}
           {socket && (
-            <div className="text-center mb-4">
+            <div className="text-center mb-2 sm:mb-4">
               {isMyTurn ? (
-                <div className="inline-block bg-green-600 px-6 py-3 rounded-full animate-pulse">
-                  <p className="text-white font-bold text-xl">🎲 YOUR TURN 🎲</p>
+                <div className="inline-block bg-green-600 px-4 sm:px-6 py-2 sm:py-3 rounded-full animate-pulse">
+                  <p className="text-white font-bold text-sm sm:text-xl">🎲 YOUR TURN 🎲</p>
                 </div>
               ) : (
-                <div className="inline-block bg-gray-700 px-6 py-3 rounded-full">
-                  <p className="text-white/60 font-bold">Waiting for {players.find(p => p.id === currentTurn)?.name || 'other player'}...</p>
+                <div className="inline-block bg-gray-700 px-4 sm:px-6 py-2 sm:py-3 rounded-full">
+                  <p className="text-white/60 font-bold text-xs sm:text-base">Waiting for {players.find(p => p.id === currentTurn)?.name || 'other player'}...</p>
                 </div>
               )}
             </div>
           )}
           
           {/* Balance Display */}
-          <div className="text-center mb-6">
-            <p className="text-yellow-300 text-2xl font-bold">{balance} LosBucks</p>
+          <div className="text-center mb-3 sm:mb-6">
+            <p className="text-yellow-300 text-xl sm:text-2xl font-bold">{balance} LosBucks</p>
           </div>
 
           {/* Game Table */}
-          <div className="relative bg-green-800 rounded-[200px] border-8 border-yellow-900 p-12 shadow-2xl min-h-[600px]">
-            <div className="absolute inset-0 rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
+          <div className="relative bg-green-800 rounded-[80px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-4 sm:p-8 md:p-12 shadow-2xl min-h-[500px] sm:min-h-[600px]">
+            <div className="absolute inset-0 rounded-[80px] sm:rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
             
             {/* Dealer Area */}
-            <div className="relative mb-16">
-              <div className="text-center mb-4">
-                <div className="inline-block bg-black/50 px-6 py-2 rounded-full">
-                  <span className="text-yellow-300 text-2xl font-bold">DEALER: {showDealerHole ? dealerHandValue : '?'}</span>
+            <div className="relative mb-8 sm:mb-16">
+              <div className="text-center mb-2 sm:mb-4">
+                <div className="inline-block bg-black/50 px-3 sm:px-6 py-1 sm:py-2 rounded-full">
+                  <span className="text-yellow-300 text-base sm:text-2xl font-bold">DEALER: {showDealerHole ? dealerHandValue : '?'}</span>
                 </div>
               </div>
-              <div className="flex justify-center gap-3">
+              <div className="flex justify-center gap-1 sm:gap-3">
                 {dealerHand.map((card, idx) => (
                   <div
                     key={idx}
-                    className="relative w-24 h-36 bg-white rounded-xl shadow-2xl border-2 border-gray-400"
+                    className="relative w-16 h-24 sm:w-24 sm:h-36 bg-white rounded-lg sm:rounded-xl shadow-2xl border-2 border-gray-400"
                     style={{ 
                       animation: 'cardDeal 0.3s ease-out forwards',
                       animationDelay: `${idx * 0.15}s`,
@@ -1220,18 +1220,18 @@ function BlackjackGame() {
                 </button>
               </div>
             ) : canHit && !isDealing && (!socket || isMyTurn) && (
-              <div className="relative flex justify-center gap-3 mt-8 flex-wrap">
+              <div className="relative flex justify-center gap-2 sm:gap-3 mt-4 sm:mt-8 flex-wrap">
                 <button
                   onClick={hit}
                   disabled={socket !== null && !isMyTurn}
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                  className="px-4 sm:px-8 py-2 sm:py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base sm:text-xl transition-all shadow-lg"
                 >
                   HIT
                 </button>
                 <button
                   onClick={stand}
                   disabled={socket !== null && !isMyTurn}
-                  className="px-8 py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                  className="px-4 sm:px-8 py-2 sm:py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base sm:text-xl transition-all shadow-lg"
                 >
                   STAND
                 </button>
@@ -1239,16 +1239,16 @@ function BlackjackGame() {
                   <button
                     onClick={doubleDown}
                     disabled={socket !== null && !isMyTurn}
-                    className="px-6 py-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                    className="px-3 sm:px-6 py-2 sm:py-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm sm:text-xl transition-all shadow-lg"
                   >
-                    DOUBLE DOWN
+                    DOUBLE
                   </button>
                 )}
                 {canSplit && (
                   <button
                     onClick={split}
                     disabled={socket !== null && !isMyTurn}
-                    className="px-6 py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                    className="px-3 sm:px-6 py-2 sm:py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm sm:text-xl transition-all shadow-lg"
                   >
                     SPLIT
                   </button>
