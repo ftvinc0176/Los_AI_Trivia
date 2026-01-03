@@ -666,8 +666,14 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (!player || bet > player.balance) return;
 
+    // Calculate total bet including side bets
+    const totalSideBets = (sideBets?.perfectPairs || 0) + (sideBets?.twentyOnePlus3 || 0);
+    const totalBet = bet + totalSideBets;
+    
+    if (totalBet > player.balance) return;
+
     player.currentBet = bet;
-    player.balance -= bet;
+    player.balance -= totalBet; // Deduct main bet + side bets
     player.sideBets = sideBets || { perfectPairs: 0, twentyOnePlus3: 0 };
 
     // Check if all players have bet
@@ -967,7 +973,7 @@ function checkBlackjackRoundEnd(roomId) {
         if (player.sideBets.perfectPairs > 0) {
           const ppResult = evaluatePerfectPairs(player.hand);
           if (ppResult.payout > 0) {
-            const ppWin = player.sideBets.perfectPairs * ppResult.payout;
+            const ppWin = player.sideBets.perfectPairs * ppResult.payout + player.sideBets.perfectPairs; // Return bet + winnings
             sideBetWinnings += ppWin;
             sideBetMessages.push(`${ppResult.name}: +${ppWin}`);
             player.balance += ppWin;
@@ -978,7 +984,7 @@ function checkBlackjackRoundEnd(roomId) {
         if (player.sideBets.twentyOnePlus3 > 0 && room.dealer.hand.length > 0) {
           const tp3Result = evaluate21Plus3(player.hand, room.dealer.hand[0]);
           if (tp3Result.payout > 0) {
-            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout;
+            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout + player.sideBets.twentyOnePlus3; // Return bet + winnings
             sideBetWinnings += tp3Win;
             sideBetMessages.push(`${tp3Result.name}: +${tp3Win}`);
             player.balance += tp3Win;
