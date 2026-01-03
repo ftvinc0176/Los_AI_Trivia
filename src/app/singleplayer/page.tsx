@@ -86,10 +86,7 @@ export default function SinglePlayer() {
     }, 1000);
     
     try {
-      // Wait 10 seconds before starting
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      
-      // Generate all 10 questions in one API call with progressive difficulty
+      // Generate questions immediately (no artificial delay)
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
