@@ -42,7 +42,6 @@ export default function SinglePlayer() {
   const [aiHint, setAiHint] = useState<string>('');
   const [gameOver, setGameOver] = useState(false);
   const [wonGame, setWonGame] = useState(false);
-  const [countdown, setCountdown] = useState(10);
 
   const handleAnswerReveal = useCallback(() => {
     setShowAnswer(true);
@@ -71,22 +70,9 @@ export default function SinglePlayer() {
 
   const startGame = async () => {
     setLoading(true);
-    setCountdown(10);
-    setQuestions([]); // Clear old questions immediately
-    
-    // Start countdown
-    const countdownInterval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    setQuestions([]);
     
     try {
-      // Generate questions immediately (no artificial delay)
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,7 +93,6 @@ export default function SinglePlayer() {
         throw new Error('Invalid questions received');
       }
       
-      clearInterval(countdownInterval);
       setQuestions(data.questions);
       setGameState('playing');
       setCurrentQuestion(0);
@@ -120,7 +105,6 @@ export default function SinglePlayer() {
       setGameOver(false);
       setWonGame(false);
     } catch (error) {
-      clearInterval(countdownInterval);
       console.error('Error generating questions:', error);
       alert('Failed to generate questions. Please try again.');
       setGameState('setup');
@@ -233,7 +217,12 @@ export default function SinglePlayer() {
               disabled={loading}
               className="flex-1 px-8 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl hover:from-yellow-500 hover:to-orange-600 transition-all text-lg font-bold disabled:opacity-50"
             >
-              {loading ? `Generating Questions... ${countdown}s` : 'Play for Cases!'}
+              {loading ? (
+                <div>
+                  <div>Generating Questions...</div>
+                  <div className="text-sm">(may take up to 30 seconds)</div>
+                </div>
+              ) : 'Play for Cases!'}
             </button>
           </div>
         </div>
