@@ -571,7 +571,261 @@ io.on('connection', (socket) => {
 
     console.log('Client disconnected:', socket.id);
   });
+
+  // ============================================
+  // CASINO GAME HANDLERS
+  // ============================================
+
+  socket.on('casinoCreateLobby', ({ playerName }) => {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 1000,
+      currentBet: 0,
+      hand: [],
+      handValue: 0,
+      isStanding: false,
+      isBusted: false
+    };
+
+    rooms.set(`casino_${roomId}`, {
+      players: [player],
+      dealer: { hand: [], value: 0 },
+      deck: [],
+      state: 'lobby', // lobby, betting, playing, results
+      isPublic: false
+    });
+
+    socket.join(roomId);
+    socket.emit('casinoLobbyCreated', { roomId });
+    console.log(`Casino lobby ${roomId} created by ${playerName}`);
+  });
+
+  socket.on('casinoJoinLobby', ({ roomId, playerName }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room) {
+      socket.emit('error', { message: 'Lobby not found' });
+      return;
+    }
+
+    if (room.players.length >= 4) {
+      socket.emit('error', { message: 'Lobby is full' });
+      return;
+    }
+
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 1000,
+      currentBet: 0,
+      hand: [],
+      handValue: 0,
+      isStanding: false,
+      isBusted: false
+    };
+
+    room.players.push(player);
+    socket.join(roomId);
+    io.to(roomId).emit('casinoPlayerJoined', { players: room.players });
+    console.log(`${playerName} joined casino lobby ${roomId}`);
+  });
+
+  socket.on('casinoStartGame', ({ roomId }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room) return;
+
+    room.state = 'betting';
+    io.to(roomId).emit('casinoGameStarted');
+    console.log(`Casino game started in ${roomId}`);
+  });
+
+  socket.on('casinoPlaceBet', ({ roomId, bet }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || bet > player.balance) return;
+
+    player.currentBet = bet;
+    player.balance -= bet;
+
+    // Check if all players have bet
+    const allBet = room.players.every(p => p.currentBet > 0);
+    if (allBet) {
+      // Deal initial cards
+      dealBlackjackCards(roomId);
+    }
+  });
+
+  socket.on('casinoHit', ({ roomId }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room || room.state !== 'playing') return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || player.isStanding || player.isBusted) return;
+
+    const card = room.deck.pop();
+    player.hand.push(card);
+    player.handValue = calculateBlackjackValue(player.hand);
+
+    if (player.handValue > 21) {
+      player.isBusted = true;
+    }
+
+    io.to(roomId).emit('casinoCardDealt', {
+      playerId: socket.id,
+      card,
+      handValue: player.handValue
+    });
+
+    // Check if all players done
+    checkBlackjackRoundEnd(roomId);
+  });
+
+  socket.on('casinoStand', ({ roomId }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room || room.state !== 'playing') return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player) return;
+
+    player.isStanding = true;
+
+    // Check if all players done
+    checkBlackjackRoundEnd(roomId);
+  });
 });
+
+// Helper functions for Blackjack
+function createBlackjackDeck() {
+  const suits = ['♠️', '♥️', '♣️', '♦️'];
+  const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const deck = [];
+
+  suits.forEach(suit => {
+    values.forEach(value => {
+      let numValue = parseInt(value);
+      if (value === 'A') numValue = 11;
+      else if (['J', 'Q', 'K'].includes(value)) numValue = 10;
+
+      deck.push({ suit, value, numValue });
+    });
+  });
+
+  return shuffleBlackjackDeck(deck);
+}
+
+function shuffleBlackjackDeck(deck) {
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function calculateBlackjackValue(hand) {
+  let value = 0;
+  let aces = 0;
+
+  hand.forEach(card => {
+    if (card.value === 'A') {
+      aces++;
+      value += 11;
+    } else {
+      value += card.numValue;
+    }
+  });
+
+  while (value > 21 && aces > 0) {
+    value -= 10;
+    aces--;
+  }
+
+  return value;
+}
+
+function dealBlackjackCards(roomId) {
+  const room = rooms.get(`casino_${roomId}`);
+  if (!room) return;
+
+  room.deck = createBlackjackDeck();
+  room.state = 'playing';
+
+  // Reset player hands
+  room.players.forEach(player => {
+    player.hand = [];
+    player.handValue = 0;
+    player.isStanding = false;
+    player.isBusted = false;
+
+    // Deal 2 cards to each player
+    const card1 = room.deck.pop();
+    const card2 = room.deck.pop();
+    player.hand = [card1, card2];
+    player.handValue = calculateBlackjackValue(player.hand);
+  });
+
+  // Deal 2 cards to dealer (only show 1)
+  const dealerCard1 = room.deck.pop();
+  const dealerCard2 = room.deck.pop();
+  room.dealer.hand = [dealerCard1, dealerCard2];
+  room.dealer.value = calculateBlackjackValue(room.dealer.hand);
+
+  // Send initial cards (hide dealer's second card)
+  io.to(roomId).emit('casinoDealCards', {
+    players: room.players,
+    dealer: {
+      hand: [dealerCard1], // Only show first card
+      value: dealerCard1.numValue
+    }
+  });
+}
+
+function checkBlackjackRoundEnd(roomId) {
+  const room = rooms.get(`casino_${roomId}`);
+  if (!room) return;
+
+  // Check if all players are done (standing or busted)
+  const allDone = room.players.every(p => p.isStanding || p.isBusted);
+  
+  if (allDone) {
+    // Play dealer's hand (hit until 17+)
+    while (room.dealer.value < 17) {
+      const card = room.deck.pop();
+      room.dealer.hand.push(card);
+      room.dealer.value = calculateBlackjackValue(room.dealer.hand);
+    }
+
+    // Determine winners and update balances
+    const results = {};
+    room.players.forEach(player => {
+      if (player.isBusted) {
+        results[player.id] = 'Bust! You lose.';
+      } else if (room.dealer.value > 21) {
+        results[player.id] = 'Dealer busts! You win!';
+        player.balance += player.currentBet * 2;
+      } else if (player.handValue > room.dealer.value) {
+        results[player.id] = 'You win!';
+        player.balance += player.currentBet * 2;
+      } else if (player.handValue < room.dealer.value) {
+        results[player.id] = 'Dealer wins.';
+      } else {
+        results[player.id] = 'Push! Bet returned.';
+        player.balance += player.currentBet;
+      }
+
+      player.currentBet = 0;
+    });
+
+    room.state = 'results';
+    io.to(roomId).emit('casinoRoundEnd', {
+      players: room.players,
+      dealer: room.dealer,
+      results
+    });
+  }
+}
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
