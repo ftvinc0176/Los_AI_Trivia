@@ -285,7 +285,7 @@ export default function Multiplayer() {
                     >
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-white font-bold text-lg">{lobby.hostName}'s Room</p>
+                          <p className="text-white font-bold text-lg">{lobby.hostName}&apos;s Room</p>
                           <p className="text-purple-200 text-sm">Code: {lobby.roomId}</p>
                         </div>
                         <div className="text-right">

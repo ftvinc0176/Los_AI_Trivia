@@ -43,7 +43,7 @@ export default function SinglePlayer() {
     } else if (timeLeft === 0 && !showAnswer) {
       handleAnswerReveal();
     }
-  }, [timeLeft, showAnswer, gameState]);
+  }, [timeLeft, showAnswer, gameState, handleAnswerReveal]);
 
   const startGame = async () => {
     setLoading(true);
