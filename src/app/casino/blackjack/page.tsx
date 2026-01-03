@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 
@@ -144,6 +144,12 @@ function BlackjackGame() {
     }
   }, [mode]);
 
+  const fetchPublicLobbies = useCallback(() => {
+    if (socket) {
+      socket.emit('getCasinoPublicLobbies');
+    }
+  }, [socket]);
+
   useEffect(() => {
     if (mode === 'browse' && socket) {
       fetchPublicLobbies();
@@ -151,7 +157,7 @@ function BlackjackGame() {
       const interval = setInterval(fetchPublicLobbies, 3000);
       return () => clearInterval(interval);
     }
-  }, [mode, socket]);
+  }, [mode, socket, fetchPublicLobbies]);
 
   const createLobby = () => {
     if (socket && playerName) {
@@ -166,12 +172,6 @@ function BlackjackGame() {
       setRoomId(lobbyCode);
       setMyPlayerId(socket.id!);
       setGameState('lobby');
-    }
-  };
-
-  const fetchPublicLobbies = () => {
-    if (socket) {
-      socket.emit('getCasinoPublicLobbies');
     }
   };
 

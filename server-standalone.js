@@ -654,7 +654,7 @@ io.on('connection', (socket) => {
     room.state = 'betting';
     // Assign player positions (right to left)
     room.playerPositions = room.players.length;
-    io.to(roomId).emit('casinoGameStarted', { playerPositions: room.playerPositions });
+    io.to(`casino_${roomId}`).emit('casinoGameStarted', { playerPositions: room.playerPositions });
     console.log(`Casino game started in ${roomId} with ${room.playerPositions} players`);
   });
 
@@ -675,7 +675,7 @@ io.on('connection', (socket) => {
       // Deal initial cards and set first player's turn (rightmost = last in array)
       dealBlackjackCards(roomId);
       room.currentTurn = room.players[room.players.length - 1].id;
-      io.to(roomId).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
+      io.to(`casino_${roomId}`).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
     }
   });
 
@@ -696,13 +696,13 @@ io.on('connection', (socket) => {
       moveToNextPlayer(roomId);
     }
 
-    io.to(roomId).emit('casinoCardDealt', {
+    io.to(`casino_${roomId}`).emit('casinoCardDealt', {
       playerId: socket.id,
       card,
       handValue: player.handValue
     });
 
-    io.to(roomId).emit('casinoPlayersUpdate', { players: room.players });
+    io.to(`casino_${roomId}`).emit('casinoPlayersUpdate', { players: room.players });
   });
 
   socket.on('casinoStand', ({ roomId }) => {
@@ -714,7 +714,7 @@ io.on('connection', (socket) => {
 
     player.isStanding = true;
     moveToNextPlayer(roomId);
-    io.to(roomId).emit('casinoPlayersUpdate', { players: room.players });
+    io.to(`casino_${roomId}`).emit('casinoPlayersUpdate', { players: room.players });
   });
 
   socket.on('casinoDoubleDown', ({ roomId }) => {
@@ -738,14 +738,14 @@ io.on('connection', (socket) => {
       player.isBusted = true;
     }
 
-    io.to(roomId).emit('casinoCardDealt', {
+    io.to(`casino_${roomId}`).emit('casinoCardDealt', {
       playerId: socket.id,
       card,
       handValue: player.handValue
     });
 
     moveToNextPlayer(roomId);
-    io.to(roomId).emit('casinoPlayersUpdate', { players: room.players });
+    io.to(`casino_${roomId}`).emit('casinoPlayersUpdate', { players: room.players });
   });
 
   socket.on('casinoLeave', ({ roomId }) => {
@@ -757,10 +757,10 @@ io.on('connection', (socket) => {
     if (room.players.length === 0) {
       rooms.delete(`casino_${roomId}`);
     } else {
-      io.to(roomId).emit('casinoPlayerJoined', { players: room.players });
+      io.to(`casino_${roomId}`).emit('casinoPlayerJoined', { players: room.players });
     }
 
-    socket.leave(roomId);
+    socket.leave(`casino_${roomId}`);
   });
 });
 
@@ -840,7 +840,7 @@ function dealBlackjackCards(roomId) {
   room.dealer.value = calculateBlackjackValue(room.dealer.hand);
 
   // Send initial cards (hide dealer's second card)
-  io.to(roomId).emit('casinoDealCards', {
+  io.to(`casino_${roomId}`).emit('casinoDealCards', {
     players: room.players,
     dealer: {
       hand: [dealerCard1], // Only show first card
@@ -859,7 +859,7 @@ function moveToNextPlayer(roomId) {
   
   if (nextIndex >= 0) {
     room.currentTurn = room.players[nextIndex].id;
-    io.to(roomId).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
+    io.to(`casino_${roomId}`).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
   } else {
     // All players done, play dealer
     checkBlackjackRoundEnd(roomId);
@@ -903,7 +903,7 @@ function checkBlackjackRoundEnd(roomId) {
     });
 
     room.state = 'results';
-    io.to(roomId).emit('casinoRoundEnd', {
+    io.to(`casino_${roomId}`).emit('casinoRoundEnd', {
       players: room.players,
       dealer: room.dealer,
       results
