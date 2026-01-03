@@ -644,8 +644,41 @@ io.on('connection', (socket) => {
 
     room.players.push(player);
     socket.join(`casino_${roomId}`);
+    
+    // Tell everyone a player joined
     io.to(`casino_${roomId}`).emit('casinoPlayerJoined', { players: room.players });
-    console.log(`${playerName} joined casino lobby ${roomId}`);
+    
+    // Tell the new player what state the game is in
+    socket.emit('casinoGameState', { 
+      state: room.state,
+      players: room.players,
+      dealer: room.dealer 
+    });
+    
+    console.log(`${playerName} joined casino lobby ${roomId} (state: ${room.state})`);
+  });
+
+  socket.on('casinoNextHand', ({ roomId }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room) return;
+
+    // Reset room state for new hand
+    room.state = 'betting';
+    room.dealer.hand = [];
+    room.dealer.value = 0;
+    room.currentTurn = null;
+    
+    // Reset all players for new hand
+    room.players.forEach(player => {
+      player.hand = [];
+      player.handValue = 0;
+      player.currentBet = 0;
+      player.isStanding = false;
+      player.isBusted = false;
+    });
+
+    io.to(`casino_${roomId}`).emit('casinoNewHandStarted');
+    console.log(`New hand started in casino ${roomId}`);
   });
 
   socket.on('casinoStartGame', ({ roomId }) => {

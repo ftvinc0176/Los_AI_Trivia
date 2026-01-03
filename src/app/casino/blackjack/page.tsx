@@ -72,6 +72,19 @@ function BlackjackGame() {
         setPlayers(players);
       });
 
+      newSocket.on('casinoGameState', ({ state, players, dealer }: { state: string; players: Player[]; dealer: any }) => {
+        // Handle joining mid-game
+        setPlayers(players);
+        if (state === 'betting') {
+          setGameState('betting');
+        } else if (state === 'playing' || state === 'results') {
+          // Player joined mid-round, show them the table but they wait
+          setGameState('playing');
+          setDealerHand(dealer.hand || []);
+          setDealerHandValue(dealer.value || 0);
+        }
+      });
+
       newSocket.on('casinoPlayersUpdate', ({ players }: { players: Player[] }) => {
         setPlayers(players);
       });
@@ -141,6 +154,19 @@ function BlackjackGame() {
         // Stay in 'playing' state to show results on table
       });
 
+      newSocket.on('casinoNewHandStarted', () => {
+        setRoundResults({});
+        setShowDealerHole(false);
+        setCanHit(true);
+        setDealerHand([]);
+        setDealerHandValue(0);
+        setMyHand([]);
+        setMyHandValue(0);
+        setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
+        setBetInput('');
+        setGameState('betting');
+      });
+
       return () => {
         newSocket.close();
       };
@@ -198,10 +224,16 @@ function BlackjackGame() {
   };
 
   const nextHand = () => {
-    setRoundResults({});
-    setShowDealerHole(false);
-    setCanHit(true);
-    setGameState('betting');
+    if (socket) {
+      // Multiplayer - emit to server so all players get reset
+      socket.emit('casinoNextHand', { roomId });
+    } else {
+      // Single player - reset locally
+      setRoundResults({});
+      setShowDealerHole(false);
+      setCanHit(true);
+      setGameState('betting');
+    }
   };
 
   const placeBet = () => {
@@ -1042,8 +1074,17 @@ function BlackjackGame() {
                     const isMe = player.id === myPlayerId;
                     const isTurn = player.id === currentTurn;
                     const result = roundResults[player.id];
+                    const isWaiting = !player.currentBet || player.currentBet === 0;
+                    
                     return (
                       <div key={player.id} className="flex flex-col items-center min-w-[100px] max-w-[180px]">
+                        {/* Waiting Message for Late Joiners */}
+                        {isWaiting && !result && (
+                          <div className="mb-2 px-2 py-1 rounded-lg font-bold text-center text-xs sm:text-sm bg-blue-600 text-white max-w-full">
+                            <div className="break-words">Waiting for next hand...</div>
+                          </div>
+                        )}
+                        
                         {/* Result Message Above Hand */}
                         {result && (
                           <div className={`mb-2 px-2 py-1 rounded-lg font-bold text-center text-xs sm:text-sm max-w-full ${
@@ -1058,7 +1099,7 @@ function BlackjackGame() {
                         )}
                         
                         <div className="flex gap-1 sm:gap-2 mb-2 sm:mb-4 flex-wrap justify-center max-w-full">
-                          {player.hand.map((card, idx) => (
+                          {!isWaiting && player.hand.map((card, idx) => (
                             <div
                               key={idx}
                               className="relative w-12 h-16 sm:w-20 sm:h-28 bg-white rounded-lg shadow-xl border border-gray-400 flex-shrink-0"
