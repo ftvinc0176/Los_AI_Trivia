@@ -84,6 +84,8 @@ function startQuestionTimer(roomId) {
   room.timeLeft = 10;
   room.showAnswer = false;
   room.answers = {};
+  room.answerTimes = {};
+  const questionStartTime = Date.now();
 
   io.to(roomId).emit('questionUpdate', {
     currentQuestion: room.currentQuestion,
@@ -101,7 +103,10 @@ function startQuestionTimer(roomId) {
       const correctAnswer = room.questions[room.currentQuestion]?.correctAnswer;
       room.players.forEach((player) => {
         if (room.answers[player.id] === correctAnswer) {
-          player.score++;
+          const answerTime = room.answerTimes[player.id];
+          const timeElapsed = answerTime ? (answerTime - questionStartTime) / 1000 : 10;
+          // Award 2 points if answered within 3 seconds, 1 point otherwise
+          player.score += timeElapsed <= 3 ? 2 : 1;
         }
       });
 
@@ -159,6 +164,7 @@ io.on('connection', (socket) => {
         currentQuestion: 0,
         questions: [],
         answers: {},
+        answerTimes: {},
         timeLeft: 10,
         showAnswer: false,
         timer: null,
@@ -223,14 +229,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('startGame', async ({ roomId }) => {
+  socket.on('startGame', async ({ roomId, category }) => {
     const room = rooms.get(roomId);
     if (room && room.host === socket.id && !room.started) {
       room.started = true;
       room.currentQuestion = 0;
       room.players.forEach((p) => (p.score = 0));
       
-      const questions = await generateQuestions(room.category, room.difficulty, 10);
+      const finalCategory = category || room.category;
+      const questions = await generateQuestions(finalCategory, room.difficulty, 10);
       room.questions = questions;
 
       io.to(roomId).emit('gameState', {
@@ -255,6 +262,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (room && !room.showAnswer) {
       room.answers[socket.id] = answer;
+      room.answerTimes[socket.id] = Date.now();
       io.to(roomId).emit('gameState', {
         players: room.players,
         host: room.host,
@@ -278,6 +286,7 @@ io.on('connection', (socket) => {
       room.currentQuestion = 0;
       room.questions = [];
       room.answers = {};
+      room.answerTimes = {};
       room.timeLeft = 10;
       room.showAnswer = false;
       room.players.forEach((p) => (p.score = 0));

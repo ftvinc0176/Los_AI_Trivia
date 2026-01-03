@@ -38,6 +38,7 @@ const CATEGORIES = [
   'Entertainment',
   'Technology',
   'Art & Literature',
+  'Custom',
 ];
 
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
@@ -55,6 +56,7 @@ export default function Multiplayer() {
   const [isPublic, setIsPublic] = useState(true);
   const [showLobbyBrowser, setShowLobbyBrowser] = useState(false);
   const [publicLobbies, setPublicLobbies] = useState<Array<{roomId: string; hostName: string; playerCount: number}>>([]);
+  const [customCategory, setCustomCategory] = useState<string>('');
 
   useEffect(() => {
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
@@ -135,13 +137,17 @@ export default function Multiplayer() {
 
   const updateSettings = (category: string, difficulty: string) => {
     if (socket && roomId) {
-      socket.emit('updateSettings', { roomId, category, difficulty });
+      const finalCategory = category === 'Custom' ? customCategory : category;
+      socket.emit('updateSettings', { roomId, category: finalCategory, difficulty });
     }
   };
 
   const startGame = () => {
-    if (socket && roomId) {
-      socket.emit('startGame', { roomId });
+    if (socket && roomId && gameState) {
+      const finalCategory = gameState.category === 'Custom' ? customCategory : gameState.category;
+      if (gameState.category !== 'Custom' || customCategory.trim()) {
+        socket.emit('startGame', { roomId, category: finalCategory });
+      }
     }
   };
 
@@ -382,6 +388,20 @@ export default function Multiplayer() {
                     ))}
                   </select>
                 </div>
+
+                {gameState.category === 'Custom' && (
+                  <div>
+                    <label className="block text-white text-lg mb-3 font-medium">Custom Category</label>
+                    <input
+                      type="text"
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      placeholder="Enter custom category (e.g., Movies, Animals)"
+                      className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg placeholder-white/50"
+                      maxLength={50}
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-white text-lg mb-3 font-medium">Difficulty</label>
