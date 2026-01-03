@@ -58,14 +58,21 @@ export default function Multiplayer() {
 
   useEffect(() => {
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
+    console.log('Initializing socket connection to:', serverUrl);
     const newSocket = io(serverUrl);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
+      console.log('Socket connected! ID:', newSocket.id);
       setPlayerId(newSocket.id || '');
     });
 
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
     newSocket.on('gameState', (state: GameState) => {
+      console.log('Received gameState:', state);
       setGameState(state);
     });
 
