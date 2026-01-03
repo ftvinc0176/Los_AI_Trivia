@@ -42,6 +42,8 @@ export default function SinglePlayer() {
   const [aiHint, setAiHint] = useState<string>('');
   const [gameOver, setGameOver] = useState(false);
   const [wonGame, setWonGame] = useState(false);
+  const [timerPaused, setTimerPaused] = useState(false);
+  const [loadingHint, setLoadingHint] = useState(false);
 
   const handleAnswerReveal = useCallback(() => {
     setShowAnswer(true);
@@ -60,13 +62,13 @@ export default function SinglePlayer() {
 
   // Timer countdown
   useEffect(() => {
-    if (gameState === 'playing' && !showAnswer && timeLeft > 0) {
+    if (gameState === 'playing' && !showAnswer && !timerPaused && timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     } else if (timeLeft === 0 && !showAnswer) {
       handleAnswerReveal();
     }
-  }, [timeLeft, showAnswer, gameState, handleAnswerReveal]);
+  }, [timeLeft, showAnswer, gameState, timerPaused, handleAnswerReveal]);
 
   const startGame = async () => {
     setLoading(true);
@@ -120,17 +122,21 @@ export default function SinglePlayer() {
 
   const useFiftyFifty = () => {
     if (fiftyFiftyLeft > 0 && !showAnswer) {
+      setTimerPaused(true);
       const correctAnswer = questions[currentQuestion].correctAnswer;
       const wrongOptions = [0, 1, 2, 3].filter(i => i !== correctAnswer);
       const toEliminate = wrongOptions.sort(() => Math.random() - 0.5).slice(0, 2);
       setEliminatedOptions(toEliminate);
       setFiftyFiftyLeft(fiftyFiftyLeft - 1);
+      // Resume timer after 2 seconds
+      setTimeout(() => setTimerPaused(false), 2000);
     }
   };
 
   const useAiHint = async () => {
     if (aiHintLeft > 0 && !showAnswer && !aiHint) {
-      setLoading(true);
+      setTimerPaused(true);
+      setLoadingHint(true);
       try {
         const currentQ = questions[currentQuestion];
         const response = await fetch('/api/generate-hint', {
@@ -157,7 +163,9 @@ export default function SinglePlayer() {
         setAiHint('Consider what you know about this topic and use logic to narrow down your choices.');
         setAiHintLeft(0);
       }
-      setLoading(false);
+      setLoadingHint(false);
+      // Resume timer after hint loads
+      setTimeout(() => setTimerPaused(false), 3000);
     }
   };
 
@@ -171,6 +179,7 @@ export default function SinglePlayer() {
       setTimeLeft(30);
       setEliminatedOptions([]);
       setAiHint('');
+      setTimerPaused(false);
       setGameState('playing');
     } else {
       // Won all 10 questions!
@@ -279,14 +288,14 @@ export default function SinglePlayer() {
                   </button>
                   <button
                     onClick={useAiHint}
-                    disabled={aiHintLeft === 0 || showAnswer || aiHint !== ''}
+                    disabled={aiHintLeft === 0 || showAnswer || aiHint !== '' || loadingHint}
                     className={`px-6 py-3 rounded-xl font-bold transition-all ${
-                      aiHintLeft > 0 && !showAnswer && aiHint === ''
+                      aiHintLeft > 0 && !showAnswer && aiHint === '' && !loadingHint
                         ? 'bg-purple-500 hover:bg-purple-600 text-white'
                         : 'bg-gray-500/30 text-gray-400'
                     }`}
                   >
-                    🤖 AI Hint ({aiHintLeft})
+                    {loadingHint ? 'Loading Hint...' : `🤖 AI Hint (${aiHintLeft})`}
                   </button>
                 </div>
                 <div className={`text-4xl font-bold ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
