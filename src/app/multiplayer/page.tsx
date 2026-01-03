@@ -111,8 +111,11 @@ export default function Multiplayer() {
     if (socket && playerName.trim()) {
       const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
       setRoomId(newRoomId);
+      console.log('Creating room:', { roomId: newRoomId, playerName, isPublic, socketConnected: socket.connected });
       socket.emit('joinRoom', { roomId: newRoomId, playerName, isPublic });
       setJoined(true);
+    } else {
+      console.log('Cannot create room:', { hasSocket: !!socket, playerName, socketConnected: socket?.connected });
     }
   };
 
