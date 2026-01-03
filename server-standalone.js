@@ -714,8 +714,21 @@ io.on('connection', (socket) => {
     if (allBet) {
       // Deal initial cards and set first player's turn (rightmost = last in array)
       dealBlackjackCards(roomId);
-      room.currentTurn = room.players[room.players.length - 1].id;
-      io.to(`casino_${roomId}`).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
+      
+      // Find first player (from right to left) who doesn't have blackjack
+      const activePlayers = room.players.filter(p => p.currentBet > 0);
+      let firstPlayerIndex = activePlayers.length - 1;
+      while (firstPlayerIndex >= 0 && activePlayers[firstPlayerIndex].isStanding) {
+        firstPlayerIndex--;
+      }
+      
+      if (firstPlayerIndex >= 0) {
+        room.currentTurn = activePlayers[firstPlayerIndex].id;
+        io.to(`casino_${roomId}`).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
+      } else {
+        // All players have blackjack, go straight to dealer
+        checkBlackjackRoundEnd(roomId);
+      }
     }
   });
 
@@ -871,6 +884,11 @@ function dealBlackjackCards(roomId) {
     const card2 = room.deck.pop();
     player.hand = [card1, card2];
     player.handValue = calculateBlackjackValue(player.hand);
+    
+    // Auto-stand on blackjack (21 on initial deal)
+    if (player.handValue === 21) {
+      player.isStanding = true;
+    }
   });
 
   // Deal 2 cards to dealer (only show 1)
@@ -965,8 +983,13 @@ function moveToNextPlayer(roomId) {
 
   // Only consider players who have bet (exclude late joiners)
   const activePlayers = room.players.filter(p => p.currentBet > 0);
-  const currentIndex = activePlayers.findIndex(p => p.id === room.currentTurn);
-  const nextIndex = currentIndex - 1; // Move left (right to left order)
+  let currentIndex = activePlayers.findIndex(p => p.id === room.currentTurn);
+  let nextIndex = currentIndex - 1; // Move left (right to left order)
+  
+  // Skip players who are already standing (blackjack or manually stood)
+  while (nextIndex >= 0 && activePlayers[nextIndex].isStanding) {
+    nextIndex--;
+  }
   
   if (nextIndex >= 0) {
     room.currentTurn = activePlayers[nextIndex].id;
