@@ -340,11 +340,14 @@ io.on('connection', (socket) => {
     }
 
     const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#a29bfe'];
+    // Spawn players in a small area near center so they can see each other
+    const spawnX = 600 + (Math.random() - 0.5) * 200; // Center ±100
+    const spawnY = 350 + (Math.random() - 0.5) * 200; // Center ±100
     const newPlayer = {
       id: socket.id,
       name: playerName,
-      x: Math.random() * 1160 + 20,
-      y: Math.random() * 660 + 20,
+      x: spawnX,
+      y: spawnY,
       angle: 0,
       health: 100,
       kills: 0,
@@ -406,8 +409,8 @@ io.on('connection', (socket) => {
               // Respawn after 3 seconds
               setTimeout(() => {
                 player.health = 100;
-                player.x = Math.random() * 1160 + 20;
-                player.y = Math.random() * 660 + 20;
+                player.x = 600 + (Math.random() - 0.5) * 200;
+                player.y = 350 + (Math.random() - 0.5) * 200;
               }, 3000);
             }
             return false;
@@ -460,6 +463,15 @@ io.on('connection', (socket) => {
     player.x = Math.max(20, Math.min(1180, player.x + dx));
     player.y = Math.max(20, Math.min(680, player.y + dy));
     player.angle = movement.angle;
+
+    // Broadcast updated positions immediately
+    io.to(roomId).emit('fpsGameState', {
+      players: room.players,
+      host: room.host,
+      started: room.started,
+      timeLeft: room.gameTime - Math.floor((Date.now() - (room.startTime || Date.now())) / 1000),
+      gameTime: room.gameTime,
+    });
   });
 
   socket.on('fpsShoot', ({ roomId, angle }) => {
