@@ -246,9 +246,9 @@ function BlackjackGame() {
     hand.forEach(card => {
       if (card.value === 'A') {
         aces++;
-        value  && currentTurn === socket.id) {
-      socket.emit('casinoHit', { roomId });
-    } else if (!socket)lue += card.numValue;
+        value += 11;
+      } else {
+        value += card.numValue;
       }
     });
     
@@ -261,9 +261,9 @@ function BlackjackGame() {
   };
 
   const hit = () => {
-    if (socket) {
+    if (socket && currentTurn === socket.id) {
       socket.emit('casinoHit', { roomId });
-    } else {
+    } else if (!socket) {
       const deck = (window as any).gameDeck as Card[];
       const newCard = deck.pop()!;
       const newHand = [...myHand, newCard];
