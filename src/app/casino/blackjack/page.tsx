@@ -182,10 +182,6 @@ function BlackjackGame() {
       setSideBets({ ...sideBets, twentyOnePlus3: sideBets.twentyOnePlus3 + selectedChip });
     }
   };
-        dealInitialCards(bet);
-      }
-    }
-  };
 
   const dealInitialCards = (bet: number) => {
     setIsDealing(true);
