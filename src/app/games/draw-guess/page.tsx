@@ -212,14 +212,29 @@ export default function DrawAndGuess() {
     setMode(selectedMode);
     
     if (selectedMode === 'single') {
-      // Generate prompt from Gemini
-      const response = await fetch('/api/generate-drawing-prompt');
-      const data = await response.json();
-      setMyPrompt(data.prompt);
-      setMyPlayerId('player1');
-      setPlayerName('You');
-      setGameState('drawing');
-      setTimeRemaining(60);
+      // Show loading state first
+      setGameState('enhancing'); // Use enhancing state as loading
+      
+      try {
+        // Generate prompt from Gemini
+        const response = await fetch('/api/generate-drawing-prompt');
+        const data = await response.json();
+        
+        if (data.prompt) {
+          setMyPrompt(data.prompt);
+          setMyPlayerId('player1');
+          setPlayerName('You');
+          setTimeRemaining(60);
+          setGameState('drawing'); // Only set to drawing after prompt is loaded
+        } else {
+          alert('Failed to generate prompt. Please try again.');
+          setGameState('menu');
+        }
+      } catch (error) {
+        console.error('Error fetching prompt:', error);
+        alert('Failed to generate prompt. Please try again.');
+        setGameState('menu');
+      }
     } else {
       // Multiplayer mode
       setGameState('lobby');
