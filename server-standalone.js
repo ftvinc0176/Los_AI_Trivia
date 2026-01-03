@@ -321,8 +321,158 @@ io.on('connection', (socket) => {
     socket.emit('publicLobbies', publicLobbies);
   });
 
+  // FPS Game Handlers
+  socket.on('fpsJoinRoom', ({ roomId, playerName }) => {
+    socket.join(roomId);
+    socket.data.fpsRoomId = roomId;
+
+    let room = rooms.get(`fps_${roomId}`);
+    if (!room) {
+      room = {
+        players: [],
+        host: socket.id,
+        started: false,
+        gameTime: 300, // 5 minutes
+      };
+      rooms.set(`fps_${roomId}`, room);
+    }
+
+    const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#a29bfe'];
+    const newPlayer = {
+      id: socket.id,
+      name: playerName,
+      x: Math.random() * 1160 + 20,
+      y: Math.random() * 660 + 20,
+      angle: 0,
+      health: 100,
+      kills: 0,
+      deaths: 0,
+      color: colors[room.players.length % colors.length],
+    };
+
+    room.players.push(newPlayer);
+
+    socket.emit('fpsJoined', { roomId });
+    io.to(roomId).emit('fpsGameState', { players: room.players, bullets: [] });
+    console.log(`${playerName} joined FPS room ${roomId}`);
+  });
+
+  socket.on('fpsStartGame', ({ roomId }) => {
+    const room = rooms.get(`fps_${roomId}`);
+    if (!room || room.started) return;
+
+    room.started = true;
+    room.startTime = Date.now();
+    room.bullets = [];
+
+    io.to(roomId).emit('fpsStart');
+
+    // Game loop
+    room.gameLoop = setInterval(() => {
+      if (!room.bullets) room.bullets = [];
+
+      // Update bullets
+      room.bullets = room.bullets.filter(bullet => {
+        bullet.x += bullet.dx;
+        bullet.y += bullet.dy;
+
+        // Check bounds
+        if (bullet.x < 0 || bullet.x > 1200 || bullet.y < 0 || bullet.y > 700) {
+          return false;
+        }
+
+        // Check player hits
+        for (const player of room.players) {
+          if (player.id === bullet.playerId) continue;
+          if (player.health <= 0) continue;
+
+          const dist = Math.sqrt((bullet.x - player.x) ** 2 + (bullet.y - player.y) ** 2);
+          if (dist < 20) {
+            player.health -= 25;
+            if (player.health <= 0) {
+              player.health = 0;
+              player.deaths++;
+              const shooter = room.players.find(p => p.id === bullet.playerId);
+              if (shooter) shooter.kills++;
+
+              // Respawn after 3 seconds
+              setTimeout(() => {
+                player.health = 100;
+                player.x = Math.random() * 1160 + 20;
+                player.y = Math.random() * 660 + 20;
+              }, 3000);
+            }
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      // Send game state
+      io.to(roomId).emit('fpsGameState', { players: room.players, bullets: room.bullets });
+
+      // Check time limit
+      const elapsed = Math.floor((Date.now() - room.startTime) / 1000);
+      if (elapsed >= room.gameTime) {
+        clearInterval(room.gameLoop);
+        io.to(roomId).emit('fpsGameOver');
+      }
+    }, 16); // ~60 FPS
+  });
+
+  socket.on('fpsMove', ({ roomId, movement }) => {
+    const room = rooms.get(`fps_${roomId}`);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || player.health <= 0) return;
+
+    const speed = 5;
+    let dx = 0;
+    let dy = 0;
+
+    if (movement.forward) dy -= speed;
+    if (movement.backward) dy += speed;
+    if (movement.left) dx -= speed;
+    if (movement.right) dx += speed;
+
+    // Normalize diagonal movement
+    if (dx !== 0 && dy !== 0) {
+      dx *= 0.707;
+      dy *= 0.707;
+    }
+
+    player.x = Math.max(20, Math.min(1180, player.x + dx));
+    player.y = Math.max(20, Math.min(680, player.y + dy));
+    player.angle = movement.angle;
+  });
+
+  socket.on('fpsShoot', ({ roomId, angle }) => {
+    const room = rooms.get(`fps_${roomId}`);
+    if (!room || !room.bullets) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || player.health <= 0) return;
+
+    const speed = 10;
+    const bullet = {
+      id: Math.random().toString(),
+      x: player.x + Math.cos(angle) * 30,
+      y: player.y + Math.sin(angle) * 30,
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      playerId: socket.id,
+    };
+
+    room.bullets.push(bullet);
+  });
+
   socket.on('disconnect', () => {
     const roomId = socket.data.roomId;
+    const fpsRoomId = socket.data.fpsRoomId;
+
+    // Handle trivia room disconnect
     if (roomId) {
       const room = rooms.get(roomId);
       if (room) {
@@ -351,6 +501,22 @@ io.on('connection', (socket) => {
         }
       }
     }
+
+    // Handle FPS room disconnect
+    if (fpsRoomId) {
+      const room = rooms.get(`fps_${fpsRoomId}`);
+      if (room) {
+        room.players = room.players.filter(p => p.id !== socket.id);
+        if (room.players.length === 0) {
+          if (room.gameLoop) clearInterval(room.gameLoop);
+          rooms.delete(`fps_${fpsRoomId}`);
+          console.log(`FPS room ${fpsRoomId} deleted (empty)`);
+        } else {
+          io.to(fpsRoomId).emit('fpsGameState', { players: room.players, bullets: room.bullets || [] });
+        }
+      }
+    }
+
     console.log('Client disconnected:', socket.id);
   });
 });
