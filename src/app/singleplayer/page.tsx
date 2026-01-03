@@ -71,14 +71,25 @@ export default function SinglePlayer() {
   const startGame = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, difficulty, count: 10 }),
-      });
+      // Generate 10 questions with progressive difficulty and varied categories
+      const difficulties = ['Medium', 'Medium', 'Medium', 'Hard', 'Hard', 'Hard', 'Hard', 'Hard', 'Hard', 'Hard'];
+      const allQuestions: Question[] = [];
       
-      const data = await response.json();
-      setQuestions(data.questions);
+      for (let i = 0; i < 10; i++) {
+        const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+        const response = await fetch('/api/generate-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: randomCategory, difficulty: difficulties[i], count: 1 }),
+        });
+        
+        const data = await response.json();
+        if (data.questions && data.questions.length > 0) {
+          allQuestions.push(data.questions[0]);
+        }
+      }
+      
+      setQuestions(allQuestions);
       setGameState('playing');
       setCurrentQuestion(0);
       setCasesWon(0);
@@ -171,40 +182,16 @@ export default function SinglePlayer() {
           </h1>
           <p className="text-white/80 text-center mb-8 text-lg">Win up to 10 Fever Cases! But one wrong answer and you lose everything...</p>
           
-          <div className="space-y-6 mb-8">
-            <div>
-              <label className="block text-white text-lg mb-3 font-medium">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg"
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat} className="bg-purple-900">
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-white text-lg mb-3 font-medium">Difficulty</label>
-              <div className="grid grid-cols-3 gap-4">
-                {DIFFICULTIES.map((diff) => (
-                  <button
-                    key={diff}
-                    onClick={() => setDifficulty(diff)}
-                    className={`p-4 rounded-xl font-medium text-lg transition-all ${
-                      difficulty === diff
-                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white'
-                        : 'bg-white/20 text-white hover:bg-white/30'
-                    }`}
-                  >
-                    {diff}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="bg-blue-500/20 border border-blue-400 rounded-xl p-6 mb-8">
+            <h3 className="text-white font-bold text-xl mb-3">Game Rules:</h3>
+            <ul className="text-white/90 space-y-2">
+              <li>📊 Questions start at Medium and get progressively harder</li>
+              <li>🎲 Each question is from a random category</li>
+              <li>⏱️ 30 seconds per question</li>
+              <li>💡 Use 2 Fifty-Fifties and 1 AI Hint wisely!</li>
+              <li>⚠️ One wrong answer = lose everything</li>
+              <li>💰 Cash out anytime or risk it for more cases!</li>
+            </ul>
           </div>
 
           <div className="flex gap-4">
@@ -219,7 +206,7 @@ export default function SinglePlayer() {
               disabled={loading}
               className="flex-1 px-8 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl hover:from-yellow-500 hover:to-orange-600 transition-all text-lg font-bold disabled:opacity-50"
             >
-              {loading ? 'Generating...' : 'Play for Cases!'}
+              {loading ? 'Generating Questions...' : 'Play for Cases!'}
             </button>
           </div>
         </div>
@@ -356,32 +343,6 @@ export default function SinglePlayer() {
                 </button>
               )}
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }          {/* Options */}
-          <div className="grid grid-cols-2 gap-6">
-            {question.options.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleAnswerSelect(index)}
-                disabled={showAnswer}
-                className={`p-8 rounded-2xl text-xl font-medium transition-all ${
-                  showAnswer
-                    ? index === question.correctAnswer
-                      ? 'bg-green-500 text-white'
-                      : selectedAnswer === index
-                      ? 'bg-red-500 text-white'
-                      : 'bg-white/20 text-white/50'
-                    : selectedAnswer === index
-                    ? 'bg-white text-purple-700'
-                    : 'bg-white/20 text-white hover:bg-white/30'
-                }`}
-              >
-                {option}
-              </button>
-            ))}
           </div>
         </div>
       </div>
