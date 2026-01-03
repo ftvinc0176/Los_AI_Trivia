@@ -843,7 +843,14 @@ function dealBlackjackCards(roomId) {
   io.to(roomId).emit('casinoDealCards', {
     players: room.players,
     dealer: {
-      hanmoveToNextPlayer(roomId) {
+      hand: [dealerCard1], // Only show first card
+      value: dealerCard1.numValue
+    },
+    currentTurn: room.currentTurn
+  });
+}
+
+function moveToNextPlayer(roomId) {
   const room = rooms.get(`casino_${roomId}`);
   if (!room) return;
 
@@ -853,13 +860,10 @@ function dealBlackjackCards(roomId) {
   if (nextIndex >= 0) {
     room.currentTurn = room.players[nextIndex].id;
     io.to(roomId).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
+  } else {
+    // All players done, play dealer
+    checkBlackjackRoundEnd(roomId);
   }
-}
-
-function d: [dealerCard1], // Only show first card
-      value: dealerCard1.numValue
-    }
-  });
 }
 
 function checkBlackjackRoundEnd(roomId) {
