@@ -345,7 +345,14 @@ function BlackjackGame() {
     setMyHand([]);
     setDealerHand([]);
     setMyHandValue(0);
-    sBrowse Lobbies
+    setDealerHandValue(0);
+    setBetAmount(0);
+    setResultMessage('');
+    setCanHit(true);
+    setGameState('betting');
+  };
+
+  // Browse Lobbies
   if (mode === 'browse' && !roomId) {
     if (!playerName) {
       return (
