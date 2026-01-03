@@ -60,8 +60,9 @@ function BlackjackGame() {
       const newSocket = io(socketUrl);
       setSocket(newSocket);
 
-      newSocket.on('casinoLobbyCreated', ({ roomId }: { roomId: string }) => {
+      newSocket.on('casinoLobbyCreated', ({ roomId, players }: { roomId: string; players: Player[] }) => {
         setRoomId(roomId);
+        setPlayers(players);
         setGameState('lobby');
       });
 

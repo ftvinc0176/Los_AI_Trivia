@@ -594,13 +594,13 @@ io.on('connection', (socket) => {
       dealer: { hand: [], value: 0 },
       deck: [],
       state: 'lobby', // lobby, betting, playing, results
-      isPublic: isPublic || false,
+      isPublic: true, // Always public
       currentTurn: null
     });
 
     socket.join(`casino_${roomId}`);
-    socket.emit('casinoLobbyCreated', { roomId });
-    console.log(`Casino lobby ${roomId} created by ${playerName} (${isPublic ? 'public' : 'private'})`);
+    socket.emit('casinoLobbyCreated', { roomId, players: [player] });
+    console.log(`Casino lobby ${roomId} created by ${playerName} (public)`);
   });
 
   socket.on('getCasinoPublicLobbies', () => {
