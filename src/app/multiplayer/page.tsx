@@ -57,6 +57,7 @@ export default function Multiplayer() {
   const [showLobbyBrowser, setShowLobbyBrowser] = useState(false);
   const [publicLobbies, setPublicLobbies] = useState<Array<{roomId: string; hostName: string; playerCount: number}>>([]);
   const [customCategory, setCustomCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('General Knowledge');
 
   useEffect(() => {
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
@@ -144,8 +145,8 @@ export default function Multiplayer() {
 
   const startGame = () => {
     if (socket && roomId && gameState) {
-      const finalCategory = gameState.category === 'Custom' ? customCategory : gameState.category;
-      if (gameState.category !== 'Custom' || customCategory.trim()) {
+      const finalCategory = selectedCategory === 'Custom' ? customCategory : selectedCategory;
+      if (selectedCategory !== 'Custom' || customCategory.trim()) {
         socket.emit('startGame', { roomId, category: finalCategory });
       }
     }
@@ -377,8 +378,13 @@ export default function Multiplayer() {
                 <div>
                   <label className="block text-white text-lg mb-3 font-medium">Category</label>
                   <select
-                    value={gameState.category}
-                    onChange={(e) => updateSettings(e.target.value, gameState.difficulty)}
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      if (e.target.value !== 'Custom') {
+                        updateSettings(e.target.value, gameState.difficulty);
+                      }
+                    }}
                     className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg"
                   >
                     {CATEGORIES.map((cat) => (
@@ -389,7 +395,7 @@ export default function Multiplayer() {
                   </select>
                 </div>
 
-                {gameState.category === 'Custom' && (
+                {selectedCategory === 'Custom' && (
                   <div>
                     <label className="block text-white text-lg mb-3 font-medium">Custom Category</label>
                     <input
@@ -409,7 +415,10 @@ export default function Multiplayer() {
                     {DIFFICULTIES.map((diff) => (
                       <button
                         key={diff}
-                        onClick={() => updateSettings(gameState.category, diff)}
+                        onClick={() => {
+                          const category = selectedCategory === 'Custom' ? customCategory : selectedCategory;
+                          updateSettings(category, diff);
+                        }}
                         className={`p-4 rounded-xl font-medium text-lg transition-all ${
                           gameState.difficulty === diff
                             ? 'bg-white text-purple-700'
