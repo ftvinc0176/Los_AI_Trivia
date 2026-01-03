@@ -93,7 +93,7 @@ function BlackjackGame() {
         setDealerHand(dealer.hand);
         setDealerHandValue(dealer.value);
         const me = players.find((p: Player) => p.id === newSocket.id);
-        if (me) {
+        if (me && newSocket.id) {
           setBalance(me.balance);
           setResultMessage(results[newSocket.id] || '');
         }
