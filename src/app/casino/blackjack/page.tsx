@@ -314,9 +314,7 @@ function BlackjackGame() {
       winAmount = currentBet * 2;
     } else if (playerValue > dealerValue) {
       message = 'You win!';
-      wSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
-    setBetInput('100');
-    setinAmount = currentBet * 2;
+      winAmount = currentBet * 2;
     } else if (playerValue < dealerValue) {
       message = 'Dealer wins.';
     } else {
