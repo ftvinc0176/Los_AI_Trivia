@@ -35,6 +35,9 @@ export default function FPS() {
   const [myId, setMyId] = useState<string>('');
   const [keys, setKeys] = useState<{[key: string]: boolean}>({});
   const [mouseAngle, setMouseAngle] = useState(0);
+  const [isPublic, setIsPublic] = useState(true);
+  const [showLobbyBrowser, setShowLobbyBrowser] = useState(false);
+  const [publicLobbies, setPublicLobbies] = useState<Array<{roomId: string; hostName: string; playerCount: number}>>([]);
 
   // Socket.io connection
   useEffect(() => {
@@ -48,6 +51,10 @@ export default function FPS() {
 
     newSocket.on('fpsGameState', (state: GameState) => {
       setGameState(state);
+    });
+
+    newSocket.on('publicFpsLobbies', (lobbies: Array<{roomId: string; hostName: string; playerCount: number}>) => {
+      setPublicLobbies(lobbies);
     });
 
     newSocket.on('playerHit', ({ targetId }: { targetId: string }) => {
@@ -250,11 +257,25 @@ export default function FPS() {
     if (socket && playerName.trim()) {
       const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
       setRoomId(newRoomId);
-      socket.emit('fpsJoinRoom', { roomId: newRoomId, playerName });
+      socket.emit('fpsJoinRoom', { roomId: newRoomId, playerName, isPublic });
       setJoined(true);
     }
   };
+  const requestPublicLobbies = () => {
+    if (socket) {
+      socket.emit('getPublicFpsLobbies');
+      setShowLobbyBrowser(true);
+    }
+  };
 
+  const joinPublicLobby = (lobbyRoomId: string) => {
+    if (socket && playerName.trim()) {
+      setRoomId(lobbyRoomId);
+      socket.emit('fpsJoinRoom', { roomId: lobbyRoomId, playerName });
+      setJoined(true);
+      setShowLobbyBrowser(false);
+    }
+  };
   const startGame = () => {
     if (socket && roomId) {
       socket.emit('fpsStartGame', { roomId });

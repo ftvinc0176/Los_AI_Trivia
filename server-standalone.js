@@ -322,7 +322,7 @@ io.on('connection', (socket) => {
   });
 
   // FPS Game Handlers
-  socket.on('fpsJoinRoom', ({ roomId, playerName }) => {
+  socket.on('fpsJoinRoom', ({ roomId, playerName, isPublic }) => {
     socket.join(roomId);
     socket.data.fpsRoomId = roomId;
 
@@ -331,8 +331,10 @@ io.on('connection', (socket) => {
       room = {
         players: [],
         host: socket.id,
+        hostName: playerName,
         started: false,
         gameTime: 300, // 5 minutes
+        isPublic: isPublic !== undefined ? isPublic : false,
       };
       rooms.set(`fps_${roomId}`, room);
     }
@@ -478,6 +480,32 @@ io.on('connection', (socket) => {
     };
 
     room.bullets.push(bullet);
+  });
+  socket.on('getPublicFpsLobbies', () => {
+    const publicLobbies = [];
+    rooms.forEach((room, id) => {
+      if (id.startsWith('fps_') && room.isPublic && !room.started && room.players.length < 4) {
+        publicLobbies.push({
+          roomId: id.replace('fps_', ''),
+          hostName: room.hostName,
+          playerCount: room.players.length,
+        });
+      }
+    });
+    socket.emit('publicFpsLobbies', publicLobbies);
+  });
+  socket.on('getPublicFpsLobbies', () => {
+    const publicLobbies = [];
+    rooms.forEach((room, id) => {
+      if (id.startsWith('fps_') && room.isPublic && !room.started && room.players.length < 4) {
+        publicLobbies.push({
+          roomId: id.replace('fps_', ''),
+          hostName: room.hostName,
+          playerCount: room.players.length,
+        });
+      }
+    });
+    socket.emit('publicFpsLobbies', publicLobbies);
   });
 
   socket.on('disconnect', () => {
