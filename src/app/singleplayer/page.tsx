@@ -71,25 +71,21 @@ export default function SinglePlayer() {
   const startGame = async () => {
     setLoading(true);
     try {
-      // Generate 10 questions with progressive difficulty and varied categories
-      const difficulties = ['Medium', 'Medium', 'Medium', 'Hard', 'Hard', 'Hard', 'Hard', 'Hard', 'Hard', 'Hard'];
-      const allQuestions: Question[] = [];
+      // Generate all 10 questions in one API call with progressive difficulty
+      const response = await fetch('/api/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          category: 'Mixed - use all categories',
+          difficulty: 'Progressive',
+          count: 10,
+          progressive: true,
+          categories: CATEGORIES
+        }),
+      });
       
-      for (let i = 0; i < 10; i++) {
-        const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-        const response = await fetch('/api/generate-questions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category: randomCategory, difficulty: difficulties[i], count: 1 }),
-        });
-        
-        const data = await response.json();
-        if (data.questions && data.questions.length > 0) {
-          allQuestions.push(data.questions[0]);
-        }
-      }
-      
-      setQuestions(allQuestions);
+      const data = await response.json();
+      setQuestions(data.questions);
       setGameState('playing');
       setCurrentQuestion(0);
       setCasesWon(0);
