@@ -22,7 +22,7 @@ const CATEGORIES = [
 
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 
-const CASE_LADDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const CASE_LADDER = [1, 2, 3, 4, 5];
 
 export default function SinglePlayer() {
   const router = useRouter();
@@ -55,8 +55,22 @@ export default function SinglePlayer() {
       setCasesWon(0);
       setTimeout(() => setGameState('results'), 2000);
     } else {
-      // Correct answer - show decision screen
-      setTimeout(() => setGameState('decision'), 2000);
+      // Correct answer - show decision screen only every 2 questions
+      const questionNum = currentQuestion + 1;
+      if (questionNum % 2 === 0) {
+        setTimeout(() => setGameState('decision'), 2000);
+      } else {
+        // Auto-continue on odd questions
+        setTimeout(() => {
+          setCurrentQuestion(currentQuestion + 1);
+          setSelectedAnswer(null);
+          setShowAnswer(false);
+          setTimeLeft(30);
+          setEliminatedOptions([]);
+          setAiHint('');
+          setGameState('playing');
+        }, 2000);
+      }
     }
   }, [selectedAnswer, questions, currentQuestion]);
 
@@ -170,6 +184,7 @@ export default function SinglePlayer() {
   };
 
   const continueToNextQuestion = () => {
+    // Award case since we're at a cashout milestone
     setCasesWon(casesWon + 1);
     
     if (currentQuestion + 1 < questions.length) {
@@ -189,6 +204,7 @@ export default function SinglePlayer() {
   };
 
   const cashOut = () => {
+    // Award case for reaching this milestone, then cash out
     setCasesWon(casesWon + 1);
     setGameState('results');
   };
@@ -200,17 +216,18 @@ export default function SinglePlayer() {
           <h1 className="text-5xl font-bold text-white mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             Who Wants to Be a Caseonaire? 💼
           </h1>
-          <p className="text-white/80 text-center mb-8 text-lg">Win up to 10 Fever Cases! But one wrong answer and you lose everything...</p>
+          <p className="text-white/80 text-center mb-8 text-lg">Win up to 5 Fever Cases! Answer 10 questions, but one wrong answer and you lose everything...</p>
           
           <div className="bg-blue-500/20 border border-blue-400 rounded-xl p-6 mb-8">
             <h3 className="text-white font-bold text-xl mb-3">Game Rules:</h3>
             <ul className="text-white/90 space-y-2">
-              <li>📊 Questions start at Medium and get progressively harder</li>
+              <li>📊 10 questions total, progressively harder</li>
+              <li>💼 Earn 1 case every 2 correct answers (5 cases total)</li>
               <li>🎲 Each question is from a random category</li>
               <li>⏱️ 30 seconds per question</li>
               <li>💡 Use 2 Fifty-Fifties and 1 AI Hint wisely!</li>
               <li>⚠️ One wrong answer = lose everything</li>
-              <li>💰 Cash out anytime or risk it for more cases!</li>
+              <li>💰 Cash out at questions 2, 4, 6, 8, or 10!</li>
             </ul>
           </div>
 
@@ -249,9 +266,9 @@ export default function SinglePlayer() {
             {/* Case Ladder */}
             <div className="col-span-1 space-y-2">
               {[...CASE_LADDER].reverse().map((cases) => {
-                const questionNum = cases - 1;
-                const isCurrent = questionNum === currentQuestion;
-                const isPassed = questionNum < currentQuestion;
+                const questionNum = cases * 2; // Each case = 2 questions
+                const isCurrent = currentQuestion >= (cases - 1) * 2 && currentQuestion < cases * 2;
+                const isPassed = currentQuestion >= cases * 2;
                 
                 return (
                   <div
@@ -383,7 +400,7 @@ export default function SinglePlayer() {
             Correct! 🎉
           </h1>
           <p className="text-3xl text-green-300 text-center mb-8">
-            You&apos;ve won {casesWon + 1} {casesWon + 1 === 1 ? 'Case' : 'Cases'} so far!
+            You can earn Case {casesWon + 1} of 5!
           </p>
 
           <div className="bg-white/10 rounded-2xl p-6 mb-8">
@@ -393,6 +410,11 @@ export default function SinglePlayer() {
             <p className="text-yellow-300 text-lg text-center">
               ⚠️ If you answer the next question wrong, you lose everything!
             </p>
+            {currentQuestion + 1 < 10 && (
+              <p className="text-green-300 text-lg text-center mt-2">
+                ✨ Next cashout opportunity at question {currentQuestion + 3}!
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

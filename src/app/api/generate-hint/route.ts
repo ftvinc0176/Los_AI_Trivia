@@ -9,22 +9,29 @@ export async function POST(request: NextRequest) {
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    const prompt = `You are the AI assistant for "Who Wants to Be a Caseonaire?" game show. A player has used their AI Hint lifeline.
+    const prompt = `You are a helpful AI assistant for a trivia game show called "Who Wants to Be a Caseonaire?"
 
-Question: "${question}"
+The player has used their AI Hint lifeline and needs help with this question:
+
+Question: ${question}
 
 Options:
-${options.map((opt: string, idx: number) => `${String.fromCharCode(65 + idx)}. ${opt}`).join('\n')}
+A) ${options[0]}
+B) ${options[1]}
+C) ${options[2]}
+D) ${options[3]}
 
-The correct answer is option ${String.fromCharCode(65 + correctAnswer)}.
+The correct answer is: ${options[correctAnswer]}
 
-Generate a helpful but not too obvious hint that:
-- Guides the player toward the correct answer without revealing it directly
-- Eliminates or casts doubt on 1-2 wrong answers
-- Uses clever reasoning, logic, or memorable facts
-- Is written in an engaging, game show host style
-- Is 1-2 sentences maximum
-- Does NOT directly state which answer is correct
+Provide a VERY HELPFUL and DIRECT hint that:
+1. Strongly guides the player toward the correct answer
+2. Explains WHY the correct answer is right (provide factual context)
+3. Points out what's wrong with 1-2 incorrect options
+4. Is written in a friendly, encouraging tone
+5. Gives enough information that a player can confidently choose the right answer
+6. Keep it to 2-3 sentences maximum
+
+Be generous with information - this is their only AI hint for the entire game!
 
 Return ONLY the hint text, nothing else.`;
 
