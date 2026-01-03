@@ -135,22 +135,28 @@ export default function SinglePlayer() {
     if (aiHintLeft > 0 && !showAnswer && !aiHint) {
       setLoading(true);
       try {
-        const response = await fetch('/api/generate-questions', {
+        const currentQ = questions[currentQuestion];
+        const response = await fetch('/api/generate-hint', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
           body: JSON.stringify({ 
-            category: 'hint',
-            difficulty: 'hint',
-            count: 1,
-            question: questions[currentQuestion].question,
-            options: questions[currentQuestion].options
+            question: currentQ.question,
+            options: currentQ.options,
+            correctAnswer: currentQ.correctAnswer
           }),
         });
         
-        // For now, use a simple hint
-        setAiHint('Think carefully about the question and eliminate obviously wrong answers.');
+        const data = await response.json();
+        
+        if (data.hint) {
+          setAiHint(data.hint);
+        } else {
+          setAiHint('Think carefully about the question and eliminate obviously wrong answers.');
+        }
         setAiHintLeft(0);
       } catch (error) {
+        console.error('Error getting hint:', error);
         setAiHint('Consider what you know about this topic and use logic to narrow down your choices.');
         setAiHintLeft(0);
       }
