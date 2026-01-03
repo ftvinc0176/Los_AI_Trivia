@@ -52,6 +52,7 @@ function BlackjackGame() {
   const [canSplit, setCanSplit] = useState(false);
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
   const [isMyTurn, setIsMyTurn] = useState(false);
+  const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; playerCount: number; maxPlayers: number }>>([]);
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -75,6 +76,10 @@ function BlackjackGame() {
       newSocket.on('casinoTurnUpdate', ({ currentTurn }: { currentTurn: string }) => {
         setCurrentTurn(currentTurn);
         setIsMyTurn(currentTurn === newSocket.id);
+      });
+
+      newSocket.on('casinoPublicLobbies', ({ lobbies }: { lobbies: Array<{ roomId: string; playerCount: number; maxPlayers: number }> }) => {
+        setPublicLobbies(lobbies);
       });
 
       newSocket.on('casinoGameStarted', () => {
@@ -138,9 +143,18 @@ function BlackjackGame() {
     }
   }, [mode]);
 
+  useEffect(() => {
+    if (mode === 'browse' && socket) {
+      fetchPublicLobbies();
+      // Refresh lobby list every 3 seconds
+      const interval = setInterval(fetchPublicLobbies, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [mode, socket]);
+
   const createLobby = () => {
     if (socket && playerName) {
-      socket.emit('casinoCreateLobby', { playerName });
+      socket.emit('casinoCreateLobby', { playerName, isPublic: false });
       setMyPlayerId(socket.id!);
     }
   };
@@ -149,6 +163,21 @@ function BlackjackGame() {
     if (socket && playerName && lobbyCode) {
       socket.emit('casinoJoinLobby', { roomId: lobbyCode, playerName });
       setRoomId(lobbyCode);
+      setMyPlayerId(socket.id!);
+      setGameState('lobby');
+    }
+  };
+
+  const fetchPublicLobbies = () => {
+    if (socket) {
+      socket.emit('getCasinoPublicLobbies');
+    }
+  };
+
+  const joinPublicLobby = (lobbyRoomId: string) => {
+    if (socket && playerName) {
+      socket.emit('casinoJoinLobby', { roomId: lobbyRoomId, playerName });
+      setRoomId(lobbyRoomId);
       setMyPlayerId(socket.id!);
       setGameState('lobby');
     }
@@ -603,6 +632,74 @@ function BlackjackGame() {
 
   // Lobby State
   if (mode !== 'single' && gameState === 'lobby' && !roomId) {
+    // Browse mode - show public lobbies
+    if (mode === 'browse') {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
+            <h1 className="text-4xl font-bold text-white mb-8 text-center">🎰 Public Casino Lobbies</h1>
+            
+            <div className="space-y-4 mb-6">
+              <input
+                type="text"
+                placeholder="Your Name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-white/40"
+              />
+            </div>
+
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">Available Lobbies</h2>
+                <button
+                  onClick={fetchPublicLobbies}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-all"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+              
+              {publicLobbies.length === 0 ? (
+                <div className="bg-white/5 rounded-xl p-8 text-center">
+                  <p className="text-white/60">No public lobbies available</p>
+                  <p className="text-white/40 text-sm mt-2">Create your own lobby to start playing!</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {publicLobbies.map((lobby) => (
+                    <div key={lobby.roomId} className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 transition-all">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-white font-bold text-lg">Lobby {lobby.roomId}</p>
+                          <p className="text-white/60 text-sm">{lobby.playerCount}/{lobby.maxPlayers} players</p>
+                        </div>
+                        <button
+                          onClick={() => joinPublicLobby(lobby.roomId)}
+                          disabled={!playerName || lobby.playerCount >= lobby.maxPlayers}
+                          className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold transition-all disabled:cursor-not-allowed"
+                        >
+                          {lobby.playerCount >= lobby.maxPlayers ? 'Full' : 'Join'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => router.push('/casino')}
+              className="w-full text-white/60 hover:text-white"
+            >
+              ← Back to Casino
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Create or Join mode
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">

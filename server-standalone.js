@@ -594,10 +594,11 @@ io.on('connection', (socket) => {
       dealer: { hand: [], value: 0 },
       deck: [],
       state: 'lobby', // lobby, betting, playing, results
-      isPublic: isPublic || false
+      isPublic: isPublic || false,
+      currentTurn: null
     });
 
-    socket.join(roomId);
+    socket.join(`casino_${roomId}`);
     socket.emit('casinoLobbyCreated', { roomId });
     console.log(`Casino lobby ${roomId} created by ${playerName} (${isPublic ? 'public' : 'private'})`);
   });
@@ -641,8 +642,8 @@ io.on('connection', (socket) => {
     };
 
     room.players.push(player);
-    socket.join(roomId);
-    io.to(roomId).emit('casinoPlayerJoined', { players: room.players });
+    socket.join(`casino_${roomId}`);
+    io.to(`casino_${roomId}`).emit('casinoPlayerJoined', { players: room.players });
     console.log(`${playerName} joined casino lobby ${roomId}`);
   });
 
