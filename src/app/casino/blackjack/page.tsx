@@ -43,6 +43,8 @@ function BlackjackGame() {
   const [isDealing, setIsDealing] = useState(false);
   const [canHit, setCanHit] = useState(true);
   const [resultMessage, setResultMessage] = useState('');
+  const [selectedChip, setSelectedChip] = useState(25);
+  const [sideBets, setSideBets] = useState({ perfectPairs: 0, twentyOnePlus3: 0 });
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -133,9 +135,12 @@ function BlackjackGame() {
 
   const placeBet = () => {
     const bet = parseInt(betInput);
-    if (bet > 0 && bet <= balance) {
+    const totalSideBets = sideBets.perfectPairs + sideBets.twentyOnePlus3;
+    const totalBet = bet + totalSideBets;
+    
+    if (bet > 0 && totalBet <= balance) {
       setBetAmount(bet);
-      setBalance(balance - bet);
+      setBalance(balance - totalBet);
       
       if (socket) {
         socket.emit('casinoPlaceBet', { roomId, bet });
@@ -144,6 +149,24 @@ function BlackjackGame() {
         dealInitialCards(bet);
       }
     }
+  };
+
+  const addChipToBet = (area: 'main' | 'perfectPairs' | 'twentyOnePlus3') => {
+    const totalBet = parseInt(betInput || '0') + sideBets.perfectPairs + sideBets.twentyOnePlus3;
+    if (totalBet + selectedChip > balance) return;
+    
+    if (area === 'main') {
+      setBetInput(String(parseInt(betInput || '0') + selectedChip));
+    } else if (area === 'perfectPairs') {
+      setSideBets({ ...sideBets, perfectPairs: sideBets.perfectPairs + selectedChip });
+    } else if (area === 'twentyOnePlus3') {
+      setSideBets({ ...sideBets, twentyOnePlus3: sideBets.twentyOnePlus3 + selectedChip });
+    }
+  };
+
+  const clearBets = () => {
+    setBetInput('0');
+    setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
   };
 
   const dealInitialCards = (bet: number) => {
@@ -291,7 +314,9 @@ function BlackjackGame() {
       winAmount = currentBet * 2;
     } else if (playerValue > dealerValue) {
       message = 'You win!';
-      winAmount = currentBet * 2;
+      wSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
+    setBetInput('100');
+    setinAmount = currentBet * 2;
     } else if (playerValue < dealerValue) {
       message = 'Dealer wins.';
     } else {
@@ -402,44 +427,123 @@ function BlackjackGame() {
 
   // Betting State
   if (gameState === 'betting') {
+    const totalBet = parseInt(betInput || '0') + sideBets.perfectPairs + sideBets.twentyOnePlus3;
+    
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
-          <h1 className="text-4xl font-bold text-white mb-4 text-center">Place Your Bet</h1>
-          <div className="text-center mb-8">
-            <p className="text-white/60 mb-2">Your Balance:</p>
-            <p className="text-4xl font-bold text-yellow-300">{balance} LosBucks</p>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+        <div className="max-w-6xl w-full">
+          {/* Balance Display */}
+          <div className="text-center mb-6">
+            <p className="text-yellow-300 text-3xl font-bold">{balance} LosBucks</p>
           </div>
-          
-          <div className="space-y-4">
-            <input
-              type="number"
-              value={betInput}
-              onChange={(e) => setBetInput(e.target.value)}
-              min="1"
-              max={balance}
-              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-center text-2xl focus:outline-none focus:border-white/40"
-            />
+
+          {/* Betting Table */}
+          <div className="relative bg-green-800 rounded-[200px] border-8 border-yellow-900 p-12 shadow-2xl">
+            <div className="absolute inset-0 rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
             
-            <div className="grid grid-cols-4 gap-2">
-              {[25, 50, 100, 250].map(amount => (
-                <button
-                  key={amount}
-                  onClick={() => setBetInput(String(amount))}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-white transition-all"
+            {/* Table Text */}
+            <div className="relative text-center mb-8">
+              <h1 className="text-4xl font-bold text-yellow-600/40 mb-2">BLACKJACK PAYS 3 TO 2</h1>
+              <p className="text-lg text-yellow-600/30">Dealer stands on all 17 and above</p>
+            </div>
+
+            {/* Betting Areas */}
+            <div className="relative flex justify-center items-end gap-8 mb-8">
+              {/* Side Bet: Perfect Pairs */}
+              <div className="flex flex-col items-center">
+                <div 
+                  onClick={() => addChipToBet('perfectPairs')}
+                  className="w-32 h-32 rounded-full border-4 border-yellow-600/50 bg-green-700 flex flex-col items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
                 >
-                  {amount}
+                  <span className="text-yellow-600/60 text-xs font-bold">PERFECT</span>
+                  <span className="text-yellow-600/60 text-xs font-bold">PAIRS</span>
+                  {sideBets.perfectPairs > 0 && (
+                    <div className="absolute -top-4">
+                      <div className="w-12 h-12 rounded-full bg-red-600 border-4 border-white flex items-center justify-center shadow-lg">
+                        <span className="text-white font-bold text-sm">{sideBets.perfectPairs}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Main Bet */}
+              <div className="flex flex-col items-center">
+                <div 
+                  onClick={() => addChipToBet('main')}
+                  className="w-40 h-40 rounded-full border-4 border-yellow-600 bg-green-700 flex items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
+                >
+                  <span className="text-yellow-600 text-2xl font-bold">{betInput || 0}</span>
+                  {parseInt(betInput || '0') > 0 && (
+                    <div className="absolute -top-6">
+                      <div className="w-16 h-16 rounded-full bg-blue-600 border-4 border-white flex items-center justify-center shadow-lg">
+                        <span className="text-white font-bold">{betInput}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <span className="text-yellow-600 text-sm mt-2 font-bold">MAIN BET</span>
+              </div>
+
+              {/* Side Bet: 21+3 */}
+              <div className="flex flex-col items-center">
+                <div 
+                  onClick={() => addChipToBet('twentyOnePlus3')}
+                  className="w-32 h-32 rounded-full border-4 border-yellow-600/50 bg-green-700 flex flex-col items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
+                >
+                  <span className="text-yellow-600/60 text-lg font-bold">21+3</span>
+                  {sideBets.twentyOnePlus3 > 0 && (
+                    <div className="absolute -top-4">
+                      <div className="w-12 h-12 rounded-full bg-green-600 border-4 border-white flex items-center justify-center shadow-lg">
+                        <span className="text-white font-bold text-sm">{sideBets.twentyOnePlus3}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Chip Selection */}
+            <div className="relative flex justify-center gap-3 mb-6">
+              {[25, 50, 100, 250, 500].map((value) => (
+                <button
+                  key={value}
+                  onClick={() => setSelectedChip(value)}
+                  disabled={value > balance}
+                  className={`relative transition-all ${selectedChip === value ? 'scale-110' : 'scale-100'} ${value > balance ? 'opacity-30' : 'hover:scale-105'}`}
+                >
+                  <div className={`w-14 h-14 rounded-full border-4 border-white shadow-lg flex items-center justify-center font-bold text-white ${
+                    value === 25 ? 'bg-red-600' :
+                    value === 50 ? 'bg-blue-600' :
+                    value === 100 ? 'bg-green-600' :
+                    value === 250 ? 'bg-purple-600' :
+                    'bg-yellow-600'
+                  }`}>
+                    {value}
+                  </div>
+                  {selectedChip === value && (
+                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-yellow-400 rounded"></div>
+                  )}
                 </button>
               ))}
             </div>
-            
-            <button
-              onClick={placeBet}
-              disabled={parseInt(betInput) <= 0 || parseInt(betInput) > balance}
-              className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-500 disabled:to-gray-600 text-white rounded-xl font-bold text-lg disabled:cursor-not-allowed"
-            >
-              Deal Cards
-            </button>
+
+            {/* Action Buttons */}
+            <div className="relative flex justify-center gap-4">
+              <button
+                onClick={clearBets}
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all"
+              >
+                Clear Bets
+              </button>
+              <button
+                onClick={placeBet}
+                disabled={parseInt(betInput || '0') <= 0 || totalBet > balance}
+                className="px-8 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white rounded-xl font-bold text-lg disabled:cursor-not-allowed transition-all"
+              >
+                Deal Cards
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -449,76 +553,106 @@ function BlackjackGame() {
   // Playing State
   if (gameState === 'playing') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
         <div className="max-w-6xl w-full">
-          <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold text-white mb-4">♠️ Blackjack ♥️</h1>
-            <div className="flex justify-center gap-8 text-xl">
-              <span className="text-yellow-300">Balance: {balance} LosBucks</span>
-              <span className="text-green-300">Bet: {currentBet} LosBucks</span>
-            </div>
+          {/* Balance Display */}
+          <div className="text-center mb-6">
+            <p className="text-yellow-300 text-2xl font-bold">{balance} LosBucks</p>
           </div>
 
-          {/* Dealer's Hand */}
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-white mb-4 text-center">Dealer: {dealerHandValue}</h2>
-            <div className="flex justify-center gap-4">
-              {dealerHand.map((card, idx) => (
-                <div
-                  key={idx}
-                  className="w-24 h-36 bg-white rounded-xl shadow-2xl flex flex-col items-center justify-center border-4 border-gray-300 animate-fade-in"
-                  style={{ animationDelay: `${idx * 0.2}s` }}
-                >
-                  <div className={`text-4xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                    {card.suit}
+          {/* Game Table */}
+          <div className="relative bg-green-800 rounded-[200px] border-8 border-yellow-900 p-12 shadow-2xl min-h-[600px]">
+            <div className="absolute inset-0 rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
+            
+            {/* Dealer Area */}
+            <div className="relative mb-16">
+              <div className="text-center mb-4">
+                <span className="text-yellow-300 text-xl font-bold">Dealer: {dealerHandValue}</span>
+              </div>
+              <div className="flex justify-center gap-2">
+                {dealerHand.map((card, idx) => (
+                  <div
+                    key={idx}
+                    className="w-20 h-28 bg-white rounded-lg shadow-2xl flex flex-col items-center justify-center border-2 border-gray-300"
+                    style={{ 
+                      animation: 'cardDeal 0.3s ease-out forwards',
+                      animationDelay: `${idx * 0.1}s`,
+                      opacity: 0
+                    }}
+                  >
+                    <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                      {card.suit}
+                    </div>
+                    <div className={`text-xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                      {card.value}
+                    </div>
                   </div>
-                  <div className={`text-3xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                    {card.value}
-                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Player Area */}
+            <div className="relative">
+              <div className="flex flex-col items-center">
+                <div className="flex gap-2 mb-4">
+                  {myHand.map((card, idx) => (
+                    <div
+                      key={idx}
+                      className="w-20 h-28 bg-white rounded-lg shadow-2xl flex flex-col items-center justify-center border-2 border-gray-300"
+                      style={{ 
+                        animation: 'cardDeal 0.3s ease-out forwards',
+                        animationDelay: `${(idx + 2) * 0.1}s`,
+                        opacity: 0
+                      }}
+                    >
+                      <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                        {card.suit}
+                      </div>
+                      <div className={`text-xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
+                        {card.value}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Player's Hand */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4 text-center">Your Hand: {myHandValue}</h2>
-            <div className="flex justify-center gap-4">
-              {myHand.map((card, idx) => (
-                <div
-                  key={idx}
-                  className="w-24 h-36 bg-white rounded-xl shadow-2xl flex flex-col items-center justify-center border-4 border-gray-300 animate-fade-in"
-                  style={{ animationDelay: `${idx * 0.2}s` }}
-                >
-                  <div className={`text-4xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                    {card.suit}
-                  </div>
-                  <div className={`text-3xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                    {card.value}
-                  </div>
+                <div className="bg-green-700 px-6 py-3 rounded-lg border-2 border-yellow-600">
+                  <p className="text-yellow-300 text-xl font-bold">Your Hand: {myHandValue}</p>
+                  <p className="text-white text-sm">Bet: {currentBet} LosBucks</p>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
 
-          {/* Actions */}
-          {canHit && !isDealing && (
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={hit}
-                className="px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-bold text-xl transition-all"
-              >
-                Hit
-              </button>
-              <button
-                onClick={stand}
-                className="px-8 py-4 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-bold text-xl transition-all"
-              >
-                Stand
-              </button>
-            </div>
-          )}
+            {/* Action Buttons */}
+            {canHit && !isDealing && (
+              <div className="relative flex justify-center gap-4 mt-8">
+                <button
+                  onClick={hit}
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                >
+                  HIT
+                </button>
+                <button
+                  onClick={stand}
+                  className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                >
+                  STAND
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        <style jsx>{`
+          @keyframes cardDeal {
+            0% {
+              opacity: 0;
+              transform: translateY(-100px) rotate(-10deg);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) rotate(0);
+            }
+          }
+        `}</style>
       </div>
     );
   }
