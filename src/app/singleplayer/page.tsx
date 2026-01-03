@@ -434,8 +434,18 @@ export default function SinglePlayer() {
             <button
               onClick={() => {
                 setGameState('setup');
+                setQuestions([]);
                 setCasesWon(0);
                 setCurrentQuestion(0);
+                setSelectedAnswer(null);
+                setShowAnswer(false);
+                setTimeLeft(30);
+                setFiftyFiftyLeft(2);
+                setAiHintLeft(1);
+                setEliminatedOptions([]);
+                setAiHint('');
+                setGameOver(false);
+                setWonGame(false);
               }}
               className="flex-1 px-8 py-4 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-all text-lg font-bold"
             >
