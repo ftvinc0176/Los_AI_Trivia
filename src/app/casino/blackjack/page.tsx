@@ -805,7 +805,7 @@ function BlackjackGame() {
     const totalBet = parseInt(betInput || '0') + sideBets.perfectPairs + sideBets.twentyOnePlus3;
     
     return (
-      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
         <div className="max-w-6xl w-full">
           {/* Balance Display */}
           <div className="text-center mb-3 sm:mb-6">
@@ -813,26 +813,26 @@ function BlackjackGame() {
           </div>
 
           {/* Betting Table */}
-          <div className="relative bg-green-800 rounded-[80px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-4 sm:p-8 md:p-12 shadow-2xl">
-            <div className="absolute inset-0 rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
+          <div className="relative bg-green-800 rounded-[60px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-3 sm:p-8 md:p-12 shadow-2xl overflow-hidden">
+            <div className="absolute inset-0 rounded-[60px] sm:rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
             
             {/* Table Text */}
-            <div className="relative text-center mb-4 sm:mb-8">
-              <h1 className="text-xl sm:text-3xl md:text-5xl font-bold text-yellow-600/30 mb-1 sm:mb-2" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>BLACKJACK PAYS 3 TO 2</h1>
-              <p className="text-xs sm:text-base md:text-xl text-yellow-600/25" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>Dealer stands on all 17 and above</p>
-              <p className="text-xs sm:text-base md:text-xl text-yellow-600/25 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>INSURANCE PAYS 2 TO 1</p>
+            <div className="relative text-center mb-2 sm:mb-4 md:mb-8">
+              <h1 className="text-sm sm:text-2xl md:text-5xl font-bold text-yellow-600/30 mb-1" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>BLACKJACK PAYS 3 TO 2</h1>
+              <p className="text-[10px] sm:text-sm md:text-xl text-yellow-600/25 hidden sm:block" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>Dealer stands on all 17 and above</p>
+              <p className="text-[10px] sm:text-sm md:text-xl text-yellow-600/25 mt-1 hidden sm:block" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>INSURANCE PAYS 2 TO 1</p>
             </div>
 
             {/* Betting Areas */}
-            <div className="relative flex justify-center items-end gap-2 sm:gap-4 md:gap-8 mb-4 sm:mb-8">
+            <div className="relative flex justify-center items-end gap-1 sm:gap-4 md:gap-8 mb-3 sm:mb-8">
               {/* Side Bet: Perfect Pairs */}
               <div className="flex flex-col items-center">
                 <div 
                   onClick={() => addChipToBet('perfectPairs')}
-                  className="w-36 h-36 rounded-full border-4 border-yellow-600/40 bg-green-700/80 flex flex-col items-center justify-center cursor-pointer hover:border-yellow-500/60 transition-all relative shadow-inner"
+                  className="w-20 h-20 sm:w-36 sm:h-36 rounded-full border-2 sm:border-4 border-yellow-600/40 bg-green-700/80 flex flex-col items-center justify-center cursor-pointer hover:border-yellow-500/60 transition-all relative shadow-inner"
                 >
-                  <span className="text-yellow-600/50 text-sm font-bold">PERFECT</span>
-                  <span className="text-yellow-600/50 text-sm font-bold">PAIRS</span>
+                  <span className="text-yellow-600/50 text-[8px] sm:text-sm font-bold">PERFECT</span>
+                  <span className="text-yellow-600/50 text-[8px] sm:text-sm font-bold">PAIRS</span>
                   {sideBets.perfectPairs > 0 && (
                     <div className="absolute -top-8 flex flex-col items-center">
                       {Array.from({ length: Math.min(Math.floor(sideBets.perfectPairs / 25), 5) }).map((_, i) => (
@@ -852,36 +852,36 @@ function BlackjackGame() {
               <div className="flex flex-col items-center">
                 <div 
                   onClick={() => addChipToBet('main')}
-                  className="w-48 h-48 rounded-full border-4 border-yellow-600 bg-green-700/80 flex items-center justify-center cursor-pointer hover:border-yellow-500 transition-all relative shadow-inner"
+                  className="w-28 h-28 sm:w-48 sm:h-48 rounded-full border-2 sm:border-4 border-yellow-600 bg-green-700/80 flex items-center justify-center cursor-pointer hover:border-yellow-500 transition-all relative shadow-inner"
                 >
-                  {parseInt(betInput || '0') === 0 && <span className="text-yellow-600/50 text-3xl font-bold">0</span>}
+                  {parseInt(betInput || '0') === 0 && <span className="text-yellow-600/50 text-xl sm:text-3xl font-bold">0</span>}
                   {parseInt(betInput || '0') > 0 && (
-                    <div className="absolute -top-12 flex flex-col items-center">
+                    <div className="absolute -top-8 sm:-top-12 flex flex-col items-center">
                       {Array.from({ length: Math.min(Math.ceil(parseInt(betInput) / 100), 6) }).map((_, i) => {
                         const chipValue = parseInt(betInput) >= 500 ? 500 : parseInt(betInput) >= 250 ? 250 : parseInt(betInput) >= 100 ? 100 : parseInt(betInput) >= 50 ? 50 : 25;
                         const chipColor = chipValue === 500 ? 'bg-yellow-600' : chipValue === 250 ? 'bg-purple-600' : chipValue === 100 ? 'bg-green-600' : chipValue === 50 ? 'bg-blue-600' : 'bg-red-600';
                         return (
-                          <div key={i} className={`w-16 h-16 rounded-full ${chipColor} border-4 border-white flex items-center justify-center shadow-xl`} style={{ marginTop: i > 0 ? '-48px' : '0', zIndex: 6 - i }}>
-                            <span className="text-white font-bold">{chipValue}</span>
+                          <div key={i} className={`w-10 h-10 sm:w-16 sm:h-16 rounded-full ${chipColor} border-2 sm:border-4 border-white flex items-center justify-center shadow-xl`} style={{ marginTop: i > 0 ? '-30px' : '0', zIndex: 6 - i }}>
+                            <span className="text-white font-bold text-xs sm:text-base">{chipValue}</span>
                           </div>
                         );
                       })}
-                      <div className="mt-2 bg-black/70 px-4 py-1 rounded-full">
-                        <span className="text-white font-bold text-lg">{betInput}</span>
+                      <div className="mt-1 sm:mt-2 bg-black/70 px-2 sm:px-4 py-1 rounded-full">
+                        <span className="text-white font-bold text-sm sm:text-lg">{betInput}</span>
                       </div>
                     </div>
                   )}
                 </div>
-                <span className="text-yellow-600 text-base mt-3 font-bold">MAIN BET</span>
+                <span className="text-yellow-600 text-xs sm:text-base mt-1 sm:mt-3 font-bold">MAIN BET</span>
               </div>
 
               {/* Side Bet: 21+3 */}
               <div className="flex flex-col items-center">
                 <div 
                   onClick={() => addChipToBet('twentyOnePlus3')}
-                  className="w-36 h-36 rounded-full border-4 border-yellow-600/40 bg-green-700/80 flex flex-col items-center justify-center cursor-pointer hover:border-yellow-500/60 transition-all relative shadow-inner"
+                  className="w-20 h-20 sm:w-36 sm:h-36 rounded-full border-2 sm:border-4 border-yellow-600/40 bg-green-700/80 flex flex-col items-center justify-center cursor-pointer hover:border-yellow-500/60 transition-all relative shadow-inner"
                 >
-                  <span className="text-yellow-600/50 text-xl font-bold">21+3</span>
+                  <span className="text-yellow-600/50 text-sm sm:text-xl font-bold">21+3</span>
                   {sideBets.twentyOnePlus3 > 0 && (
                     <div className="absolute -top-8 flex flex-col items-center">
                       {Array.from({ length: Math.min(Math.floor(sideBets.twentyOnePlus3 / 25), 5) }).map((_, i) => (
@@ -899,7 +899,7 @@ function BlackjackGame() {
             </div>
 
             {/* Chip Selection */}
-            <div className="relative flex justify-center gap-3 mb-6">
+            <div className="relative flex justify-center gap-1 sm:gap-3 mb-3 sm:mb-6">
               {[25, 50, 100, 250, 500].map((value) => (
                 <button
                   key={value}
@@ -907,7 +907,7 @@ function BlackjackGame() {
                   disabled={value > balance}
                   className={`relative transition-all ${selectedChip === value ? 'scale-110' : 'scale-100'} ${value > balance ? 'opacity-30' : 'hover:scale-105'}`}
                 >
-                  <div className={`w-14 h-14 rounded-full border-4 border-white shadow-lg flex items-center justify-center font-bold text-white ${
+                  <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 sm:border-4 border-white shadow-lg flex items-center justify-center font-bold text-white text-xs sm:text-base ${
                     value === 25 ? 'bg-red-600' :
                     value === 50 ? 'bg-blue-600' :
                     value === 100 ? 'bg-green-600' :
@@ -917,24 +917,24 @@ function BlackjackGame() {
                     {value}
                   </div>
                   {selectedChip === value && (
-                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-yellow-400 rounded"></div>
+                    <div className="absolute -bottom-1 sm:-bottom-2 left-1/2 transform -translate-x-1/2 w-10 sm:w-16 h-1 bg-yellow-400 rounded"></div>
                   )}
                 </button>
               ))}
             </div>
 
             {/* Action Buttons */}
-            <div className="relative flex justify-center gap-4">
+            <div className="relative flex justify-center gap-2 sm:gap-4">
               <button
                 onClick={clearBets}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all"
+                className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm sm:text-base transition-all"
               >
                 Clear Bets
               </button>
               <button
                 onClick={placeBet}
                 disabled={parseInt(betInput || '0') <= 0 || totalBet > balance}
-                className="px-8 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white rounded-xl font-bold text-lg disabled:cursor-not-allowed transition-all"
+                className="px-5 sm:px-8 py-2 sm:py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white rounded-xl font-bold text-sm sm:text-lg disabled:cursor-not-allowed transition-all"
               >
                 Deal Cards
               </button>
@@ -948,7 +948,7 @@ function BlackjackGame() {
   // Playing State
   if (gameState === 'playing') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
         <div className="max-w-6xl w-full px-2 sm:px-0">
           {/* Turn Indicator for Multiplayer */}
           {socket && (
@@ -971,8 +971,8 @@ function BlackjackGame() {
           </div>
 
           {/* Game Table */}
-          <div className="relative bg-green-800 rounded-[80px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-4 sm:p-8 md:p-12 shadow-2xl min-h-[500px] sm:min-h-[600px]">
-            <div className="absolute inset-0 rounded-[80px] sm:rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
+          <div className="relative bg-green-800 rounded-[60px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-4 sm:p-8 md:p-12 shadow-2xl min-h-[400px] sm:min-h-[600px] overflow-hidden">
+            <div className="absolute inset-0 rounded-[60px] sm:rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
             
             {/* Dealer Area */}
             <div className="relative mb-8 sm:mb-16">
