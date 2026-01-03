@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Question {
@@ -34,6 +34,24 @@ export default function SinglePlayer() {
   const [timeLeft, setTimeLeft] = useState(10);
   const [showAnswer, setShowAnswer] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleAnswerReveal = useCallback(() => {
+    setShowAnswer(true);
+    if (selectedAnswer === questions[currentQuestion]?.correctAnswer) {
+      setScore(score + 1);
+    }
+    
+    setTimeout(() => {
+      if (currentQuestion + 1 < questions.length) {
+        setCurrentQuestion(currentQuestion + 1);
+        setSelectedAnswer(null);
+        setShowAnswer(false);
+        setTimeLeft(10);
+      } else {
+        setGameState('results');
+      }
+    }, 2000);
+  }, [selectedAnswer, questions, currentQuestion, score]);
 
   // Timer countdown
   useEffect(() => {
@@ -71,24 +89,6 @@ export default function SinglePlayer() {
     if (!showAnswer) {
       setSelectedAnswer(index);
     }
-  };
-
-  const handleAnswerReveal = () => {
-    setShowAnswer(true);
-    if (selectedAnswer === questions[currentQuestion].correctAnswer) {
-      setScore(score + 1);
-    }
-    
-    setTimeout(() => {
-      if (currentQuestion + 1 < questions.length) {
-        setCurrentQuestion(currentQuestion + 1);
-        setSelectedAnswer(null);
-        setShowAnswer(false);
-        setTimeLeft(10);
-      } else {
-        setGameState('results');
-      }
-    }, 3000);
   };
 
   if (gameState === 'setup') {
