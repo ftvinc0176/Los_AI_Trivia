@@ -573,6 +573,160 @@ io.on('connection', (socket) => {
   });
 
   // ============================================
+  // DRAW & GUESS GAME HANDLERS
+  // ============================================
+
+  socket.on('drawGuessCreateLobby', ({ roomId, playerName }) => {
+    const player = {
+      id: socket.id,
+      name: playerName,
+      prompt: '',
+      drawing: '',
+      enhancedImage: '',
+      guess: '',
+      score: 0
+    };
+
+    rooms.set(`drawguess_${roomId}`, {
+      players: [player],
+      state: 'lobby', // lobby, drawing, guessing, results
+      prompts: [],
+      timeRemaining: 60
+    });
+
+    socket.join(`drawguess_${roomId}`);
+    socket.emit('drawGuessLobbyCreated', { roomId, players: [player] });
+    console.log(`Draw & Guess lobby ${roomId} created by ${playerName}`);
+  });
+
+  socket.on('drawGuessJoinLobby', ({ roomId, playerName }) => {
+    const room = rooms.get(`drawguess_${roomId}`);
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+
+    const player = {
+      id: socket.id,
+      name: playerName,
+      prompt: '',
+      drawing: '',
+      enhancedImage: '',
+      guess: '',
+      score: 0
+    };
+
+    room.players.push(player);
+    socket.join(`drawguess_${roomId}`);
+    
+    io.to(`drawguess_${roomId}`).emit('drawGuessPlayerJoined', { players: room.players });
+    socket.emit('drawGuessJoinedLobby', { roomId, players: room.players });
+  });
+
+  socket.on('drawGuessStartGame', async ({ roomId }) => {
+    const room = rooms.get(`drawguess_${roomId}`);
+    if (!room) return;
+
+    room.state = 'drawing';
+
+    // Generate prompts for each player using Gemini
+    const prompts = [];
+    for (let i = 0; i < room.players.length; i++) {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+      const result = await model.generateContent(`Generate a single random object or thing for someone to draw. It should be simple enough to draw in 60 seconds and recognizable. Examples: "a cat", "a bicycle", "a tree". Respond with ONLY the thing to draw, nothing else.`);
+      const prompt = result.response.text().trim();
+      prompts.push(prompt);
+    }
+
+    room.players.forEach((player, index) => {
+      player.prompt = prompts[index];
+      io.to(player.id).emit('drawGuessYourPrompt', { prompt: prompts[index] });
+    });
+
+    io.to(`drawguess_${roomId}`).emit('drawGuessGameStarted', { state: 'drawing' });
+    
+    // Start 60 second timer
+    let timeLeft = 60;
+    const timerInterval = setInterval(() => {
+      timeLeft--;
+      io.to(`drawguess_${roomId}`).emit('drawGuessTimerUpdate', { timeRemaining: timeLeft });
+      
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        room.state = 'guessing';
+        io.to(`drawguess_${roomId}`).emit('drawGuessPhaseChange', { state: 'guessing' });
+      }
+    }, 1000);
+  });
+
+  socket.on('drawGuessSubmitDrawing', ({ roomId, drawing, enhancedImage }) => {
+    const room = rooms.get(`drawguess_${roomId}`);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (player) {
+      player.drawing = drawing;
+      player.enhancedImage = enhancedImage;
+    }
+
+    // Check if all players have submitted
+    const allSubmitted = room.players.every(p => p.enhancedImage);
+    if (allSubmitted) {
+      room.state = 'guessing';
+      io.to(`drawguess_${roomId}`).emit('drawGuessAllSubmitted', { players: room.players, state: 'guessing' });
+    }
+  });
+
+  socket.on('drawGuessSubmitGuess', ({ roomId, guess, targetPlayerId }) => {
+    const room = rooms.get(`drawguess_${roomId}`);
+    if (!room) return;
+
+    const targetPlayer = room.players.find(p => p.id === targetPlayerId);
+    const guessingPlayer = room.players.find(p => p.id === socket.id);
+
+    if (targetPlayer && guessingPlayer) {
+      // Simple scoring: exact match = 100 points, close match = 50 points
+      const targetPrompt = targetPlayer.prompt.toLowerCase();
+      const guessLower = guess.toLowerCase();
+
+      if (guessLower === targetPrompt) {
+        guessingPlayer.score += 100;
+      } else if (targetPrompt.includes(guessLower) || guessLower.includes(targetPrompt)) {
+        guessingPlayer.score += 50;
+      }
+
+      targetPlayer.guess = guess;
+    }
+
+    // Check if everyone has guessed all drawings
+    const allGuessed = room.players.every(p => p.guess !== '' || p.id === socket.id);
+    if (allGuessed) {
+      room.state = 'results';
+      io.to(`drawguess_${roomId}`).emit('drawGuessResults', { players: room.players, state: 'results' });
+    }
+  });
+
+  socket.on('drawGuessPlayAgain', ({ roomId }) => {
+    const room = rooms.get(`drawguess_${roomId}`);
+    if (!room) return;
+
+    // Reset players
+    room.players.forEach(player => {
+      player.prompt = '';
+      player.drawing = '';
+      player.enhancedImage = '';
+      player.guess = '';
+      player.score = 0;
+    });
+
+    room.state = 'lobby';
+    io.to(`drawguess_${roomId}`).emit('drawGuessReset', { players: room.players, state: 'lobby' });
+  });
+
+  // ============================================
   // CASINO GAME HANDLERS
   // ============================================
 
