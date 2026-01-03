@@ -119,7 +119,11 @@ function BlackjackGame() {
         newSocket.close();
       };
     }
-  }, [mode]);, isPublic });
+  }, [mode]);
+
+  const createLobby = () => {
+    if (socket && playerName) {
+      socket.emit('casinoCreateLobby', { playerName, isPublic });
       setMyPlayerId(socket.id!);
     }
   };
@@ -136,11 +140,7 @@ function BlackjackGame() {
 
   const refreshLobbies = () => {
     if (socket) {
-      socket.emit('getCasinoPublicLobbiesame && lobbyCode) {
-      socket.emit('casinoJoinLobby', { roomId: lobbyCode, playerName });
-      setRoomId(lobbyCode);
-      setMyPlayerId(socket.id!);
-      setGameState('lobby');
+      socket.emit('getCasinoPublicLobbies');
     }
   };
 
@@ -150,6 +150,11 @@ function BlackjackGame() {
     } else {
       // Single player
       setGameState('betting');
+    }
+  };
+
+  const placeBet = () => {
+    const bet = parseInt(betInput);
     const totalSideBets = sideBets.perfectPairs + sideBets.twentyOnePlus3;
     const totalBet = bet + totalSideBets;
     
@@ -174,10 +179,9 @@ function BlackjackGame() {
     } else if (area === 'perfectPairs') {
       setSideBets({ ...sideBets, perfectPairs: sideBets.perfectPairs + selectedChip });
     } else if (area === 'twentyOnePlus3') {
-      setSideBets({ ...sideBets, twentyOnePlus3: sideBets.twentyOnePlus3 + selectedChip });f (socket) {
-        socket.emit('casinoPlaceBet', { roomId, bet });
-      } else {
-        // Single player - deal cards immediately
+      setSideBets({ ...sideBets, twentyOnePlus3: sideBets.twentyOnePlus3 + selectedChip });
+    }
+  };
         dealInitialCards(bet);
       }
     }
