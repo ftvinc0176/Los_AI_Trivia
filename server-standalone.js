@@ -677,7 +677,10 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('casinoTurnUpdate', { currentTurn: room.currentTurn });
     }
   });
- || room.currentTurn !== socket.id) return;
+
+  socket.on('casinoHit', ({ roomId }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room || room.currentTurn !== socket.id) return;
 
     const player = room.players.find(p => p.id === socket.id);
     if (!player || player.isStanding || player.isBusted) return;
