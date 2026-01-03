@@ -52,15 +52,25 @@ correctAnswer is the index (0-3) of the correct option.`;
 
 async function generateQuestions(category, difficulty, count) {
   try {
-    const response = await fetch(`${process.env.API_URL || 'http://localhost:3001'}/api/generate-questions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, difficulty, count }),
-    });
-    const data = await response.json();
-    return data.questions;
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    const prompt = `Generate ${count} trivia questions about ${category} with ${difficulty} difficulty.
+Return ONLY a valid JSON array with this exact structure:
+[{"question": "question text", "options": ["A", "B", "C", "D"], "correctAnswer": 0}]
+correctAnswer is the index (0-3) of the correct option.`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    
+    if (!jsonMatch) throw new Error('No JSON found');
+    
+    const questions = JSON.parse(jsonMatch[0]);
+    return questions;
   } catch (error) {
-    console.error('Error fetching questions:', error);
+    console.error('Error generating questions:', error);
     return [];
   }
 }
