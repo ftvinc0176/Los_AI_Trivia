@@ -45,6 +45,8 @@ function BlackjackGame() {
   const [resultMessage, setResultMessage] = useState('');
   const [selectedChip, setSelectedChip] = useState(25);
   const [sideBets, setSideBets] = useState({ perfectPairs: 0, twentyOnePlus3: 0 });
+  const [sideBetResults, setSideBetResults] = useState({ perfectPairs: '', twentyOnePlus3: '', perfectPairsWin: 0, twentyOnePlus3Win: 0 });
+  const [showDealerHole, setShowDealerHole] = useState(false);
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -193,11 +195,85 @@ function BlackjackGame() {
       setDealerHandValue(dealerCard1.numValue);
       setIsDealing(false);
       setCanHit(true);
+      setShowDealerHole(false);
       
       // Store full dealer hand in state for later
       (window as any).dealerFullHand = dealerHandInitial;
       (window as any).gameDeck = deck;
+      
+      // Check side bets
+      checkSideBets(playerHand, dealerCard1);
     }, 1000);
+  };
+
+  const checkSideBets = (playerHand: Card[], dealerUpCard: Card) => {
+    let ppResult = '';
+    let ppWin = 0;
+    let tp3Result = '';
+    let tp3Win = 0;
+    
+    // Perfect Pairs - checks if player's first two cards are a pair
+    if (sideBets.perfectPairs > 0) {
+      const card1 = playerHand[0];
+      const card2 = playerHand[1];
+      
+      if (card1.value === card2.value && card1.suit === card2.suit) {
+        ppResult = 'Perfect Pair!';
+        ppWin = sideBets.perfectPairs * 25; // 25:1
+      } else if (card1.value === card2.value && (card1.suit === '♥️' || card1.suit === '♦️') === (card2.suit === '♥️' || card2.suit === '♦️')) {
+        ppResult = 'Colored Pair!';
+        ppWin = sideBets.perfectPairs * 12; // 12:1
+      } else if (card1.value === card2.value) {
+        ppResult = 'Mixed Pair!';
+        ppWin = sideBets.perfectPairs * 6; // 6:1
+      } else {
+        ppResult = 'No pair';
+      }
+    }
+    
+    // 21+3 - checks for poker hands with player's first two cards and dealer's up card
+    if (sideBets.twentyOnePlus3 > 0) {
+      const cards = [playerHand[0], playerHand[1], dealerUpCard];
+      const values = cards.map(c => c.value).sort();
+      const suits = cards.map(c => c.suit);
+      const allSameSuit = suits.every(s => s === suits[0]);
+      
+      // Check for straight
+      const valueOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+      const indices = values.map(v => valueOrder.indexOf(v));
+      const sortedIndices = [...indices].sort((a, b) => a - b);
+      const isStraight = sortedIndices.every((val, i, arr) => i === 0 || val === arr[i-1] + 1) || 
+                         (sortedIndices[0] === 0 && sortedIndices[1] === 11 && sortedIndices[2] === 12); // A-Q-K
+      
+      // Check for three of a kind
+      const isThreeOfKind = values.every(v => v === values[0]);
+      
+      if (isThreeOfKind && allSameSuit) {
+        tp3Result = 'Suited Trips!';
+        tp3Win = sideBets.twentyOnePlus3 * 100; // 100:1
+      } else if (isStraight && allSameSuit) {
+        tp3Result = 'Straight Flush!';
+        tp3Win = sideBets.twentyOnePlus3 * 40; // 40:1
+      } else if (isThreeOfKind) {
+        tp3Result = 'Three of a Kind!';
+        tp3Win = sideBets.twentyOnePlus3 * 30; // 30:1
+      } else if (isStraight) {
+        tp3Result = 'Straight!';
+        tp3Win = sideBets.twentyOnePlus3 * 10; // 10:1
+      } else if (allSameSuit) {
+        tp3Result = 'Flush!';
+        tp3Win = sideBets.twentyOnePlus3 * 5; // 5:1
+      } else {
+        tp3Result = 'No winning hand';
+      }
+    }
+    
+    setSideBetResults({ perfectPairs: ppResult, twentyOnePlus3: tp3Result, perfectPairsWin: ppWin, twentyOnePlus3Win: tp3Win });
+    
+    // Add side bet winnings immediately
+    if (ppWin > 0 || tp3Win > 0) {
+      setBalance(prev => prev + ppWin + tp3Win);
+    }
   };
 
   const createDeck = (): Card[] => {
@@ -246,6 +322,74 @@ function BlackjackGame() {
     return value;
   };
 
+  const checkSideBets = (playerHand: Card[], dealerUpCard: Card) => {
+    let ppResult = '';
+    let ppWin = 0;
+    let tp3Result = '';
+    let tp3Win = 0;
+    
+    // Perfect Pairs - checks if player's first two cards are a pair
+    if (sideBets.perfectPairs > 0) {
+      const card1 = playerHand[0];
+      const card2 = playerHand[1];
+      
+      if (card1.value === card2.value && card1.suit === card2.suit) {
+        ppResult = 'Perfect Pair!';
+        ppWin = sideBets.perfectPairs * 25; // 25:1
+      } else if (card1.value === card2.value && (card1.suit === '♥️' || card1.suit === '♦️') === (card2.suit === '♥️' || card2.suit === '♦️')) {
+        ppResult = 'Colored Pair!';
+        ppWin = sideBets.perfectPairs * 12; // 12:1
+      } else if (card1.value === card2.value) {
+        ppResult = 'Mixed Pair!';
+        ppWin = sideBets.perfectPairs * 6; // 6:1
+      } else {
+        ppResult = 'No pair';
+      }
+    }
+    
+    // 21+3 - checks for poker hands with player's first two cards and dealer's up card
+    if (sideBets.twentyOnePlus3 > 0) {
+      const cards = [playerHand[0], playerHand[1], dealerUpCard];
+      const values = cards.map(c => c.value).sort();
+      const suits = cards.map(c => c.suit);
+      const allSameSuit = suits.every(s => s === suits[0]);
+      
+      // Check for straight
+      const valueOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+      const indices = values.map(v => valueOrder.indexOf(v));
+      const isStraight = indices.sort((a, b) => a - b).every((val, i, arr) => i === 0 || val === arr[i-1] + 1);
+      
+      // Check for three of a kind
+      const isThreeOfKind = values.every(v => v === values[0]);
+      
+      if (isThreeOfKind && allSameSuit) {
+        tp3Result = 'Suited Trips!';
+        tp3Win = sideBets.twentyOnePlus3 * 100; // 100:1
+      } else if (isStraight && allSameSuit) {
+        tp3Result = 'Straight Flush!';
+        tp3Win = sideBets.twentyOnePlus3 * 40; // 40:1
+      } else if (isThreeOfKind) {
+        tp3Result = 'Three of a Kind!';
+        tp3Win = sideBets.twentyOnePlus3 * 30; // 30:1
+      } else if (isStraight) {
+        tp3Result = 'Straight!';
+        tp3Win = sideBets.twentyOnePlus3 * 10; // 10:1
+      } else if (allSameSuit) {
+        tp3Result = 'Flush!';
+        tp3Win = sideBets.twentyOnePlus3 * 5; // 5:1
+      } else {
+        tp3Result = 'No winning hand';
+      }
+    }
+    
+    setSideBetResults({ perfectPairs: ppResult, twentyOnePlus3: tp3Result, perfectPairsWin: ppWin, twentyOnePlus3Win: tp3Win });
+    
+    // Add side bet winnings immediately
+    if (ppWin > 0 || tp3Win > 0) {
+      setBalance(prev => prev + ppWin + tp3Win);
+    }
+  };
+
   const hit = () => {
     if (socket) {
       socket.emit('casinoHit', { roomId });
@@ -267,6 +411,7 @@ function BlackjackGame() {
 
   const stand = () => {
     setCanHit(false);
+    setShowDealerHole(true);
     
     if (socket) {
       socket.emit('casinoStand', { roomId });
@@ -335,6 +480,10 @@ function BlackjackGame() {
     setBetAmount(0);
     setResultMessage('');
     setCanHit(true);
+    setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
+    setSideBetResults({ perfectPairs: '', twentyOnePlus3: '', perfectPairsWin: 0, twentyOnePlus3Win: 0 });
+    setShowDealerHole(false);
+    setBetInput('100');
     setGameState('betting');
   };
 
@@ -441,8 +590,9 @@ function BlackjackGame() {
             
             {/* Table Text */}
             <div className="relative text-center mb-8">
-              <h1 className="text-4xl font-bold text-yellow-600/40 mb-2">BLACKJACK PAYS 3 TO 2</h1>
-              <p className="text-lg text-yellow-600/30">Dealer stands on all 17 and above</p>
+              <h1 className="text-5xl font-bold text-yellow-600/30 mb-2" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>BLACKJACK PAYS 3 TO 2</h1>
+              <p className="text-xl text-yellow-600/25" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>Dealer stands on all 17 and above</p>
+              <p className="text-xl text-yellow-600/25 mt-1" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>INSURANCE PAYS 2 TO 1</p>
             </div>
 
             {/* Betting Areas */}
@@ -451,13 +601,18 @@ function BlackjackGame() {
               <div className="flex flex-col items-center">
                 <div 
                   onClick={() => addChipToBet('perfectPairs')}
-                  className="w-32 h-32 rounded-full border-4 border-yellow-600/50 bg-green-700 flex flex-col items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
+                  className="w-36 h-36 rounded-full border-4 border-yellow-600/40 bg-green-700/80 flex flex-col items-center justify-center cursor-pointer hover:border-yellow-500/60 transition-all relative shadow-inner"
                 >
-                  <span className="text-yellow-600/60 text-xs font-bold">PERFECT</span>
-                  <span className="text-yellow-600/60 text-xs font-bold">PAIRS</span>
+                  <span className="text-yellow-600/50 text-sm font-bold">PERFECT</span>
+                  <span className="text-yellow-600/50 text-sm font-bold">PAIRS</span>
                   {sideBets.perfectPairs > 0 && (
-                    <div className="absolute -top-4">
-                      <div className="w-12 h-12 rounded-full bg-red-600 border-4 border-white flex items-center justify-center shadow-lg">
+                    <div className="absolute -top-8 flex flex-col items-center">
+                      {Array.from({ length: Math.min(Math.floor(sideBets.perfectPairs / 25), 5) }).map((_, i) => (
+                        <div key={i} className="w-14 h-14 rounded-full bg-red-600 border-4 border-white flex items-center justify-center shadow-xl" style={{ marginTop: i > 0 ? '-40px' : '0', zIndex: 5 - i }}>
+                          <span className="text-white font-bold text-xs">25</span>
+                        </div>
+                      ))}
+                      <div className="mt-1 bg-black/70 px-3 py-1 rounded-full">
                         <span className="text-white font-bold text-sm">{sideBets.perfectPairs}</span>
                       </div>
                     </div>
@@ -469,30 +624,44 @@ function BlackjackGame() {
               <div className="flex flex-col items-center">
                 <div 
                   onClick={() => addChipToBet('main')}
-                  className="w-40 h-40 rounded-full border-4 border-yellow-600 bg-green-700 flex items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
+                  className="w-48 h-48 rounded-full border-4 border-yellow-600 bg-green-700/80 flex items-center justify-center cursor-pointer hover:border-yellow-500 transition-all relative shadow-inner"
                 >
-                  <span className="text-yellow-600 text-2xl font-bold">{betInput || 0}</span>
+                  {parseInt(betInput || '0') === 0 && <span className="text-yellow-600/50 text-3xl font-bold">0</span>}
                   {parseInt(betInput || '0') > 0 && (
-                    <div className="absolute -top-6">
-                      <div className="w-16 h-16 rounded-full bg-blue-600 border-4 border-white flex items-center justify-center shadow-lg">
-                        <span className="text-white font-bold">{betInput}</span>
+                    <div className="absolute -top-12 flex flex-col items-center">
+                      {Array.from({ length: Math.min(Math.ceil(parseInt(betInput) / 100), 6) }).map((_, i) => {
+                        const chipValue = parseInt(betInput) >= 500 ? 500 : parseInt(betInput) >= 250 ? 250 : parseInt(betInput) >= 100 ? 100 : parseInt(betInput) >= 50 ? 50 : 25;
+                        const chipColor = chipValue === 500 ? 'bg-yellow-600' : chipValue === 250 ? 'bg-purple-600' : chipValue === 100 ? 'bg-green-600' : chipValue === 50 ? 'bg-blue-600' : 'bg-red-600';
+                        return (
+                          <div key={i} className={`w-16 h-16 rounded-full ${chipColor} border-4 border-white flex items-center justify-center shadow-xl`} style={{ marginTop: i > 0 ? '-48px' : '0', zIndex: 6 - i }}>
+                            <span className="text-white font-bold">{chipValue}</span>
+                          </div>
+                        );
+                      })}
+                      <div className="mt-2 bg-black/70 px-4 py-1 rounded-full">
+                        <span className="text-white font-bold text-lg">{betInput}</span>
                       </div>
                     </div>
                   )}
                 </div>
-                <span className="text-yellow-600 text-sm mt-2 font-bold">MAIN BET</span>
+                <span className="text-yellow-600 text-base mt-3 font-bold">MAIN BET</span>
               </div>
 
               {/* Side Bet: 21+3 */}
               <div className="flex flex-col items-center">
                 <div 
                   onClick={() => addChipToBet('twentyOnePlus3')}
-                  className="w-32 h-32 rounded-full border-4 border-yellow-600/50 bg-green-700 flex flex-col items-center justify-center cursor-pointer hover:bg-green-600 transition-all relative"
+                  className="w-36 h-36 rounded-full border-4 border-yellow-600/40 bg-green-700/80 flex flex-col items-center justify-center cursor-pointer hover:border-yellow-500/60 transition-all relative shadow-inner"
                 >
-                  <span className="text-yellow-600/60 text-lg font-bold">21+3</span>
+                  <span className="text-yellow-600/50 text-xl font-bold">21+3</span>
                   {sideBets.twentyOnePlus3 > 0 && (
-                    <div className="absolute -top-4">
-                      <div className="w-12 h-12 rounded-full bg-green-600 border-4 border-white flex items-center justify-center shadow-lg">
+                    <div className="absolute -top-8 flex flex-col items-center">
+                      {Array.from({ length: Math.min(Math.floor(sideBets.twentyOnePlus3 / 25), 5) }).map((_, i) => (
+                        <div key={i} className="w-14 h-14 rounded-full bg-green-600 border-4 border-white flex items-center justify-center shadow-xl" style={{ marginTop: i > 0 ? '-40px' : '0', zIndex: 5 - i }}>
+                          <span className="text-white font-bold text-xs">25</span>
+                        </div>
+                      ))}
+                      <div className="mt-1 bg-black/70 px-3 py-1 rounded-full">
                         <span className="text-white font-bold text-sm">{sideBets.twentyOnePlus3}</span>
                       </div>
                     </div>
@@ -565,56 +734,120 @@ function BlackjackGame() {
             {/* Dealer Area */}
             <div className="relative mb-16">
               <div className="text-center mb-4">
-                <span className="text-yellow-300 text-xl font-bold">Dealer: {dealerHandValue}</span>
+                <div className="inline-block bg-black/50 px-6 py-2 rounded-full">
+                  <span className="text-yellow-300 text-2xl font-bold">DEALER: {showDealerHole ? dealerHandValue : '?'}</span>
+                </div>
               </div>
-              <div className="flex justify-center gap-2">
+              <div className="flex justify-center gap-3">
                 {dealerHand.map((card, idx) => (
                   <div
                     key={idx}
-                    className="w-20 h-28 bg-white rounded-lg shadow-2xl flex flex-col items-center justify-center border-2 border-gray-300"
+                    className="relative w-24 h-36 bg-white rounded-xl shadow-2xl border-2 border-gray-400"
                     style={{ 
                       animation: 'cardDeal 0.3s ease-out forwards',
-                      animationDelay: `${idx * 0.1}s`,
-                      opacity: 0
+                      animationDelay: `${idx * 0.15}s`,
+                      opacity: 0,
+                      transform: 'perspective(1000px)'
                     }}
                   >
-                    <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                      {card.suit}
+                    <div className="absolute top-2 left-2">
+                      <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                        {card.value}
+                      </div>
+                      <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                        {card.suit}
+                      </div>
                     </div>
-                    <div className={`text-xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                      {card.value}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                      <div className={`text-6xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                        {card.suit}
+                      </div>
+                    </div>
+                    <div className="absolute bottom-2 right-2 rotate-180">
+                      <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                        {card.value}
+                      </div>
+                      <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                        {card.suit}
+                      </div>
                     </div>
                   </div>
                 ))}
+                {/* Dealer hole card */}
+                {!showDealerHole && dealerHand.length === 1 && (
+                  <div
+                    className="w-24 h-36 bg-gradient-to-br from-blue-900 to-red-900 rounded-xl shadow-2xl border-2 border-gray-400 flex items-center justify-center"
+                    style={{ 
+                      animation: 'cardDeal 0.3s ease-out forwards',
+                      animationDelay: '0.15s',
+                      opacity: 0,
+                      backgroundImage: 'repeating-linear-gradient(45deg, #1e3a8a 0px, #1e3a8a 10px, #991b1b 10px, #991b1b 20px)'
+                    }}
+                  >
+                    <div className="text-white text-4xl font-bold opacity-30">🂠</div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Player Area */}
             <div className="relative">
               <div className="flex flex-col items-center">
-                <div className="flex gap-2 mb-4">
+                <div className="flex gap-3 mb-6">
                   {myHand.map((card, idx) => (
                     <div
                       key={idx}
-                      className="w-20 h-28 bg-white rounded-lg shadow-2xl flex flex-col items-center justify-center border-2 border-gray-300"
+                      className="relative w-24 h-36 bg-white rounded-xl shadow-2xl border-2 border-gray-400"
                       style={{ 
                         animation: 'cardDeal 0.3s ease-out forwards',
-                        animationDelay: `${(idx + 2) * 0.1}s`,
-                        opacity: 0
+                        animationDelay: `${(idx + 2) * 0.15}s`,
+                        opacity: 0,
+                        transform: 'perspective(1000px)'
                       }}
                     >
-                      <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                        {card.suit}
+                      <div className="absolute top-2 left-2">
+                        <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                          {card.value}
+                        </div>
+                        <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                          {card.suit}
+                        </div>
                       </div>
-                      <div className={`text-xl font-bold ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-500' : 'text-black'}`}>
-                        {card.value}
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                        <div className={`text-6xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                          {card.suit}
+                        </div>
+                      </div>
+                      <div className="absolute bottom-2 right-2 rotate-180">
+                        <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                          {card.value}
+                        </div>
+                        <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                          {card.suit}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="bg-green-700 px-6 py-3 rounded-lg border-2 border-yellow-600">
-                  <p className="text-yellow-300 text-xl font-bold">Your Hand: {myHandValue}</p>
-                  <p className="text-white text-sm">Bet: {currentBet} LosBucks</p>
+                <div className="bg-black/70 px-8 py-4 rounded-2xl border-2 border-yellow-600 shadow-xl">
+                  <p className="text-yellow-300 text-2xl font-bold mb-1">YOUR HAND: {myHandValue}</p>
+                  <p className="text-white text-lg">Main Bet: {currentBet} LosBucks</p>
+                  
+                  {/* Side Bet Results */}
+                  {(sideBetResults.perfectPairs || sideBetResults.twentyOnePlus3) && (
+                    <div className="mt-3 pt-3 border-t border-yellow-600/30">
+                      {sideBetResults.perfectPairs && (
+                        <div className={`text-sm mb-1 ${sideBetResults.perfectPairsWin > 0 ? 'text-green-400 font-bold' : 'text-red-400'}`}>
+                          Perfect Pairs: {sideBetResults.perfectPairs} {sideBetResults.perfectPairsWin > 0 && `+${sideBetResults.perfectPairsWin} LosBucks!`}
+                        </div>
+                      )}
+                      {sideBetResults.twentyOnePlus3 && (
+                        <div className={`text-sm ${sideBetResults.twentyOnePlus3Win > 0 ? 'text-green-400 font-bold' : 'text-red-400'}`}>
+                          21+3: {sideBetResults.twentyOnePlus3} {sideBetResults.twentyOnePlus3Win > 0 && `+${sideBetResults.twentyOnePlus3Win} LosBucks!`}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
