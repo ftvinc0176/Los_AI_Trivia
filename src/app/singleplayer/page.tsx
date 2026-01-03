@@ -70,21 +70,32 @@ export default function SinglePlayer() {
 
   const startGame = async () => {
     setLoading(true);
+    setQuestions([]); // Clear old questions immediately
+    
     try {
       // Generate all 10 questions in one API call with progressive difficulty
+      // Add timestamp to prevent any caching
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store', // Prevent caching
         body: JSON.stringify({ 
           category: 'Mixed - use all categories',
           difficulty: 'Progressive',
           count: 10,
           progressive: true,
-          categories: CATEGORIES
+          categories: CATEGORIES,
+          timestamp: Date.now() // Cache buster
         }),
       });
       
       const data = await response.json();
+      
+      // Ensure we got fresh questions
+      if (!data.questions || data.questions.length !== 10) {
+        throw new Error('Invalid questions received');
+      }
+      
       setQuestions(data.questions);
       setGameState('playing');
       setCurrentQuestion(0);
@@ -99,6 +110,7 @@ export default function SinglePlayer() {
     } catch (error) {
       console.error('Error generating questions:', error);
       alert('Failed to generate questions. Please try again.');
+      setGameState('setup'); // Return to setup on error
     }
     setLoading(false);
   };
