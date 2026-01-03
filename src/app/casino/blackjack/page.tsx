@@ -50,6 +50,8 @@ function BlackjackGame() {
   const [hasDoubled, setHasDoubled] = useState(false);
   const [canDouble, setCanDouble] = useState(false);
   const [canSplit, setCanSplit] = useState(false);
+  const [currentTurn, setCurrentTurn] = useState<string | null>(null);
+  const [isMyTurn, setIsMyTurn] = useState(false);
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -66,21 +68,44 @@ function BlackjackGame() {
         setPlayers(players);
       });
 
+      newSocket.on('casinoPlayersUpdate', ({ players }: { players: Player[] }) => {
+        setPlayers(players);
+      });
+
+      newSocket.on('casinoTurnUpdate', ({ currentTurn }: { currentTurn: string }) => {
+        setCurrentTurn(currentTurn);
+        setIsMyTurn(currentTurn === newSocket.id);
+      });
+
       newSocket.on('casinoGameStarted', () => {
         setGameState('betting');
       });
 
-      newSocket.on('casinoDealCards', ({ players, dealer }: { players: Player[]; dealer: { hand: Card[]; value: number } }) => {
+      newSocket.on('casinoDealCards', ({ players, dealer, currentTurn }: { players: Player[]; dealer: { hand: Card[]; value: number }; currentTurn: string }) => {
         setPlayers(players);
-        setDealerHand(dealer.hand);
-        setDealerHandValue(dealer.value);
+        setDealerHand([dealer.hand[0]]); // Only show one dealer card initially
+        setDealerHandValue(dealer.hand[0].numValue);
+        setShowDealerHole(false);
         const me = players.find(p => p.id === newSocket.id);
         if (me) {
           setMyHand(me.hand);
-          setMyHandValue(me.handValue);
+          const playerVal = calculateHandValue(me.hand);
+          setMyHandValue(playerVal);
+          
+          // Check for blackjack or set turn abilities
+          if (playerVal === 21) {
+            setCanHit(false);
+            setCanDouble(false);
+            setCanSplit(false);
+          } else {
+            setCanDouble(me.balance >= me.currentBet && me.hand.length === 2);
+            setCanSplit(me.hand.length === 2 && me.hand[0].value === me.hand[1].value && me.balance >= me.currentBet);
+          }
         }
         setIsDealing(false);
-        setCanHit(true);
+        setCurrentTurn(currentTurn);
+        setIsMyTurn(currentTurn === newSocket.id);
+        setGameState('playing');
       });
 
       newSocket.on('casinoCardDealt', ({ playerId, card, handValue }: { playerId: string; card: Card; handValue: number }) => {
@@ -131,9 +156,10 @@ function BlackjackGame() {
 
   const startGame = () => {
     if (socket) {
+      // Allow starting with 1-3 players
       socket.emit('casinoStartGame', { roomId });
     } else {
-      // Single player
+      // Single player mode
       setGameState('betting');
     }
   };
@@ -371,7 +397,10 @@ function BlackjackGame() {
 
   const hit = () => {
     if (socket) {
+      if (!isMyTurn) return; // Can only hit on your turn
       socket.emit('casinoHit', { roomId });
+      setCanDouble(false); // Can't double after hitting
+      setCanSplit(false); // Can't split after hitting
     } else {
       const deck = (window as any).gameDeck as Card[];
       const newCard = deck.pop()!;
@@ -402,11 +431,12 @@ function BlackjackGame() {
     setCanHit(false);
     setCanDouble(false);
     setCanSplit(false);
-    setShowDealerHole(true);
     
     if (socket) {
+      if (!isMyTurn) return; // Can only stand on your turn
       socket.emit('casinoStand', { roomId });
     } else {
+      setShowDealerHole(true);
       // Only play dealer if player hasn't busted
       if (myHandValue > 21) {
         const dealerFullHand = (window as any).dealerFullHand as Card[];
@@ -451,9 +481,18 @@ function BlackjackGame() {
   };
 
   const doubleDown = () => {
+    if (socket) {
+      if (!isMyTurn) return; // Can only double on your turn
+      socket.emit('casinoDoubleDown', { roomId });
+      setCanHit(false);
+      setCanDouble(false);
+      setCanSplit(false);
+      return;
+    }
+    
     if (balance < currentBet) return;
     
-    // Double the bet
+    // Double the bet (single player)
     setBalance(balance - currentBet);
     setBetAmount(currentBet * 2);
     setHasDoubled(true);
@@ -635,12 +674,18 @@ function BlackjackGame() {
           </div>
           
           {players.length > 0 && players[0].id === myPlayerId && (
-            <button
-              onClick={startGame}
-              className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold text-lg"
-            >
-              Start Game
-            </button>
+            <>
+              <p className="text-white/60 text-sm mb-4 text-center">
+                {players.length === 1 ? 'You can start alone or wait for others to join (max 3 players)' : `${players.length}/3 players ready`}
+              </p>
+              <button
+                onClick={startGame}
+                disabled={players.length > 3}
+                className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold text-lg transition-all"
+              >
+                Start Game {players.length > 1 && `(${players.length} Players)`}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -797,6 +842,21 @@ function BlackjackGame() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
         <div className="max-w-6xl w-full">
+          {/* Turn Indicator for Multiplayer */}
+          {socket && (
+            <div className="text-center mb-4">
+              {isMyTurn ? (
+                <div className="inline-block bg-green-600 px-6 py-3 rounded-full animate-pulse">
+                  <p className="text-white font-bold text-xl">🎲 YOUR TURN 🎲</p>
+                </div>
+              ) : (
+                <div className="inline-block bg-gray-700 px-6 py-3 rounded-full">
+                  <p className="text-white/60 font-bold">Waiting for {players.find(p => p.id === currentTurn)?.name || 'other player'}...</p>
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Balance Display */}
           <div className="text-center mb-6">
             <p className="text-yellow-300 text-2xl font-bold">{balance} LosBucks</p>
@@ -928,24 +988,27 @@ function BlackjackGame() {
             </div>
 
             {/* Action Buttons */}
-            {canHit && !isDealing && (
+            {canHit && !isDealing && (!socket || isMyTurn) && (
               <div className="relative flex justify-center gap-3 mt-8 flex-wrap">
                 <button
                   onClick={hit}
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                  disabled={socket !== null && !isMyTurn}
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
                 >
                   HIT
                 </button>
                 <button
                   onClick={stand}
-                  className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                  disabled={socket !== null && !isMyTurn}
+                  className="px-8 py-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
                 >
                   STAND
                 </button>
                 {canDouble && (
                   <button
                     onClick={doubleDown}
-                    className="px-6 py-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                    disabled={socket !== null && !isMyTurn}
+                    className="px-6 py-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
                   >
                     DOUBLE DOWN
                   </button>
@@ -953,7 +1016,8 @@ function BlackjackGame() {
                 {canSplit && (
                   <button
                     onClick={split}
-                    className="px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                    disabled={socket !== null && !isMyTurn}
+                    className="px-6 py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xl transition-all shadow-lg"
                   >
                     SPLIT
                   </button>
