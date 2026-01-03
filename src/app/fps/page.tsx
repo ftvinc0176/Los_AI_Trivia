@@ -283,6 +283,50 @@ export default function FPS() {
   };
 
   if (!joined || !gameState) {
+    if (showLobbyBrowser) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20">
+            <h1 className="text-5xl font-bold text-white mb-8 text-center">🎯 Public FPS Lobbies</h1>
+            
+            {publicLobbies.length === 0 ? (
+              <div className="bg-white/10 rounded-xl p-8 mb-6 text-center">
+                <p className="text-white text-lg">No public lobbies available</p>
+                <p className="text-purple-200 text-sm mt-2">Create your own or try again later</p>
+              </div>
+            ) : (
+              <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
+                {publicLobbies.map((lobby) => (
+                  <div
+                    key={lobby.roomId}
+                    onClick={() => joinPublicLobby(lobby.roomId)}
+                    className="bg-white/10 hover:bg-white/20 rounded-xl p-4 cursor-pointer transition-all border border-white/20 hover:border-white/40"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-white font-bold text-lg">{lobby.hostName}'s Room</p>
+                        <p className="text-purple-200 text-sm">Code: {lobby.roomId}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-green-400 font-bold">{lobby.playerCount}/4 Players</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowLobbyBrowser(false)}
+              className="w-full px-8 py-4 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-all text-lg font-medium"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20">
@@ -302,33 +346,70 @@ export default function FPS() {
             </div>
 
             <div>
-              <label className="block text-white text-lg mb-3 font-medium">Room Code</label>
+              <label className="block text-white text-lg mb-3 font-medium">Room Code (optional)</label>
               <input
                 type="text"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                placeholder="Enter room code"
+                placeholder="Enter to join existing"
                 className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg placeholder-white/50 uppercase"
                 maxLength={6}
               />
             </div>
 
+            {!roomId.trim() && (
+              <div className="bg-white/10 rounded-xl p-4">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-white font-medium">Public Lobby</span>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-14 h-8 rounded-full transition-colors ${
+                      isPublic ? 'bg-green-500' : 'bg-gray-600'
+                    }`}>
+                      <div className={`w-6 h-6 bg-white rounded-full mt-1 transition-transform ${
+                        isPublic ? 'ml-7' : 'ml-1'
+                      }`}></div>
+                    </div>
+                  </div>
+                </label>
+                <p className="text-purple-200 text-xs mt-2">
+                  {isPublic ? 'Others can see and join your lobby' : 'Only players with code can join'}
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-4">
-              <button
-                onClick={joinRoom}
-                disabled={!playerName.trim() || !roomId.trim()}
-                className="flex-1 px-8 py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all text-lg font-bold disabled:opacity-50"
-              >
-                Join Room
-              </button>
-              <button
-                onClick={createRoom}
-                disabled={!playerName.trim()}
-                className="flex-1 px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-lg font-bold disabled:opacity-50"
-              >
-                Create Room
-              </button>
+              {roomId.trim() ? (
+                <button
+                  onClick={joinRoom}
+                  disabled={!playerName.trim()}
+                  className="flex-1 px-8 py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all text-lg font-bold disabled:opacity-50"
+                >
+                  Join Room
+                </button>
+              ) : (
+                <button
+                  onClick={createRoom}
+                  disabled={!playerName.trim()}
+                  className="flex-1 px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-lg font-bold disabled:opacity-50"
+                >
+                  Create Room
+                </button>
+              )}
             </div>
+
+            <button
+              onClick={requestPublicLobbies}
+              disabled={!playerName.trim()}
+              className="w-full px-8 py-4 bg-purple-500 text-white rounded-xl hover:bg-purple-600 transition-all text-lg font-bold disabled:opacity-50"
+            >
+              Browse Public Lobbies
+            </button>
 
             <button
               onClick={() => router.push('/')}
