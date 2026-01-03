@@ -606,12 +606,13 @@ io.on('connection', (socket) => {
   socket.on('getCasinoPublicLobbies', () => {
     const publicLobbies = [];
     rooms.forEach((room, key) => {
-      if (key.startsWith('casino_') && room.isPublic && room.state === 'lobby') {
+      if (key.startsWith('casino_') && room.isPublic && room.players.length < 3) {
         const roomId = key.replace('casino_', '');
         publicLobbies.push({
           roomId,
           playerCount: room.players.length,
-          maxPlayers: 4
+          maxPlayers: 3,
+          state: room.state
         });
       }
     });
