@@ -19,6 +19,7 @@ interface Player {
   handValue: number;
   isStanding: boolean;
   isBusted: boolean;
+  sideBets?: { perfectPairs: number; twentyOnePlus3: number };
 }
 
 function BlackjackGame() {
@@ -53,6 +54,7 @@ function BlackjackGame() {
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; playerCount: number; maxPlayers: number }>>([]);
+  const [roundResults, setRoundResults] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -130,12 +132,13 @@ function BlackjackGame() {
         setPlayers(players);
         setDealerHand(dealer.hand);
         setDealerHandValue(dealer.value);
+        setShowDealerHole(true);
+        setRoundResults(results);
         const me = players.find((p: Player) => p.id === newSocket.id);
         if (me && newSocket.id) {
           setBalance(me.balance);
-          setResultMessage(results[newSocket.id] || '');
         }
-        setGameState('results');
+        // Stay in 'playing' state to show results on table
       });
 
       return () => {
@@ -192,6 +195,13 @@ function BlackjackGame() {
       // Single player mode
       setGameState('betting');
     }
+  };
+
+  const nextHand = () => {
+    setRoundResults({});
+    setShowDealerHole(false);
+    setCanHit(true);
+    setGameState('betting');
   };
 
   const placeBet = () => {
@@ -305,8 +315,8 @@ function BlackjackGame() {
     }
     
     setBalance(balance + winAmount);
-    setResultMessage(message);
-    setGameState('results');
+    setShowDealerHole(true);
+    setRoundResults({ 'single': message });
   };
 
   const checkSideBets = (playerHand: Card[], dealerUpCard: Card) => {
@@ -609,8 +619,8 @@ function BlackjackGame() {
     }
     
     setBalance(balance + winAmount);
-    setResultMessage(message);
-    setGameState('results');
+    setShowDealerHole(true);
+    setRoundResults({ 'single': message });
   };
 
   const playAgain = () => {
@@ -1023,70 +1033,191 @@ function BlackjackGame() {
               </div>
             </div>
 
-            {/* Player Area */}
+            {/* Players Area - Show all players in multiplayer */}
             <div className="relative">
-              <div className="flex flex-col items-center">
-                <div className="flex gap-3 mb-6">
-                  {myHand.map((card, idx) => (
-                    <div
-                      key={idx}
-                      className="relative w-24 h-36 bg-white rounded-xl shadow-2xl border-2 border-gray-400"
-                      style={{ 
-                        animation: 'cardDeal 0.3s ease-out forwards',
-                        animationDelay: `${(idx + 2) * 0.15}s`,
-                        opacity: 0,
-                        transform: 'perspective(1000px)'
-                      }}
-                    >
-                      <div className="absolute top-2 left-2">
-                        <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
-                          {card.value}
+              {socket && players.length > 1 ? (
+                /* Multiplayer: Show all players */
+                <div className="flex justify-around items-end gap-4">
+                  {players.map((player) => {
+                    const isMe = player.id === myPlayerId;
+                    const isTurn = player.id === currentTurn;
+                    const result = roundResults[player.id];
+                    return (
+                      <div key={player.id} className="flex flex-col items-center">
+                        {/* Result Message Above Hand */}
+                        {result && (
+                          <div className={`mb-3 px-4 py-2 rounded-lg font-bold text-center ${
+                            result.includes('win') || result.includes('Win') 
+                              ? 'bg-green-600 text-white' 
+                              : result.includes('Push') 
+                                ? 'bg-yellow-600 text-black' 
+                                : 'bg-red-600 text-white'
+                          }`}>
+                            <div className="text-sm">{result}</div>
+                            {player.sideBets && (player.sideBets.perfectPairs > 0 || player.sideBets.twentyOnePlus3 > 0) && (
+                              <div className="text-xs mt-1 opacity-90">
+                                {player.sideBets.perfectPairs > 0 && <div>Perfect Pairs bet</div>}
+                                {player.sideBets.twentyOnePlus3 > 0 && <div>21+3 bet</div>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2 mb-4">
+                          {player.hand.map((card, idx) => (
+                            <div
+                              key={idx}
+                              className="relative w-20 h-28 bg-white rounded-lg shadow-xl border-2 border-gray-400"
+                              style={{ 
+                                animation: 'cardDeal 0.3s ease-out forwards',
+                                animationDelay: `${(idx + 2) * 0.15}s`,
+                                opacity: 0,
+                                transform: 'perspective(1000px)'
+                              }}
+                            >
+                              <div className="absolute top-1 left-1">
+                                <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                  {card.value}
+                                </div>
+                                <div className={`text-xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                  {card.suit}
+                                </div>
+                              </div>
+                              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                                <div className={`text-4xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                  {card.suit}
+                                </div>
+                              </div>
+                              <div className="absolute bottom-1 right-1 rotate-180">
+                                <div className={`text-2xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                  {card.value}
+                                </div>
+                                <div className={`text-xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                                  {card.suit}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
-                          {card.suit}
+                        <div className={`px-6 py-3 rounded-2xl shadow-xl ${
+                          isMe 
+                            ? 'bg-yellow-600 border-2 border-yellow-400' 
+                            : isTurn 
+                              ? 'bg-green-600 border-2 border-green-400 animate-pulse' 
+                              : player.isStanding 
+                                ? 'bg-gray-700 border-2 border-gray-500' 
+                                : player.isBusted 
+                                  ? 'bg-red-900 border-2 border-red-700' 
+                                  : 'bg-black/70 border-2 border-white/30'
+                        }`}>
+                          <p className={`font-bold text-lg ${isMe ? 'text-black' : 'text-white'}`}>
+                            {isMe ? 'YOU' : player.name}
+                          </p>
+                          <p className={`text-xl font-bold ${isMe ? 'text-black' : 'text-yellow-300'}`}>
+                            {player.handValue}
+                          </p>
+                          <p className={`text-sm ${isMe ? 'text-black/70' : 'text-white/70'}`}>
+                            Bet: {player.currentBet}
+                          </p>
+                          {player.isStanding && !result && (
+                            <p className="text-xs text-white/90 mt-1">STANDING</p>
+                          )}
+                          {player.isBusted && (
+                            <p className="text-xs text-red-300 mt-1 font-bold">BUSTED!</p>
+                          )}
                         </div>
                       </div>
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                        <div className={`text-6xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
-                          {card.suit}
-                        </div>
-                      </div>
-                      <div className="absolute bottom-2 right-2 rotate-180">
-                        <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
-                          {card.value}
-                        </div>
-                        <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
-                          {card.suit}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-                <div className="bg-black/70 px-8 py-4 rounded-2xl border-2 border-yellow-600 shadow-xl">
-                  <p className="text-yellow-300 text-2xl font-bold mb-1">YOUR HAND: {myHandValue}</p>
-                  <p className="text-white text-lg">Main Bet: {currentBet} LosBucks</p>
-                  
-                  {/* Side Bet Results */}
-                  {(sideBetResults.perfectPairs || sideBetResults.twentyOnePlus3) && (
-                    <div className="mt-3 pt-3 border-t border-yellow-600/30">
-                      {sideBetResults.perfectPairs && (
-                        <div className={`text-sm mb-1 ${sideBetResults.perfectPairsWin > 0 ? 'text-green-400 font-bold' : 'text-red-400'}`}>
-                          Perfect Pairs: {sideBetResults.perfectPairs} {sideBetResults.perfectPairsWin > 0 && `+${sideBetResults.perfectPairsWin} LosBucks!`}
-                        </div>
-                      )}
-                      {sideBetResults.twentyOnePlus3 && (
-                        <div className={`text-sm ${sideBetResults.twentyOnePlus3Win > 0 ? 'text-green-400 font-bold' : 'text-red-400'}`}>
-                          21+3: {sideBetResults.twentyOnePlus3} {sideBetResults.twentyOnePlus3Win > 0 && `+${sideBetResults.twentyOnePlus3Win} LosBucks!`}
-                        </div>
-                      )}
+              ) : (
+                /* Single Player: Show just your hand */
+                <div className="flex flex-col items-center">
+                  {/* Result Message Above Hand */}
+                  {roundResults['single'] && (
+                    <div className={`mb-4 px-6 py-3 rounded-lg font-bold text-xl ${
+                      roundResults['single'].includes('win') || roundResults['single'].includes('Win') 
+                        ? 'bg-green-600 text-white' 
+                        : roundResults['single'].includes('Push') 
+                          ? 'bg-yellow-600 text-black' 
+                          : 'bg-red-600 text-white'
+                    }`}>
+                      {roundResults['single']}
                     </div>
                   )}
+                  
+                  <div className="flex gap-3 mb-6">
+                    {myHand.map((card, idx) => (
+                      <div
+                        key={idx}
+                        className="relative w-24 h-36 bg-white rounded-xl shadow-2xl border-2 border-gray-400"
+                        style={{ 
+                          animation: 'cardDeal 0.3s ease-out forwards',
+                          animationDelay: `${(idx + 2) * 0.15}s`,
+                          opacity: 0,
+                          transform: 'perspective(1000px)'
+                        }}
+                      >
+                        <div className="absolute top-2 left-2">
+                          <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                            {card.value}
+                          </div>
+                          <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                            {card.suit}
+                          </div>
+                        </div>
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                          <div className={`text-6xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                            {card.suit}
+                          </div>
+                        </div>
+                        <div className="absolute bottom-2 right-2 rotate-180">
+                          <div className={`text-3xl ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                            {card.value}
+                          </div>
+                          <div className={`text-2xl -mt-1 ${card.suit === '♥️' || card.suit === '♦️' ? 'text-red-600' : 'text-gray-900'}`}>
+                            {card.suit}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-black/70 px-8 py-4 rounded-2xl border-2 border-yellow-600 shadow-xl">
+                    <p className="text-yellow-300 text-2xl font-bold mb-1">YOUR HAND: {myHandValue}</p>
+                    <p className="text-white text-lg">Main Bet: {currentBet} LosBucks</p>
+                    
+                    {/* Side Bet Results */}
+                    {(sideBetResults.perfectPairs || sideBetResults.twentyOnePlus3) && (
+                      <div className="mt-3 pt-3 border-t border-yellow-600/30">
+                        {sideBetResults.perfectPairs && (
+                          <div className={`text-sm mb-1 ${sideBetResults.perfectPairsWin > 0 ? 'text-green-400 font-bold' : 'text-red-400'}`}>
+                            Perfect Pairs: {sideBetResults.perfectPairs} {sideBetResults.perfectPairsWin > 0 && `+${sideBetResults.perfectPairsWin} LosBucks!`}
+                          </div>
+                        )}
+                        {sideBetResults.twentyOnePlus3 && (
+                          <div className={`text-sm ${sideBetResults.twentyOnePlus3Win > 0 ? 'text-green-400 font-bold' : 'text-red-400'}`}>
+                            21+3: {sideBetResults.twentyOnePlus3} {sideBetResults.twentyOnePlus3Win > 0 && `+${sideBetResults.twentyOnePlus3Win} LosBucks!`}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Action Buttons */}
-            {canHit && !isDealing && (!socket || isMyTurn) && (
+            {Object.keys(roundResults).length > 0 ? (
+              /* Show Next Hand button after round ends */
+              <div className="relative flex justify-center mt-8">
+                <button
+                  onClick={nextHand}
+                  className="px-12 py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold text-2xl transition-all shadow-lg animate-pulse"
+                >
+                  Next Hand
+                </button>
+              </div>
+            ) : canHit && !isDealing && (!socket || isMyTurn) && (
               <div className="relative flex justify-center gap-3 mt-8 flex-wrap">
                 <button
                   onClick={hit}
@@ -1137,33 +1268,6 @@ function BlackjackGame() {
             }
           }
         `}</style>
-      </div>
-    );
-  }
-
-  // Results State
-  if (gameState === 'results') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 text-center">
-          <h1 className="text-5xl font-bold text-white mb-6">{resultMessage}</h1>
-          <p className="text-3xl text-yellow-300 mb-8">Balance: {balance} LosBucks</p>
-          
-          <div className="space-y-4">
-            <button
-              onClick={playAgain}
-              className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold text-lg"
-            >
-              Play Again
-            </button>
-            <button
-              onClick={() => router.push('/casino')}
-              className="w-full text-white/60 hover:text-white"
-            >
-              ← Back to Casino
-            </button>
-          </div>
-        </div>
       </div>
     );
   }
