@@ -353,7 +353,13 @@ io.on('connection', (socket) => {
     room.players.push(newPlayer);
 
     socket.emit('fpsJoined', { roomId });
-    io.to(roomId).emit('fpsGameState', { players: room.players, bullets: [] });
+    io.to(roomId).emit('fpsGameState', {
+      players: room.players,
+      host: room.host,
+      started: room.started,
+      timeLeft: room.gameTime,
+      gameTime: room.gameTime,
+    });
     console.log(`${playerName} joined FPS room ${roomId}`);
   });
 
@@ -410,7 +416,13 @@ io.on('connection', (socket) => {
       });
 
       // Send game state
-      io.to(roomId).emit('fpsGameState', { players: room.players, bullets: room.bullets });
+      io.to(roomId).emit('fpsGameState', {
+        players: room.players,
+        host: room.host,
+        started: room.started,
+        timeLeft: room.gameTime - Math.floor((Date.now() - room.startTime) / 1000),
+        gameTime: room.gameTime,
+      });
 
       // Check time limit
       const elapsed = Math.floor((Date.now() - room.startTime) / 1000);

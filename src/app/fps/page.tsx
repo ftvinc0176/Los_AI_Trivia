@@ -225,7 +225,7 @@ export default function FPS() {
 
   const joinRoom = () => {
     if (socket && playerName.trim() && roomId.trim()) {
-      socket.emit('joinFpsRoom', { roomId, playerName });
+      socket.emit('fpsJoinRoom', { roomId, playerName });
       setJoined(true);
     }
   };
@@ -234,14 +234,14 @@ export default function FPS() {
     if (socket && playerName.trim()) {
       const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
       setRoomId(newRoomId);
-      socket.emit('joinFpsRoom', { roomId: newRoomId, playerName });
+      socket.emit('fpsJoinRoom', { roomId: newRoomId, playerName });
       setJoined(true);
     }
   };
 
   const startGame = () => {
     if (socket && roomId) {
-      socket.emit('startFpsGame', { roomId });
+      socket.emit('fpsStartGame', { roomId });
     }
   };
 
