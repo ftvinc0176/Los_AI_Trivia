@@ -41,11 +41,12 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    socket.on('joinRoom', ({ roomId, playerName }) => {
+    socket.on('joinRoom', ({ roomId, playerName, isPublic }) => {
       if (!rooms.has(roomId)) {
         rooms.set(roomId, {
           players: [],
           host: socket.id,
+          hostName: playerName,
           category: 'General Knowledge',
           difficulty: 'Medium',
           started: false,
@@ -55,6 +56,7 @@ app.prepare().then(() => {
           timeLeft: 10,
           showAnswer: false,
           timer: null,
+          isPublic: isPublic !== undefined ? isPublic : false,
         });
       }
 
@@ -166,6 +168,20 @@ app.prepare().then(() => {
         timeLeft: room.timeLeft,
         showAnswer: room.showAnswer,
       });
+    });
+
+    socket.on('getPublicLobbies', () => {
+      const publicLobbies = [];
+      rooms.forEach((room, id) => {
+        if (room.isPublic && !room.started && room.players.length < 4) {
+          publicLobbies.push({
+            roomId: id,
+            hostName: room.hostName,
+            playerCount: room.players.length,
+          });
+        }
+      });
+      socket.emit('publicLobbies', publicLobbies);
     });
 
     socket.on('returnToLobby', ({ roomId }) => {

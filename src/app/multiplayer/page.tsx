@@ -52,6 +52,9 @@ export default function Multiplayer() {
   const [joined, setJoined] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
+  const [showLobbyBrowser, setShowLobbyBrowser] = useState(false);
+  const [publicLobbies, setPublicLobbies] = useState<Array<{roomId: string; hostName: string; playerCount: number}>>([]);
 
   useEffect(() => {
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
@@ -85,15 +88,22 @@ export default function Multiplayer() {
       setShowResults(true);
     });
 
+    newSocket.on('publicLobbies', (lobbies: Array<{roomId: string; hostName: string; playerCount: number}>) => {
+      setPublicLobbies(lobbies);
+    });
+
     return () => {
       newSocket.close();
     };
   }, []);
 
-  const joinRoom = () => {
-    if (socket && playerName.trim() && roomId.trim()) {
-      socket.emit('joinRoom', { roomId, playerName });
+  const joinRoom = (targetRoomId?: string) => {
+    const finalRoomId = targetRoomId || roomId;
+    if (socket && playerName.trim() && finalRoomId.trim()) {
+      socket.emit('joinRoom', { roomId: finalRoomId, playerName });
+      setRoomId(finalRoomId);
       setJoined(true);
+      setShowLobbyBrowser(false);
     }
   };
 
@@ -101,8 +111,15 @@ export default function Multiplayer() {
     if (socket && playerName.trim()) {
       const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
       setRoomId(newRoomId);
-      socket.emit('joinRoom', { roomId: newRoomId, playerName });
+      socket.emit('joinRoom', { roomId: newRoomId, playerName, isPublic });
       setJoined(true);
+    }
+  };
+
+  const requestPublicLobbies = () => {
+    if (socket) {
+      socket.emit('getPublicLobbies');
+      setShowLobbyBrowser(true);
     }
   };
 
@@ -139,58 +156,149 @@ export default function Multiplayer() {
   if (!joined || !gameState) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20">
+        <div className="max-w-4xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-12 border border-white/20">
           <h1 className="text-5xl font-bold text-white mb-8 text-center">Multiplayer</h1>
           
-          <div className="space-y-6">
-            <div>
-              <label className="block text-white text-lg mb-3 font-medium">Your Name</label>
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Enter your name"
-                className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg placeholder-white/50"
-                maxLength={20}
-              />
-            </div>
+          {!showLobbyBrowser ? (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-white text-lg mb-3 font-medium">Your Name</label>
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg placeholder-white/50"
+                  maxLength={20}
+                />
+              </div>
 
-            <div>
-              <label className="block text-white text-lg mb-3 font-medium">Room ID</label>
-              <input
-                type="text"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                placeholder="Enter room ID"
-                className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg placeholder-white/50 uppercase"
-                maxLength={6}
-              />
-            </div>
+              <div>
+                <label className="block text-white text-lg mb-3 font-medium">Privacy Setting</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setIsPublic(true)}
+                    className={`p-4 rounded-xl font-medium text-lg transition-all ${
+                      isPublic
+                        ? 'bg-white text-purple-700'
+                        : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
+                  >
+                    🌐 Public
+                  </button>
+                  <button
+                    onClick={() => setIsPublic(false)}
+                    className={`p-4 rounded-xl font-medium text-lg transition-all ${
+                      !isPublic
+                        ? 'bg-white text-purple-700'
+                        : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
+                  >
+                    🔒 Private
+                  </button>
+                </div>
+              </div>
 
-            <div className="flex gap-4">
+              {!isPublic && (
+                <div>
+                  <label className="block text-white text-lg mb-3 font-medium">Room Code</label>
+                  <input
+                    type="text"
+                    value={roomId}
+                    onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                    placeholder="Enter room code to join"
+                    className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg placeholder-white/50 uppercase"
+                    maxLength={6}
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                {isPublic ? (
+                  <>
+                    <button
+                      onClick={requestPublicLobbies}
+                      disabled={!playerName.trim()}
+                      className="px-8 py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all text-lg font-bold disabled:opacity-50"
+                    >
+                      Browse Lobbies
+                    </button>
+                    <button
+                      onClick={createRoom}
+                      disabled={!playerName.trim()}
+                      className="px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-lg font-bold disabled:opacity-50"
+                    >
+                      Create Public Room
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => joinRoom()}
+                      disabled={!playerName.trim() || !roomId.trim()}
+                      className="px-8 py-4 bg-white text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-lg font-bold disabled:opacity-50"
+                    >
+                      Join Private Room
+                    </button>
+                    <button
+                      onClick={createRoom}
+                      disabled={!playerName.trim()}
+                      className="px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-lg font-bold disabled:opacity-50"
+                    >
+                      Create Private Room
+                    </button>
+                  </>
+                )}
+              </div>
+
               <button
-                onClick={joinRoom}
-                disabled={!playerName.trim() || !roomId.trim()}
-                className="flex-1 px-8 py-4 bg-white text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-lg font-bold disabled:opacity-50"
+                onClick={() => router.push('/')}
+                className="w-full px-8 py-4 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-all text-lg font-medium"
               >
-                Join Room
-              </button>
-              <button
-                onClick={createRoom}
-                disabled={!playerName.trim()}
-                className="flex-1 px-8 py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-lg font-bold disabled:opacity-50"
-              >
-                Create Room
+                Back to Home
               </button>
             </div>
-
-            <button
-              onClick={() => router.push('/')}
-              className="w-full px-8 py-4 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-all text-lg font-medium"
-            >
-              Back to Home
-            </button>
-          </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-white">Public Lobbies</h2>
+                <button
+                  onClick={() => setShowLobbyBrowser(false)}
+                  className="px-6 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all"
+                >
+                  Back
+                </button>
+              </div>
+              
+              {publicLobbies.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-white/70 text-lg">No public lobbies available</p>
+                  <p className="text-white/50 text-sm mt-2">Create a new public room to get started!</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {publicLobbies.map((lobby) => (
+                    <button
+                      key={lobby.roomId}
+                      onClick={() => joinRoom(lobby.roomId)}
+                      className="w-full p-6 bg-white/20 rounded-xl hover:bg-white/30 transition-all text-left border border-white/20 hover:border-white/40"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-white font-bold text-lg">{lobby.hostName}'s Room</p>
+                          <p className="text-purple-200 text-sm">Code: {lobby.roomId}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-white font-medium">{lobby.playerCount}/4 Players</p>
+                          <p className="text-green-300 text-sm">Click to Join</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
