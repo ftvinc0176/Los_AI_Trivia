@@ -47,6 +47,9 @@ function BlackjackGame() {
   const [sideBets, setSideBets] = useState({ perfectPairs: 0, twentyOnePlus3: 0 });
   const [sideBetResults, setSideBetResults] = useState({ perfectPairs: '', twentyOnePlus3: '', perfectPairsWin: 0, twentyOnePlus3Win: 0 });
   const [showDealerHole, setShowDealerHole] = useState(false);
+  const [hasDoubled, setHasDoubled] = useState(false);
+  const [canDouble, setCanDouble] = useState(false);
+  const [canSplit, setCanSplit] = useState(false);
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -191,11 +194,35 @@ function BlackjackGame() {
       
       setMyHand(playerHand);
       setDealerHand([dealerCard1]); // Only show one dealer card
-      setMyHandValue(calculateHandValue(playerHand));
+      const playerVal = calculateHandValue(playerHand);
+      setMyHandValue(playerVal);
       setDealerHandValue(dealerCard1.numValue);
       setIsDealing(false);
-      setCanHit(true);
       setShowDealerHole(false);
+      setHasDoubled(false);
+      
+      // Check for blackjack (21 with 2 cards)
+      const dealerVal = calculateHandValue(dealerHandInitial);
+      if (playerVal === 21 || dealerVal === 21) {
+        // Instant blackjack - reveal dealer and determine winner
+        setCanHit(false);
+        setCanDouble(false);
+        setCanSplit(false);
+        setTimeout(() => {
+          setDealerHand(dealerHandInitial);
+          setDealerHandValue(dealerVal);
+          setShowDealerHole(true);
+          setTimeout(() => {
+            handleBlackjack(playerVal, dealerVal, bet);
+          }, 1000);
+        }, 1500);
+      } else {
+        setCanHit(true);
+        // Can double on any first two cards
+        setCanDouble(balance >= bet);
+        // Can split if cards have same value
+        setCanSplit(playerCard1.value === playerCard2.value && balance >= bet);
+      }
       
       // Store full dealer hand in state for later
       (window as any).dealerFullHand = dealerHandInitial;
@@ -204,6 +231,26 @@ function BlackjackGame() {
       // Check side bets
       checkSideBets(playerHand, dealerCard1);
     }, 1000);
+  };
+
+  const handleBlackjack = (playerValue: number, dealerValue: number, bet: number) => {
+    let message = '';
+    let winAmount = 0;
+    
+    if (playerValue === 21 && dealerValue === 21) {
+      message = 'Push - Both Blackjack!';
+      winAmount = bet; // Return bet
+    } else if (playerValue === 21) {
+      message = 'Blackjack! You win!';
+      winAmount = bet + Math.floor(bet * 1.5); // Blackjack pays 3:2
+    } else if (dealerValue === 21) {
+      message = 'Dealer Blackjack. You lose.';
+      winAmount = 0;
+    }
+    
+    setBalance(balance + winAmount);
+    setResultMessage(message);
+    setGameState('results');
   };
 
   const checkSideBets = (playerHand: Card[], dealerUpCard: Card) => {
@@ -333,21 +380,44 @@ function BlackjackGame() {
       const newValue = calculateHandValue(newHand);
       setMyHandValue(newValue);
       
+      // Can't double or split after hitting
+      setCanDouble(false);
+      setCanSplit(false);
+      
       if (newValue > 21) {
-        // Busted
+        // Busted - don't play dealer, just end game
         setCanHit(false);
-        setTimeout(() => stand(), 1000);
+        setShowDealerHole(true);
+        const dealerFullHand = (window as any).dealerFullHand as Card[];
+        setDealerHand(dealerFullHand);
+        setDealerHandValue(calculateHandValue(dealerFullHand));
+        setTimeout(() => {
+          determineWinner(newValue, calculateHandValue(dealerFullHand));
+        }, 1500);
       }
     }
   };
 
   const stand = () => {
     setCanHit(false);
+    setCanDouble(false);
+    setCanSplit(false);
     setShowDealerHole(true);
     
     if (socket) {
       socket.emit('casinoStand', { roomId });
     } else {
+      // Only play dealer if player hasn't busted
+      if (myHandValue > 21) {
+        const dealerFullHand = (window as any).dealerFullHand as Card[];
+        setDealerHand(dealerFullHand);
+        setDealerHandValue(calculateHandValue(dealerFullHand));
+        setTimeout(() => {
+          determineWinner(myHandValue, calculateHandValue(dealerFullHand));
+        }, 1000);
+        return;
+      }
+      
       // Reveal dealer's hand and play dealer
       const dealerFullHand = (window as any).dealerFullHand as Card[];
       setDealerHand(dealerFullHand);
@@ -380,23 +450,93 @@ function BlackjackGame() {
     }
   };
 
+  const doubleDown = () => {
+    if (balance < currentBet) return;
+    
+    // Double the bet
+    setBalance(balance - currentBet);
+    setBetAmount(currentBet * 2);
+    setHasDoubled(true);
+    setCanDouble(false);
+    setCanSplit(false);
+    
+    // Take exactly one card
+    const deck = (window as any).gameDeck as Card[];
+    const newCard = deck.pop()!;
+    const newHand = [...myHand, newCard];
+    setMyHand(newHand);
+    const newValue = calculateHandValue(newHand);
+    setMyHandValue(newValue);
+    setCanHit(false);
+    
+    // Automatically stand after double
+    setTimeout(() => {
+      setShowDealerHole(true);
+      
+      if (newValue > 21) {
+        // Busted - don't play dealer
+        const dealerFullHand = (window as any).dealerFullHand as Card[];
+        setDealerHand(dealerFullHand);
+        setDealerHandValue(calculateHandValue(dealerFullHand));
+        setTimeout(() => {
+          determineWinner(newValue, calculateHandValue(dealerFullHand));
+        }, 1000);
+      } else {
+        // Play dealer
+        const dealerFullHand = (window as any).dealerFullHand as Card[];
+        setDealerHand(dealerFullHand);
+        let dealerValue = calculateHandValue(dealerFullHand);
+        setDealerHandValue(dealerValue);
+        const gameDeck = (window as any).gameDeck as Card[];
+        
+        const dealerPlay = () => {
+          if (dealerValue < 17) {
+            setTimeout(() => {
+              const card = gameDeck.pop()!;
+              dealerFullHand.push(card);
+              setDealerHand([...dealerFullHand]);
+              dealerValue = calculateHandValue(dealerFullHand);
+              setDealerHandValue(dealerValue);
+              dealerPlay();
+            }, 1000);
+          } else {
+            setTimeout(() => {
+              determineWinner(newValue, dealerValue);
+            }, 1000);
+          }
+        };
+        
+        dealerPlay();
+      }
+    }, 1500);
+  };
+
+  const split = () => {
+    // For now, show a message that split is not yet implemented in this version
+    // Full split implementation would require managing two separate hands
+    alert('Split functionality coming soon! For now, please Hit or Stand.');
+  };
+
   const determineWinner = (playerValue: number, dealerValue: number) => {
     let message = '';
     let winAmount = 0;
+    const finalBet = currentBet; // Use current bet (which may be doubled)
     
     if (playerValue > 21) {
       message = 'Bust! You lose.';
+      winAmount = 0;
     } else if (dealerValue > 21) {
       message = 'Dealer busts! You win!';
-      winAmount = currentBet * 2;
+      winAmount = finalBet * 2;
     } else if (playerValue > dealerValue) {
       message = 'You win!';
-      winAmount = currentBet * 2;
+      winAmount = finalBet * 2;
     } else if (playerValue < dealerValue) {
       message = 'Dealer wins.';
+      winAmount = 0;
     } else {
       message = 'Push! Bet returned.';
-      winAmount = currentBet;
+      winAmount = finalBet;
     }
     
     setBalance(balance + winAmount);
@@ -412,6 +552,9 @@ function BlackjackGame() {
     setBetAmount(0);
     setResultMessage('');
     setCanHit(true);
+    setHasDoubled(false);
+    setCanDouble(false);
+    setCanSplit(false);
     setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
     setSideBetResults({ perfectPairs: '', twentyOnePlus3: '', perfectPairsWin: 0, twentyOnePlus3Win: 0 });
     setShowDealerHole(false);
@@ -786,7 +929,7 @@ function BlackjackGame() {
 
             {/* Action Buttons */}
             {canHit && !isDealing && (
-              <div className="relative flex justify-center gap-4 mt-8">
+              <div className="relative flex justify-center gap-3 mt-8 flex-wrap">
                 <button
                   onClick={hit}
                   className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
@@ -799,6 +942,22 @@ function BlackjackGame() {
                 >
                   STAND
                 </button>
+                {canDouble && (
+                  <button
+                    onClick={doubleDown}
+                    className="px-6 py-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                  >
+                    DOUBLE DOWN
+                  </button>
+                )}
+                {canSplit && (
+                  <button
+                    onClick={split}
+                    className="px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xl transition-all shadow-lg"
+                  >
+                    SPLIT
+                  </button>
+                )}
               </div>
             )}
           </div>
