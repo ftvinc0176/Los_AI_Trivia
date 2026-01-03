@@ -885,21 +885,31 @@ function checkBlackjackRoundEnd(roomId) {
     // Determine winners and update balances
     const results = {};
     room.players.forEach(player => {
+      const betAmount = player.currentBet;
+      let winAmount = 0;
+      let message = '';
+      
       if (player.isBusted) {
-        results[player.id] = 'Bust! You lose.';
+        message = `Bust! Lost ${betAmount} LosBucks`;
+        winAmount = 0;
       } else if (room.dealer.value > 21) {
-        results[player.id] = 'Dealer busts! You win!';
-        player.balance += player.currentBet * 2;
+        message = `Dealer busts! Won ${betAmount} LosBucks`;
+        winAmount = betAmount * 2;
+        player.balance += winAmount;
       } else if (player.handValue > room.dealer.value) {
-        results[player.id] = 'You win!';
-        player.balance += player.currentBet * 2;
+        message = `You win! Won ${betAmount} LosBucks`;
+        winAmount = betAmount * 2;
+        player.balance += winAmount;
       } else if (player.handValue < room.dealer.value) {
-        results[player.id] = 'Dealer wins.';
+        message = `Dealer wins. Lost ${betAmount} LosBucks`;
+        winAmount = 0;
       } else {
-        results[player.id] = 'Push! Bet returned.';
-        player.balance += player.currentBet;
+        message = `Push! ${betAmount} LosBucks returned`;
+        winAmount = betAmount;
+        player.balance += betAmount;
       }
 
+      results[player.id] = message;
       player.currentBet = 0;
     });
 

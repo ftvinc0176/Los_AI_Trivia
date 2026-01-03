@@ -1116,13 +1116,15 @@ function BlackjackGame() {
                           <p className={`text-xl font-bold ${isMe ? 'text-black' : 'text-yellow-300'}`}>
                             {player.handValue}
                           </p>
-                          <p className={`text-sm ${isMe ? 'text-black/70' : 'text-white/70'}`}>
-                            Bet: {player.currentBet}
-                          </p>
+                          {!result && (
+                            <p className={`text-sm ${isMe ? 'text-black/70' : 'text-white/70'}`}>
+                              Bet: {player.currentBet}
+                            </p>
+                          )}
                           {player.isStanding && !result && (
                             <p className="text-xs text-white/90 mt-1">STANDING</p>
                           )}
-                          {player.isBusted && (
+                          {player.isBusted && !result && (
                             <p className="text-xs text-red-300 mt-1 font-bold">BUSTED!</p>
                           )}
                         </div>
