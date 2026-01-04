@@ -265,8 +265,10 @@ function DrawAndGuessGame() {
         }
       }
       
-      if (mode === 'multiplayer' && socket) {
+      if (mode !== 'single' && socket && roomId) {
+        // Multiplayer - emit drawing to server
         socket.emit('drawGuessSubmitDrawing', { roomId, drawing, enhancedImage: enhancedImageUrl });
+        setGameState('enhancing'); // Show waiting state
       } else {
         // Single player - go to results
         setPlayers([{
