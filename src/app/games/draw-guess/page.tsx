@@ -33,6 +33,10 @@ function DrawAndGuessGame() {
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [currentGuessIndex, setCurrentGuessIndex] = useState(0);
   const [myGuess, setMyGuess] = useState('');
+  const [currentDrawingIndex, setCurrentDrawingIndex] = useState(0);
+  const [guessResult, setGuessResult] = useState<{ correct: boolean; answer: string } | null>(null);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [hasGuessed, setHasGuessed] = useState(false);
 
   // Drawing state
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
@@ -114,6 +118,29 @@ function DrawAndGuessGame() {
         setMyPrompt('');
         setCurrentGuessIndex(0);
         setMyGuess('');
+        setCurrentDrawingIndex(0);
+        setGuessResult(null);
+        setHasGuessed(false);
+      });
+
+      newSocket.on('drawGuessGuessFeedback', ({ correct, answer, score }) => {
+        setGuessResult({ correct, answer });
+        const myPlayer = players.find(p => p.id === newSocket.id);
+        if (myPlayer) {
+          myPlayer.score = score;
+        }
+      });
+
+      newSocket.on('drawGuessNextDrawing', ({ drawingIndex }) => {
+        setCurrentDrawingIndex(drawingIndex);
+        setMyGuess('');
+        setGuessResult(null);
+        setHasGuessed(false);
+      });
+
+      newSocket.on('drawGuessRoundComplete', ({ round, players }) => {
+        setCurrentRound(round);
+        setPlayers(players);
       });
 
       return () => {
@@ -562,40 +589,111 @@ function DrawAndGuessGame() {
 
   // Guessing Screen
   if (gameState === 'guessing') {
-    const currentPlayer = players[currentGuessIndex];
-    if (!currentPlayer || currentPlayer.id === myPlayerId) {
-      return null; // Skip own drawing
+    // Filter out own drawing
+    const drawingsToGuess = players.filter(p => p.id !== myPlayerId && p.enhancedImage);
+    const currentDrawing = drawingsToGuess[currentDrawingIndex];
+
+    if (!currentDrawing) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <div className="text-center">
+            <div className="w-20 h-20 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-6"></div>
+            <h2 className="text-4xl font-bold text-white mb-2">Waiting for results...</h2>
+          </div>
+        </div>
+      );
     }
 
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
         <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
-          <h2 className="text-3xl font-bold text-white mb-6 text-center">What did {currentPlayer.name} draw?</h2>
-          
-          <div className="bg-white rounded-2xl p-4 mb-6">
-            <img src={currentPlayer.enhancedImage} alt="Enhanced drawing" className="w-full rounded-lg" />
+          <div className="text-center mb-6">
+            <h2 className="text-4xl font-bold text-white mb-2">Round {currentRound}/3</h2>
+            <p className="text-white/80 text-xl">Drawing {currentDrawingIndex + 1}/{drawingsToGuess.length}</p>
           </div>
           
-          <input
-            type="text"
-            placeholder="Your guess..."
-            value={myGuess}
-            onChange={(e) => setMyGuess(e.target.value)}
-            className="w-full px-6 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 text-lg mb-4"
-          />
+          <h3 className="text-3xl font-bold text-white mb-6 text-center">What did {currentDrawing.name} draw?</h3>
           
-          <button
-            onClick={() => {
-              if (socket) {
-                socket.emit('drawGuessSubmitGuess', { roomId, guess: myGuess, targetPlayerId: currentPlayer.id });
-              }
-              setMyGuess('');
-              setCurrentGuessIndex(currentGuessIndex + 1);
-            }}
-            className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg"
-          >
-            Submit Guess
-          </button>
+          <div className="bg-white rounded-2xl p-4 mb-6">
+            <img src={currentDrawing.enhancedImage} alt="AI Enhanced drawing" className="w-full rounded-lg" />
+          </div>
+          
+          {!guessResult ? (
+            <>
+              <input
+                type="text"
+                placeholder="Type your guess..."
+                value={myGuess}
+                onChange={(e) => setMyGuess(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && myGuess.trim() && !hasGuessed) {
+                    setHasGuessed(true);
+                    if (socket) {
+                      socket.emit('drawGuessSubmitGuess', {
+                        roomId,
+                        guess: myGuess.trim(),
+                        targetPlayerId: currentDrawing.id,
+                        drawingIndex: currentDrawingIndex
+                      });
+                    }
+                  }
+                }}
+                disabled={hasGuessed}
+                className="w-full px-6 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 text-lg mb-4 disabled:opacity-50"
+              />
+              
+              <button
+                onClick={() => {
+                  if (myGuess.trim() && !hasGuessed) {
+                    setHasGuessed(true);
+                    if (socket) {
+                      socket.emit('drawGuessSubmitGuess', {
+                        roomId,
+                        guess: myGuess.trim(),
+                        targetPlayerId: currentDrawing.id,
+                        drawingIndex: currentDrawingIndex
+                      });
+                    }
+                  }
+                }}
+                disabled={!myGuess.trim() || hasGuessed}
+                className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold text-lg transition-all disabled:cursor-not-allowed"
+              >
+                {hasGuessed ? 'Submitting...' : 'Submit Guess'}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className={`p-6 rounded-xl mb-6 ${guessResult.correct ? 'bg-green-500/20 border-2 border-green-500' : 'bg-red-500/20 border-2 border-red-500'}`}>
+                <h3 className={`text-3xl font-bold text-center mb-2 ${guessResult.correct ? 'text-green-300' : 'text-red-300'}`}>
+                  {guessResult.correct ? '✓ Correct! +1 Point' : '✗ Wrong'}
+                </h3>
+                <p className="text-white text-xl text-center">The answer was: <span className="font-bold text-yellow-300">{guessResult.answer}</span></p>
+                {!guessResult.correct && <p className="text-white/80 text-center mt-2">You guessed: {myGuess}</p>}
+              </div>
+
+              <div className="bg-white rounded-2xl p-4 mb-6">
+                <h4 className="text-lg font-bold text-gray-800 mb-3 text-center">Original Drawing</h4>
+                <img src={currentDrawing.drawing} alt="Original drawing" className="w-full rounded-lg" />
+              </div>
+
+              <button
+                onClick={() => {
+                  if (currentDrawingIndex < drawingsToGuess.length - 1) {
+                    setCurrentDrawingIndex(currentDrawingIndex + 1);
+                    setMyGuess('');
+                    setGuessResult(null);
+                    setHasGuessed(false);
+                  } else if (socket) {
+                    socket.emit('drawGuessFinishRound', { roomId });
+                  }
+                }}
+                className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-bold text-lg"
+              >
+                {currentDrawingIndex < drawingsToGuess.length - 1 ? 'Next Drawing →' : 'Finish Round'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     );

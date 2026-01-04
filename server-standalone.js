@@ -601,7 +601,10 @@ io.on('connection', (socket) => {
       timeRemaining: 60,
       isPublic,
       hostName: playerName,
-      maxPlayers: 4
+      maxPlayers: 4,
+      currentRound: 1,
+      maxRounds: 3,
+      guesses: new Map() // Track guesses per player per drawing
     });
 
     socket.join(`drawguess_${roomId}`);
@@ -713,7 +716,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('drawGuessSubmitGuess', ({ roomId, guess, targetPlayerId }) => {
+  socket.on('drawGuessSubmitGuess', ({ roomId, guess, targetPlayerId, drawingIndex }) => {
     const room = rooms.get(`drawguess_${roomId}`);
     if (!room) return;
 
@@ -721,24 +724,58 @@ io.on('connection', (socket) => {
     const guessingPlayer = room.players.find(p => p.id === socket.id);
 
     if (targetPlayer && guessingPlayer) {
-      // Simple scoring: exact match = 100 points, close match = 50 points
-      const targetPrompt = targetPlayer.prompt.toLowerCase();
-      const guessLower = guess.toLowerCase();
+      const targetPrompt = targetPlayer.prompt.toLowerCase().trim();
+      const guessLower = guess.toLowerCase().trim();
 
-      if (guessLower === targetPrompt) {
-        guessingPlayer.score += 100;
-      } else if (targetPrompt.includes(guessLower) || guessLower.includes(targetPrompt)) {
-        guessingPlayer.score += 50;
+      // Check if correct (exact match or very close)
+      const correct = guessLower === targetPrompt || 
+                     targetPrompt.includes(guessLower) || 
+                     guessLower.includes(targetPrompt);
+
+      if (correct) {
+        guessingPlayer.score += 1; // 1 point per correct guess
       }
 
-      targetPlayer.guess = guess;
+      // Send immediate feedback to the guessing player
+      io.to(socket.id).emit('drawGuessGuessFeedback', {
+        correct,
+        answer: targetPlayer.prompt,
+        score: guessingPlayer.score
+      });
     }
+  });
 
-    // Check if everyone has guessed all drawings
-    const allGuessed = room.players.every(p => p.guess !== '' || p.id === socket.id);
-    if (allGuessed) {
+  socket.on('drawGuessFinishRound', ({ roomId }) => {
+    const room = rooms.get(`drawguess_${roomId}`);
+    if (!room) return;
+
+    if (room.currentRound < room.maxRounds) {
+      // Start next round
+      room.currentRound++;
+      room.players.forEach(player => {
+        player.drawing = '';
+        player.enhancedImage = '';
+        player.guess = '';
+        player.prompt = '';
+      });
+      
+      room.state = 'lobby';
+      io.to(`drawguess_${roomId}`).emit('drawGuessRoundComplete', { 
+        round: room.currentRound,
+        players: room.players
+      });
+      
+      // Auto-start next round
+      setTimeout(() => {
+        socket.emit('drawGuessStartGame', { roomId });
+      }, 3000);
+    } else {
+      // Game over - show final results
       room.state = 'results';
-      io.to(`drawguess_${roomId}`).emit('drawGuessResults', { players: room.players, state: 'results' });
+      io.to(`drawguess_${roomId}`).emit('drawGuessResults', { 
+        players: room.players, 
+        state: 'results'
+      });
     }
   });
 
@@ -746,7 +783,8 @@ io.on('connection', (socket) => {
     const room = rooms.get(`drawguess_${roomId}`);
     if (!room) return;
 
-    // Reset players
+    // Reset for new game
+    room.currentRound = 1;
     room.players.forEach(player => {
       player.prompt = '';
       player.drawing = '';
