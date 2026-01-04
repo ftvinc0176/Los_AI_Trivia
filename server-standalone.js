@@ -1726,6 +1726,7 @@ function checkBlackjackRoundEnd(roomId) {
       // Evaluate side bets
       let sideBetWinnings = 0;
       let sideBetMessages = [];
+      let sideBetDetails = {};
       
       if (player.sideBets) {
         // Perfect Pairs
@@ -1735,7 +1736,11 @@ function checkBlackjackRoundEnd(roomId) {
             const ppWin = player.sideBets.perfectPairs * ppResult.payout + player.sideBets.perfectPairs; // Original bet + winnings
             sideBetWinnings += ppWin;
             sideBetMessages.push(`${ppResult.name}: +${ppWin}`);
+            sideBetDetails.perfectPairs = { name: ppResult.name, win: ppWin, lost: false };
             player.balance += ppWin;
+          } else {
+            sideBetMessages.push(`Perfect Pairs: Lost ${player.sideBets.perfectPairs}`);
+            sideBetDetails.perfectPairs = { name: 'No Pair', win: 0, lost: true };
           }
         }
         
@@ -1746,10 +1751,17 @@ function checkBlackjackRoundEnd(roomId) {
             const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout + player.sideBets.twentyOnePlus3; // Original bet + winnings
             sideBetWinnings += tp3Win;
             sideBetMessages.push(`${tp3Result.name}: +${tp3Win}`);
+            sideBetDetails.twentyOnePlus3 = { name: tp3Result.name, win: tp3Win, lost: false };
             player.balance += tp3Win;
+          } else {
+            sideBetMessages.push(`21+3: Lost ${player.sideBets.twentyOnePlus3}`);
+            sideBetDetails.twentyOnePlus3 = { name: 'No Hand', win: 0, lost: true };
           }
         }
       }
+      
+      // Store side bet details for this player
+      player.sideBetDetails = sideBetDetails;
       
       // Main hand results
       if (player.splitHands && player.splitHands.length > 0) {

@@ -20,6 +20,10 @@ interface Player {
   isStanding: boolean;
   isBusted: boolean;
   sideBets?: { perfectPairs: number; twentyOnePlus3: number };
+  sideBetDetails?: {
+    perfectPairs?: { name: string; win: number; lost: boolean };
+    twentyOnePlus3?: { name: string; win: number; lost: boolean };
+  };
 }
 
 function BlackjackGame() {
@@ -150,6 +154,17 @@ function BlackjackGame() {
         const me = players.find((p: Player) => p.id === newSocket.id);
         if (me && newSocket.id) {
           setBalance(me.balance);
+          // Update side bet results from server
+          if (me.sideBetDetails) {
+            const ppDetails = me.sideBetDetails.perfectPairs;
+            const tp3Details = me.sideBetDetails.twentyOnePlus3;
+            setSideBetResults({
+              perfectPairs: ppDetails ? ppDetails.name : '',
+              twentyOnePlus3: tp3Details ? tp3Details.name : '',
+              perfectPairsWin: ppDetails ? ppDetails.win : 0,
+              twentyOnePlus3Win: tp3Details ? tp3Details.win : 0
+            });
+          }
         }
         // Stay in 'playing' state to show results on table
       });
@@ -1161,6 +1176,23 @@ function BlackjackGame() {
                               Bet: {player.currentBet}
                             </p>
                           )}
+                          
+                          {/* Side Bet Results for Multiplayer */}
+                          {isMe && result && (sideBetResults.perfectPairs || sideBetResults.twentyOnePlus3) && (
+                            <div className="mt-2 pt-2 border-t border-white/20">
+                              {sideBetResults.perfectPairs && (
+                                <div className={`text-xs mb-1 ${sideBetResults.perfectPairsWin > 0 ? 'text-green-300 font-bold' : 'text-red-300'}`}>
+                                  PP: {sideBetResults.perfectPairs} {sideBetResults.perfectPairsWin > 0 && `+${sideBetResults.perfectPairsWin}`}
+                                </div>
+                              )}
+                              {sideBetResults.twentyOnePlus3 && (
+                                <div className={`text-xs ${sideBetResults.twentyOnePlus3Win > 0 ? 'text-green-300 font-bold' : 'text-red-300'}`}>
+                                  21+3: {sideBetResults.twentyOnePlus3} {sideBetResults.twentyOnePlus3Win > 0 && `+${sideBetResults.twentyOnePlus3Win}`}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
                           {player.isStanding && !result && (
                             <p className="text-[10px] sm:text-xs text-white/90 mt-1">STANDING</p>
                           )}
