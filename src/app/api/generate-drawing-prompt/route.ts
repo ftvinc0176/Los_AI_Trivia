@@ -5,21 +5,32 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function GET() {
   try {
-    const prompt = `Generate a short 2-3 word drawing prompt using this format: "[NOUN] [VERB-ING]" or "[ADJECTIVE] [NOUN]"
+    const prompt = `Generate a SHORT 2 word drawing prompt using CONCRETE, RECOGNIZABLE things: "[THING] [ACTION]"
 
-Examples:
-- "cat sleeping"
-- "robot dancing"
-- "dinosaur running"
-- "happy elephant"
-- "chef cooking"
-- "astronaut floating"
-- "bird flying"
-- "dog jumping"
+The THING must be a real, physical object or animal that anyone can recognize and draw:
+- Animals: cat, dog, duck, horse, elephant, fish, bird, penguin, monkey, lion
+- People: chef, astronaut, pirate, doctor, dancer, ninja, robot, witch
+- Objects: house, car, tree, bicycle, rocket, boat, airplane, pizza, cake, phone
 
-Be creative but keep it SHORT and simple! Maximum 3 words.
+The ACTION must be a clear, visible verb ending in -ing:
+- burning, surfing, flying, jumping, dancing, sleeping, running, eating, melting, exploding, swimming, cooking
 
-Respond with ONLY the prompt phrase (2-3 words max), nothing else.`;
+Good examples:
+- "duck surfing"
+- "house burning"
+- "elephant flying"
+- "pizza melting"
+- "pirate dancing"
+- "rocket exploding"
+
+BAD examples (NEVER use these):
+- "stardust drifting" - NO abstract concepts!
+- "dreams flowing" - NO intangible things!
+- "wisdom growing" - NO abstract ideas!
+
+Only use REAL, DRAWABLE, PHYSICAL things that exist in the real world!
+
+Respond with ONLY 2 words in this format: [THING] [ACTION-ing]`;
 
     const response = await client.responses.create({
       model: 'gpt-5-nano',

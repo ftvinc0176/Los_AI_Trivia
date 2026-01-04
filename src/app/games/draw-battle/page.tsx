@@ -88,6 +88,8 @@ export default function DrawBattle() {
     });
 
     newSocket.on('allDrawingsReady', (allDrawings: Drawing[]) => {
+      console.log('All drawings ready! Received', allDrawings.length, 'drawings');
+      console.log('Transitioning to guessing phase');
       setDrawings(allDrawings);
       setGameState('guessing');
       setCurrentGuessIndex(0);
@@ -129,20 +131,24 @@ export default function DrawBattle() {
 
       const data = await response.json();
       
+      console.log('Submitting drawing with prompt:', currentPrompt);
       socket?.emit('submitDrawing', {
         imageData,
         enhancedImage: data.enhancedImage,
         prompt: currentPrompt,
       });
 
+      console.log('Moving to waiting state');
       setGameState('waiting');
     } catch (error) {
       console.error('Error enhancing drawing:', error);
+      console.log('Submitting drawing without enhancement, prompt:', currentPrompt);
       socket?.emit('submitDrawing', {
         imageData,
         enhancedImage: imageData,
         prompt: currentPrompt,
       });
+      console.log('Moving to waiting state (no enhancement)');
       setGameState('waiting');
     }
     setEnhancing(false);

@@ -1000,7 +1000,10 @@ io.on('connection', (socket) => {
   socket.on('submitDrawing', ({ imageData, enhancedImage, prompt }) => {
     const lobbyId = socket.lobbyId;
     const lobby = drawBattleLobbies.get(lobbyId);
-    if (!lobby) return;
+    if (!lobby) {
+      console.log('submitDrawing: Lobby not found for socket', socket.id);
+      return;
+    }
 
     const player = lobby.players.find(p => p.id === socket.id);
     if (player) {
@@ -1013,11 +1016,16 @@ io.on('connection', (socket) => {
         enhancedImage
       });
 
+      console.log(`Player ${player.name} submitted drawing. Total: ${lobby.drawings.length}/${lobby.players.length}`);
       io.to(lobbyId).emit('lobbyUpdate', lobby);
 
       // Check if all players have drawn
-      if (lobby.players.every(p => p.hasDrawn)) {
+      const allDrawn = lobby.players.every(p => p.hasDrawn);
+      console.log(`All players drawn? ${allDrawn}`);
+      if (allDrawn) {
+        console.log('All players have drawn! Emitting allDrawingsReady in 2 seconds...');
         setTimeout(() => {
+          console.log('Emitting allDrawingsReady with', lobby.drawings.length, 'drawings to lobby', lobbyId);
           io.to(lobbyId).emit('allDrawingsReady', lobby.drawings);
         }, 2000);
       }
