@@ -272,12 +272,12 @@ function DrawAndGuessGame() {
         setGameState('drawing');
       } else {
         alert('Failed to generate prompt.');
-        router.push('/losgames');
+        router.push('/');
       }
     } catch (error) {
       console.error('Error:', error);
       alert('Failed to generate prompt.');
-      router.push('/losgames');
+      router.push('/');
     }
   };
 
@@ -375,8 +375,22 @@ function DrawAndGuessGame() {
             )}
           </div>
           
+          <div className="flex gap-4 mb-4">
+            <button
+              onClick={() => {
+                if (playerName) {
+                  createLobby();
+                }
+              }}
+              disabled={!playerName}
+              className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold text-lg transition-all disabled:cursor-not-allowed"
+            >
+              + Create Public Lobby
+            </button>
+          </div>
+          
           <button
-            onClick={() => router.push('/losgames')}
+            onClick={() => router.push('/')}
             className="w-full text-white/60 hover:text-white"
           >
             ← Back to Games
@@ -434,7 +448,7 @@ function DrawAndGuessGame() {
           </div>
           
           <button
-            onClick={() => router.push('/losgames')}
+            onClick={() => router.push('/')}
             className="w-full mt-6 text-white/60 hover:text-white"
           >
             ← Back to Games
@@ -625,7 +639,7 @@ function DrawAndGuessGame() {
           
           <div className="flex gap-4">
             <button
-              onClick={() => router.push('/losgames')}
+              onClick={() => router.push('/')}
               className="flex-1 px-6 py-4 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold text-lg"
             >
               Main Menu
