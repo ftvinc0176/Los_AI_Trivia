@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import io, { Socket } from 'socket.io-client';
 
@@ -142,7 +142,7 @@ function DrawAndGuessGame() {
         drawPaperBackground(ctx, canvas.width, canvas.height);
       }
     }
-  }, [canvasRef.current, gameState]);
+  }, [gameState]);
 
   const drawPaperBackground = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     // White background
@@ -309,12 +309,13 @@ function DrawAndGuessGame() {
     }
   };
 
-  // Single Player Mode
-  if (mode === 'single') {
-    useEffect(() => {
+  // Auto-start single player mode
+  useEffect(() => {
+    if (mode === 'single') {
       startSinglePlayer();
-    }, []);
-  }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   // Browse Public Lobbies
   if (mode === 'browse' && !roomId) {
@@ -355,7 +356,7 @@ function DrawAndGuessGame() {
                   <div key={lobby.roomId} className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 transition-all">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="text-white font-bold text-lg">{lobby.hostName}'s Game</p>
+                        <p className="text-white font-bold text-lg">{lobby.hostName}&apos;s Game</p>
                         <p className="text-white/60 text-sm">{lobby.playerCount}/{lobby.maxPlayers} players • Room: {lobby.roomId}</p>
                       </div>
                       <button
