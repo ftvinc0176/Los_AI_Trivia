@@ -1780,6 +1780,8 @@ function checkBlackjackRoundEnd(roomId) {
       // Attach side bet results to player object for client
       player.sideBetResults = sideBetResults;
       
+      console.log(`Player ${player.name} side bet results:`, JSON.stringify(sideBetResults));
+
       // Main hand results
       if (player.splitHands && player.splitHands.length > 0) {
         // Handle split hands - evaluate each separately
@@ -1865,6 +1867,12 @@ function checkBlackjackRoundEnd(roomId) {
     }
 
     room.state = 'results';
+    
+    console.log('Emitting casinoRoundEnd with players:', room.players.map(p => ({ 
+      name: p.name, 
+      sideBetResults: p.sideBetResults 
+    })));
+    
     io.to(`casino_${roomId}`).emit('casinoRoundEnd', {
       players: room.players,
       dealer: room.dealer,

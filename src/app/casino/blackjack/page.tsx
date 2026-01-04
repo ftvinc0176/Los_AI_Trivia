@@ -146,6 +146,11 @@ function BlackjackGame() {
       });
 
       newSocket.on('casinoRoundEnd', ({ players, dealer, results }: any) => {
+        console.log('Received casinoRoundEnd, players:', players.map((p: Player) => ({ 
+          name: p.name, 
+          sideBetResults: p.sideBetResults 
+        })));
+        
         setPlayers(players);
         setDealerHand(dealer.hand);
         setDealerHandValue(dealer.value);
@@ -154,17 +159,6 @@ function BlackjackGame() {
         const me = players.find((p: Player) => p.id === newSocket.id);
         if (me && newSocket.id) {
           setBalance(me.balance);
-          // Update side bet results from server
-          if (me.sideBetDetails) {
-            const ppDetails = me.sideBetDetails.perfectPairs;
-            const tp3Details = me.sideBetDetails.twentyOnePlus3;
-            setSideBetResults({
-              perfectPairs: ppDetails ? ppDetails.name : '',
-              twentyOnePlus3: tp3Details ? tp3Details.name : '',
-              perfectPairsWin: ppDetails ? ppDetails.win : 0,
-              twentyOnePlus3Win: tp3Details ? tp3Details.win : 0
-            });
-          }
         }
         // Stay in 'playing' state to show results on table
       });
@@ -1118,35 +1112,35 @@ function BlackjackGame() {
                             }`}>
                               {result}
                             </div>
-                            
-                            {/* Side Bet Results */}
-                            {player.sideBetResults && (
-                              <>
-                                {player.sideBetResults.perfectPairs && (
-                                  <div className={`px-2 py-1 rounded text-xs font-semibold text-center ${
-                                    player.sideBetResults.perfectPairs.lost 
-                                      ? 'bg-red-500 text-white' 
-                                      : 'bg-green-500 text-white'
-                                  }`}>
-                                    {player.sideBetResults.perfectPairs.lost 
-                                      ? `Perfect Pairs: Lost ${player.sideBetResults.perfectPairs.betAmount}` 
-                                      : `${player.sideBetResults.perfectPairs.name}: Won ${player.sideBetResults.perfectPairs.win}`
-                                    }
-                                  </div>
-                                )}
-                                {player.sideBetResults.twentyOnePlus3 && (
-                                  <div className={`px-2 py-1 rounded text-xs font-semibold text-center ${
-                                    player.sideBetResults.twentyOnePlus3.lost 
-                                      ? 'bg-red-500 text-white' 
-                                      : 'bg-green-500 text-white'
-                                  }`}>
-                                    {player.sideBetResults.twentyOnePlus3.lost 
-                                      ? `21+3: Lost ${player.sideBetResults.twentyOnePlus3.betAmount}` 
-                                      : `${player.sideBetResults.twentyOnePlus3.name}: Won ${player.sideBetResults.twentyOnePlus3.win}`
-                                    }
-                                  </div>
-                                )}
-                              </>
+                          </div>
+                        )}
+                        
+                        {/* Show Side Bet Results when round ends */}
+                        {result && player.sideBetResults && (
+                          <div className="mb-2 space-y-1">
+                            {player.sideBetResults.perfectPairs && (
+                              <div className={`px-2 py-1 rounded text-[10px] sm:text-xs font-semibold text-center ${
+                                player.sideBetResults.perfectPairs.lost 
+                                  ? 'bg-red-500 text-white' 
+                                  : 'bg-green-500 text-white'
+                              }`}>
+                                {player.sideBetResults.perfectPairs.lost 
+                                  ? `Perfect Pairs: ${player.sideBetResults.perfectPairs.name}` 
+                                  : `${player.sideBetResults.perfectPairs.name} +${player.sideBetResults.perfectPairs.win}`
+                                }
+                              </div>
+                            )}
+                            {player.sideBetResults.twentyOnePlus3 && (
+                              <div className={`px-2 py-1 rounded text-[10px] sm:text-xs font-semibold text-center ${
+                                player.sideBetResults.twentyOnePlus3.lost 
+                                  ? 'bg-red-500 text-white' 
+                                  : 'bg-green-500 text-white'
+                              }`}>
+                                {player.sideBetResults.twentyOnePlus3.lost 
+                                  ? `21+3: ${player.sideBetResults.twentyOnePlus3.name}` 
+                                  : `${player.sideBetResults.twentyOnePlus3.name} +${player.sideBetResults.twentyOnePlus3.win}`
+                                }
+                              </div>
                             )}
                           </div>
                         )}
