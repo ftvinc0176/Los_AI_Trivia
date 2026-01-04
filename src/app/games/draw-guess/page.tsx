@@ -16,7 +16,7 @@ function AIDrawingGame() {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  const [gameState, setGameState] = useState<'start' | 'drawing' | 'enhancing' | 'results'>('start');
+  const [gameState, setGameState] = useState<'start' | 'loading' | 'drawing' | 'enhancing' | 'results'>('start');
   const [myPrompt, setMyPrompt] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(60);
@@ -179,7 +179,7 @@ function AIDrawingGame() {
   };
 
   const startGame = async () => {
-    setGameState('enhancing');
+    setGameState('loading');
     
     try {
       const response = await fetch('/api/generate-drawing-prompt');
@@ -282,7 +282,20 @@ function AIDrawingGame() {
     );
   }
 
-  // Enhancing Screen
+  // Loading Screen (when starting game)
+  if (gameState === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <div className="text-center">
+          <div className="w-20 h-20 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-6"></div>
+          <h2 className="text-4xl font-bold text-white mb-2">Loading the game...</h2>
+          <p className="text-white/80 text-xl">(please wait up to 30 seconds)</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Enhancing Screen (when submitting drawing)
   if (gameState === 'enhancing') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
