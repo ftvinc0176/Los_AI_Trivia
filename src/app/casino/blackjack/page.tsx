@@ -258,11 +258,17 @@ function BlackjackGame() {
     const totalSideBets = sideBets.perfectPairs + sideBets.twentyOnePlus3;
     const totalBet = bet + totalSideBets;
     
+    console.log('=== PLACING BET ===');
+    console.log('Main bet:', bet);
+    console.log('Side bets:', sideBets);
+    console.log('Total bet:', totalBet);
+    
     if (bet > 0 && totalBet <= balance) {
       setBetAmount(bet);
       setBalance(balance - totalBet);
       
       if (socket) {
+        console.log('Emitting casinoPlaceBet with:', { roomId, bet, sideBets });
         socket.emit('casinoPlaceBet', { roomId, bet, sideBets });
       } else {
         // Single player - deal cards immediately
@@ -278,9 +284,13 @@ function BlackjackGame() {
     if (area === 'main') {
       setBetInput(String(parseInt(betInput || '0') + selectedChip));
     } else if (area === 'perfectPairs') {
-      setSideBets({ ...sideBets, perfectPairs: sideBets.perfectPairs + selectedChip });
+      const newAmount = sideBets.perfectPairs + selectedChip;
+      console.log('Adding chip to Perfect Pairs:', selectedChip, '-> new total:', newAmount);
+      setSideBets({ ...sideBets, perfectPairs: newAmount });
     } else if (area === 'twentyOnePlus3') {
-      setSideBets({ ...sideBets, twentyOnePlus3: sideBets.twentyOnePlus3 + selectedChip });
+      const newAmount = sideBets.twentyOnePlus3 + selectedChip;
+      console.log('Adding chip to 21+3:', selectedChip, '-> new total:', newAmount);
+      setSideBets({ ...sideBets, twentyOnePlus3: newAmount });
     }
   };
 
