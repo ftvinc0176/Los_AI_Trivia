@@ -149,13 +149,13 @@ export default function DrawBattle() {
   }, [socket, currentPrompt]);
 
   useEffect(() => {
-    if (gameState === 'drawing' && timeLeft > 0) {
+    if (gameState === 'drawing' && currentPrompt && !loadingPrompt && timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && gameState === 'drawing') {
+    } else if (timeLeft === 0 && gameState === 'drawing' && currentPrompt) {
       submitDrawing();
     }
-  }, [timeLeft, gameState, submitDrawing]);
+  }, [timeLeft, gameState, submitDrawing, currentPrompt, loadingPrompt]);
 
   useEffect(() => {
     if (gameState === 'drawing' && !currentPrompt) {
@@ -177,13 +177,16 @@ export default function DrawBattle() {
 
   const loadDrawingPrompt = async () => {
     setLoadingPrompt(true);
+    setTimeLeft(60); // Reset timer while loading
     try {
       const response = await fetch('/api/generate-drawing-prompt');
       const data = await response.json();
       setCurrentPrompt(data.prompt);
+      setTimeLeft(60); // Start with full time once prompt is loaded
     } catch (error) {
       console.error('Error loading prompt:', error);
-      setCurrentPrompt('a cat riding a skateboard');
+      setCurrentPrompt('cat sleeping');
+      setTimeLeft(60);
     }
     setLoadingPrompt(false);
   };
@@ -536,7 +539,7 @@ export default function DrawBattle() {
 
           <div className="bg-yellow-400/20 border-4 border-yellow-400 rounded-2xl p-6 mb-6">
             <p className="text-center text-white font-bold text-4xl">
-              {loadingPrompt ? 'Loading prompt...' : currentPrompt}
+              {loadingPrompt ? '⏳ Loading prompt...' : currentPrompt}
             </p>
           </div>
 
