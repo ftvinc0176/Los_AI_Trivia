@@ -196,15 +196,17 @@ export default function DrawAndGuess() {
       // Use Puter.js for FREE AI image-to-image enhancement (no API key needed!)
       if ((window as any).puter && puterLoaded) {
         try {
-          // Convert base64 to raw image data for Puter
+          // Convert base64 to raw image data for Puter (remove data:image/png;base64, prefix)
           const base64Data = drawing.split(',')[1];
           
-          // Enhance the actual drawing - NO PROMPT, only the image itself
+          // Enhance the actual drawing using Gemini's image-to-image
+          // CRITICAL: input_image only works with Gemini models!
           const imageElement = await (window as any).puter.ai.txt2img(
-            `Transform this sketch into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus`,
+            `Transform this simple sketch into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus, photorealistic`,
             { 
-              model: 'black-forest-labs/FLUX.1-schnell',
-              input_image: base64Data
+              model: 'gemini-2.5-flash-image-preview',  // MUST use Gemini model for input_image support
+              input_image: base64Data,
+              input_image_mime_type: 'image/png'
             }
           );
           
