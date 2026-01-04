@@ -104,7 +104,10 @@ function DrawAndGuessGame() {
       newSocket.on('drawGuessAllSubmitted', ({ players, state }) => {
         setPlayers(players);
         setGameState(state);
-        setCurrentGuessIndex(0);
+        setCurrentDrawingIndex(0);
+        setGuessResult(null);
+        setHasGuessed(false);
+        setMyGuess('');
       });
 
       newSocket.on('drawGuessResults', ({ players, state }) => {
