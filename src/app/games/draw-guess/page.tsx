@@ -279,6 +279,34 @@ function DrawAndGuessGame() {
     } else {
       // Single player
       setGameState('enhancing');
+      
+      try {
+        let enhancedImageUrl = drawing;
+
+        // Use Puter.js for FREE AI image-to-image enhancement (no API key needed!)
+        if ((window as any).puter && puterLoaded) {
+          try {
+            // Convert base64 to raw image data for Puter (remove data:image/png;base64, prefix)
+            const base64Data = drawing.split(',')[1];
+            
+            // Enhance the actual drawing using Gemini's image-to-image
+            const imageElement = await (window as any).puter.ai.txt2img(
+              `Transform this simple sketch into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus, photorealistic`,
+              { 
+                model: 'gemini-2.5-flash-image-preview',
+                input_image: base64Data,
+                input_image_mime_type: 'image/png'
+              }
+            );
+            
+            // Convert image element to base64
+            enhancedImageUrl = imageElement.src;
+          } catch (puterError) {
+            console.error('Puter.js image enhancement error:', puterError);
+            // Fall back to original drawing if Puter fails
+          }
+        }
+
         setPlayers([{
           id: myPlayerId,
           name: playerName,
@@ -289,11 +317,11 @@ function DrawAndGuessGame() {
           score: 0
         }]);
         setGameState('results');
+      } catch (error) {
+        console.error('Error enhancing drawing:', error);
+        alert('Failed to enhance drawing. Please try again.');
+        setGameState('drawing');
       }
-    } catch (error) {
-      console.error('Error enhancing drawing:', error);
-      alert('Failed to enhance drawing. Please try again.');
-      setGameState('drawing');
     }
   };
 
