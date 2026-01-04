@@ -54,9 +54,23 @@ export default function DrawBattle() {
   const [guessResults, setGuessResults] = useState<{ playerId: string; correct: boolean; answer: string }[]>([]);
   const [roundScores, setRoundScores] = useState<{ [playerId: string]: number }>({});
   const [privateLobbyCode, setPrivateLobbyCode] = useState('');
+  const [puterLoaded, setPuterLoaded] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCanvasDrawing, setIsCanvasDrawing] = useState(false);
+
+  // Load Puter.js for free AI image enhancement
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).puter) {
+      const script = document.createElement('script');
+      script.src = 'https://js.puter.com/v2/';
+      script.async = true;
+      script.onload = () => setPuterLoaded(true);
+      document.body.appendChild(script);
+    } else {
+      setPuterLoaded(true);
+    }
+  }, []);
 
   useEffect(() => {
     const newSocket = io(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000');
@@ -124,18 +138,33 @@ export default function DrawBattle() {
     const imageData = canvas.toDataURL('image/png');
 
     try {
-      const response = await fetch('/api/enhance-drawing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, prompt: currentPrompt }),
-      });
+      let enhancedImageUrl = imageData;
 
-      const data = await response.json();
+      // Use Puter.js for FREE AI image-to-image enhancement
+      if ((window as any).puter && puterLoaded) {
+        try {
+          const base64Data = imageData.split(',')[1];
+          
+          const imageElement = await (window as any).puter.ai.txt2img(
+            `Transform this simple sketch of "${currentPrompt}" into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus, photorealistic`,
+            { 
+              model: 'gemini-2.5-flash-image-preview',
+              input_image: base64Data,
+              input_image_mime_type: 'image/png'
+            }
+          );
+          
+          enhancedImageUrl = imageElement.src;
+          console.log('Successfully enhanced drawing with Puter.js');
+        } catch (puterError) {
+          console.error('Puter.js enhancement error:', puterError);
+        }
+      }
       
       console.log('Submitting drawing with prompt:', currentPrompt);
       socket?.emit('submitDrawing', {
         imageData,
-        enhancedImage: data.enhancedImage,
+        enhancedImage: enhancedImageUrl,
         prompt: currentPrompt,
       });
 
@@ -153,7 +182,7 @@ export default function DrawBattle() {
       setGameState('waiting');
     }
     setEnhancing(false);
-  }, [socket, currentPrompt]);
+  }, [socket, currentPrompt, puterLoaded]);
 
   useEffect(() => {
     if (gameState === 'drawing' && currentPrompt && !loadingPrompt && timeLeft > 0) {
