@@ -1250,6 +1250,8 @@ io.on('connection', (socket) => {
       player.currentBet = 0;
       player.isStanding = false;
       player.isBusted = false;
+      player.splitHands = null;
+      player.currentSplitIndex = 0;
     });
 
     io.to(`casino_${roomId}`).emit('casinoNewHandStarted');
@@ -1315,13 +1317,41 @@ io.on('connection', (socket) => {
     if (!player || player.isStanding || player.isBusted) return;
 
     const card = room.deck.pop();
-    player.hand.push(card);
-    player.handValue = calculateBlackjackValue(player.hand);
+    
+    // Handle split hands
+    if (player.splitHands && player.splitHands.length > 0) {
+      const currentSplit = player.splitHands[player.currentSplitIndex];
+      currentSplit.hand.push(card);
+      currentSplit.handValue = calculateBlackjackValue(currentSplit.hand);
+      
+      // Update main display
+      player.hand = currentSplit.hand;
+      player.handValue = currentSplit.handValue;
 
-    if (player.handValue > 21) {
-      player.isBusted = true;
-      player.isStanding = true;
-      moveToNextPlayer(roomId);
+      if (currentSplit.handValue > 21) {
+        currentSplit.isBusted = true;
+        currentSplit.isStanding = true;
+        
+        // Move to next split hand or next player
+        if (player.currentSplitIndex < player.splitHands.length - 1) {
+          player.currentSplitIndex++;
+          player.hand = player.splitHands[player.currentSplitIndex].hand;
+          player.handValue = player.splitHands[player.currentSplitIndex].handValue;
+        } else {
+          player.isStanding = true;
+          moveToNextPlayer(roomId);
+        }
+      }
+    } else {
+      // Normal hand (no splits)
+      player.hand.push(card);
+      player.handValue = calculateBlackjackValue(player.hand);
+
+      if (player.handValue > 21) {
+        player.isBusted = true;
+        player.isStanding = true;
+        moveToNextPlayer(roomId);
+      }
     }
 
     io.to(`casino_${roomId}`).emit('casinoCardDealt', {
@@ -1340,8 +1370,26 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (!player) return;
 
-    player.isStanding = true;
-    moveToNextPlayer(roomId);
+    // Handle split hands
+    if (player.splitHands && player.splitHands.length > 0) {
+      const currentSplit = player.splitHands[player.currentSplitIndex];
+      currentSplit.isStanding = true;
+      
+      // Move to next split hand or next player
+      if (player.currentSplitIndex < player.splitHands.length - 1) {
+        player.currentSplitIndex++;
+        player.hand = player.splitHands[player.currentSplitIndex].hand;
+        player.handValue = player.splitHands[player.currentSplitIndex].handValue;
+      } else {
+        player.isStanding = true;
+        moveToNextPlayer(roomId);
+      }
+    } else {
+      // Normal hand (no splits)
+      player.isStanding = true;
+      moveToNextPlayer(roomId);
+    }
+    
     io.to(`casino_${roomId}`).emit('casinoPlayersUpdate', { players: room.players });
   });
 
@@ -1373,6 +1421,83 @@ io.on('connection', (socket) => {
     });
 
     moveToNextPlayer(roomId);
+    io.to(`casino_${roomId}`).emit('casinoPlayersUpdate', { players: room.players });
+  });
+
+  socket.on('casinoSplit', ({ roomId }) => {
+    const room = rooms.get(`casino_${roomId}`);
+    if (!room || room.currentTurn !== socket.id) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || player.balance < player.currentBet) return;
+
+    // Initialize split hands if first split
+    if (!player.splitHands) {
+      player.splitHands = [];
+      player.currentSplitIndex = 0;
+    }
+
+    // Check if can split (max 4 hands, same card values)
+    const currentHand = player.splitHands.length === 0 ? player.hand : player.splitHands[player.currentSplitIndex].hand;
+    if (player.splitHands.length >= 3) return; // Already have 4 hands (original + 3 splits)
+    if (currentHand.length !== 2) return;
+    if (currentHand[0].value !== currentHand[1].value) return;
+
+    // Deduct bet for new hand
+    player.balance -= player.currentBet;
+
+    // If first split, move original hand to splitHands
+    if (player.splitHands.length === 0) {
+      player.splitHands.push({
+        hand: [currentHand[0]],
+        handValue: currentHand[0].numValue,
+        bet: player.currentBet,
+        isStanding: false,
+        isBusted: false
+      });
+      player.splitHands.push({
+        hand: [currentHand[1]],
+        handValue: currentHand[1].numValue,
+        bet: player.currentBet,
+        isStanding: false,
+        isBusted: false
+      });
+      player.currentSplitIndex = 0;
+    } else {
+      // Splitting an already split hand
+      const splitHand = player.splitHands[player.currentSplitIndex];
+      const card1 = splitHand.hand[0];
+      const card2 = splitHand.hand[1];
+      
+      // Replace current hand with first card
+      splitHand.hand = [card1];
+      splitHand.handValue = card1.numValue;
+      
+      // Insert new hand with second card after current
+      player.splitHands.splice(player.currentSplitIndex + 1, 0, {
+        hand: [card2],
+        handValue: card2.numValue,
+        bet: player.currentBet,
+        isStanding: false,
+        isBusted: false
+      });
+    }
+
+    // Deal one card to current split hand
+    const card = room.deck.pop();
+    player.splitHands[player.currentSplitIndex].hand.push(card);
+    player.splitHands[player.currentSplitIndex].handValue = calculateBlackjackValue(player.splitHands[player.currentSplitIndex].hand);
+
+    // Update main hand display to show current split
+    player.hand = player.splitHands[player.currentSplitIndex].hand;
+    player.handValue = player.splitHands[player.currentSplitIndex].handValue;
+
+    io.to(`casino_${roomId}`).emit('casinoSplit', {
+      playerId: socket.id,
+      splitHands: player.splitHands,
+      currentSplitIndex: player.currentSplitIndex
+    });
+
     io.to(`casino_${roomId}`).emit('casinoPlayersUpdate', { players: room.players });
   });
 
@@ -1607,7 +1732,7 @@ function checkBlackjackRoundEnd(roomId) {
         if (player.sideBets.perfectPairs > 0) {
           const ppResult = evaluatePerfectPairs(player.hand);
           if (ppResult.payout > 0) {
-            const ppWin = player.sideBets.perfectPairs * ppResult.payout + player.sideBets.perfectPairs; // Return bet + winnings
+            const ppWin = player.sideBets.perfectPairs * ppResult.payout; // Just the winnings (bet was already deducted)
             sideBetWinnings += ppWin;
             sideBetMessages.push(`${ppResult.name}: +${ppWin}`);
             player.balance += ppWin;
@@ -1618,7 +1743,7 @@ function checkBlackjackRoundEnd(roomId) {
         if (player.sideBets.twentyOnePlus3 > 0 && room.dealer.hand.length > 0) {
           const tp3Result = evaluate21Plus3(player.hand, room.dealer.hand[0]);
           if (tp3Result.payout > 0) {
-            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout + player.sideBets.twentyOnePlus3; // Return bet + winnings
+            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout; // Just the winnings (bet was already deducted)
             sideBetWinnings += tp3Win;
             sideBetMessages.push(`${tp3Result.name}: +${tp3Win}`);
             player.balance += tp3Win;
@@ -1627,24 +1752,58 @@ function checkBlackjackRoundEnd(roomId) {
       }
       
       // Main hand results
-      if (player.isBusted) {
-        message = `Bust! Lost ${betAmount} LosBucks`;
-        winAmount = 0;
-      } else if (room.dealer.value > 21) {
-        message = `Dealer busts! Won ${betAmount} LosBucks`;
-        winAmount = betAmount * 2;
-        player.balance += winAmount;
-      } else if (player.handValue > room.dealer.value) {
-        message = `You win! Won ${betAmount} LosBucks`;
-        winAmount = betAmount * 2;
-        player.balance += winAmount;
-      } else if (player.handValue < room.dealer.value) {
-        message = `Dealer wins. Lost ${betAmount} LosBucks`;
-        winAmount = 0;
+      if (player.splitHands && player.splitHands.length > 0) {
+        // Handle split hands - evaluate each separately
+        let totalWinnings = 0;
+        const handResults = [];
+        
+        player.splitHands.forEach((splitHand, index) => {
+          let handWin = 0;
+          let handMsg = '';
+          
+          if (splitHand.isBusted) {
+            handMsg = `Hand ${index + 1}: Bust`;
+          } else if (room.dealer.value > 21) {
+            handMsg = `Hand ${index + 1}: Won ${splitHand.bet}`;
+            handWin = splitHand.bet * 2;
+          } else if (splitHand.handValue > room.dealer.value) {
+            handMsg = `Hand ${index + 1}: Won ${splitHand.bet}`;
+            handWin = splitHand.bet * 2;
+          } else if (splitHand.handValue < room.dealer.value) {
+            handMsg = `Hand ${index + 1}: Lost`;
+          } else {
+            handMsg = `Hand ${index + 1}: Push`;
+            handWin = splitHand.bet;
+          }
+          
+          totalWinnings += handWin;
+          handResults.push(handMsg);
+        });
+        
+        player.balance += totalWinnings;
+        message = handResults.join(' | ');
+        winAmount = totalWinnings;
       } else {
-        message = `Push! ${betAmount} LosBucks returned`;
-        winAmount = betAmount;
-        player.balance += betAmount;
+        // Normal single hand
+        if (player.isBusted) {
+          message = `Bust! Lost ${betAmount} LosBucks`;
+          winAmount = 0;
+        } else if (room.dealer.value > 21) {
+          message = `Dealer busts! Won ${betAmount} LosBucks`;
+          winAmount = betAmount * 2;
+          player.balance += winAmount;
+        } else if (player.handValue > room.dealer.value) {
+          message = `You win! Won ${betAmount} LosBucks`;
+          winAmount = betAmount * 2;
+          player.balance += winAmount;
+        } else if (player.handValue < room.dealer.value) {
+          message = `Dealer wins. Lost ${betAmount} LosBucks`;
+          winAmount = 0;
+        } else {
+          message = `Push! ${betAmount} LosBucks returned`;
+          winAmount = betAmount;
+          player.balance += betAmount;
+        }
       }
       
       // Add side bet results to message
