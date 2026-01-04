@@ -46,9 +46,9 @@ export default function SinglePlayer() {
   const [loadingHint, setLoadingHint] = useState(false);
   const [loadingRemainingQuestions, setLoadingRemainingQuestions] = useState(false);
 
-  // Load remaining 6 questions in background when user answers question 3 correctly
-  const loadRemainingQuestions = useCallback(async () => {
-    if (loadingRemainingQuestions || questions.length >= 10 || questions.length < 2) return;
+  // Load next 2 questions in background based on current progress
+  const loadNextQuestions = useCallback(async () => {
+    if (loadingRemainingQuestions || questions.length >= 10) return;
     
     setLoadingRemainingQuestions(true);
     
@@ -60,18 +60,18 @@ export default function SinglePlayer() {
         body: JSON.stringify({ 
           progressive: true,
           categories: CATEGORIES,
-          batch: 'remaining',
+          questionNumber: questions.length + 1,
           timestamp: Date.now()
         }),
       });
       
       const data = await response.json();
       
-      if (data.questions && data.questions.length === 8) {
+      if (data.questions && data.questions.length === 2) {
         setQuestions(prev => [...prev, ...data.questions]);
       }
     } catch (error) {
-      console.error('Error loading remaining questions:', error);
+      console.error('Error loading next questions:', error);
     }
     
     setLoadingRemainingQuestions(false);
@@ -87,9 +87,10 @@ export default function SinglePlayer() {
       setCasesWon(0);
       setTimeout(() => setGameState('results'), 2000);
     } else {
-      // Trigger background loading of remaining questions after question 3 (index 2)
-      if (currentQuestion === 2 && questions.length === 4) {
-        loadRemainingQuestions();
+      // Trigger background loading of next 2 questions at appropriate times
+      // Load after Q1 (index 0), Q3 (index 2), Q5 (index 4), Q7 (index 6)
+      if (currentQuestion % 2 === 0 && questions.length < 10) {
+        loadNextQuestions();
       }
       
       // Correct answer - show decision screen only every 2 questions
@@ -109,7 +110,7 @@ export default function SinglePlayer() {
         }, 2000);
       }
     }
-  }, [selectedAnswer, questions, currentQuestion, loadRemainingQuestions]);
+  }, [selectedAnswer, questions, currentQuestion, loadNextQuestions]);
 
   // Timer countdown
   useEffect(() => {
@@ -134,7 +135,7 @@ export default function SinglePlayer() {
         body: JSON.stringify({ 
           progressive: true,
           categories: CATEGORIES,
-          batch: 'initial',
+          questionNumber: 1,
           timestamp: Date.now()
         }),
       });
@@ -147,8 +148,8 @@ export default function SinglePlayer() {
       
       setQuestions(data.questions);
       setGameState('playing');
-      // Start loading remaining 8 questions in background immediately
-      setTimeout(() => loadRemainingQuestions(), 100);
+      // Start loading next 2 questions in background immediately
+      setTimeout(() => loadNextQuestions(), 100);
       setCurrentQuestion(0);
       setCasesWon(0);
       setTimeLeft(30);
@@ -225,8 +226,10 @@ export default function SinglePlayer() {
     // Award case since we're at a cashout milestone
     setCasesWon(casesWon + 1);
     
-    if (currentQuestion + 1 < questions.length) {
-      setCurrentQuestion(currentQuestion + 1);
+    // Check against total expected questions (10), not current array length
+    if (currentQuestion + 1 < 10) {
+      const nextQuestion = currentQuestion + 1;
+      setCurrentQuestion(nextQuestion);
       setSelectedAnswer(null);
       setShowAnswer(false);
       setTimeLeft(30);
@@ -234,6 +237,11 @@ export default function SinglePlayer() {
       setAiHint('');
       setTimerPaused(false);
       setGameState('playing');
+      
+      // Load next batch of 2 questions when starting questions 2, 4, 6, 8
+      if (nextQuestion === 2 || nextQuestion === 4 || nextQuestion === 6 || nextQuestion === 8) {
+        setTimeout(() => loadRemainingQuestions(), 100);
+      }
     } else {
       // Won all 10 questions!
       setWonGame(true);
