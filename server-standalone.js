@@ -1823,6 +1823,9 @@ function checkBlackjackRoundEnd(roomId) {
         message += ' | ' + sideBetMessages.join(', ');
       }
 
+      // Store side bet details on player for client display
+      player.sideBetResults = sideBetDetails;
+
       results[player.id] = message;
       player.currentBet = 0;
     });
