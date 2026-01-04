@@ -29,6 +29,7 @@ interface Lobby {
   isPrivate: boolean;
   maxPlayers: number;
   inGame: boolean;
+  gameType: string;
 }
 
 type GameState = 'menu' | 'lobbies' | 'lobby' | 'drawing' | 'waiting' | 'guessing' | 'roundResults' | 'finalResults';
@@ -61,7 +62,7 @@ export default function DrawBattle() {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      setPlayerId(newSocket.id);
+      setPlayerId(newSocket.id || '');
     });
 
     newSocket.on('lobbiesUpdate', (updatedLobbies: Lobby[]) => {
