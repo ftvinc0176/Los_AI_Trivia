@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import io, { Socket } from 'socket.io-client';
 
 interface Player {
@@ -686,15 +687,18 @@ export default function DrawBattle() {
 
           <div className="bg-white rounded-2xl p-6 mb-6">
             {currentDrawing.enhancedImage ? (
-              <img
+              <Image
                 src={currentDrawing.enhancedImage}
                 alt="Drawing to guess"
+                width={800}
+                height={600}
                 className="w-full h-auto rounded-xl"
+                unoptimized
               />
             ) : (
               <div className="text-center py-12">
                 <p className="text-red-500 text-2xl font-bold mb-4">❌ Error</p>
-                <p className="text-white text-lg">Couldn't generate AI images because Los fucked something up</p>
+                <p className="text-white text-lg">Could not generate AI images because Los messed something up</p>
               </div>
             )}
           </div>
