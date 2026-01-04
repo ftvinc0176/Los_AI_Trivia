@@ -705,11 +705,11 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (player) {
       player.drawing = drawing;
-      player.enhancedImage = enhancedImage;
+      player.enhancedImage = enhancedImage || drawing; // Fall back to original drawing if enhancement failed
     }
 
-    // Check if all players have submitted
-    const allSubmitted = room.players.every(p => p.enhancedImage);
+    // Check if all players have submitted their drawing
+    const allSubmitted = room.players.every(p => p.drawing);
     if (allSubmitted) {
       room.state = 'guessing';
       io.to(`drawguess_${roomId}`).emit('drawGuessAllSubmitted', { players: room.players, state: 'guessing' });
