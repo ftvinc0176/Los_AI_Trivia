@@ -1031,11 +1031,11 @@ io.on('connection', (socket) => {
       const allDrawn = lobby.players.every(p => p.hasDrawn);
       console.log(`All players drawn? ${allDrawn}`);
       if (allDrawn) {
-        console.log('All players have drawn! Emitting allDrawingsReady in 2 seconds...');
+        console.log('All players have drawn! Waiting 20 seconds for AI enhancements to complete...');
         setTimeout(() => {
           console.log('Emitting allDrawingsReady with', lobby.drawings.length, 'drawings to lobby', lobbyId);
           io.to(lobbyId).emit('allDrawingsReady', lobby.drawings);
-        }, 2000);
+        }, 20000);
       }
     }
   });

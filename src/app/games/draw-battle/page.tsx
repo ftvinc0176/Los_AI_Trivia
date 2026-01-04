@@ -105,6 +105,11 @@ export default function DrawBattle() {
 
     newSocket.on('allDrawingsReady', (allDrawings: Drawing[]) => {
       console.log('All drawings ready! Received', allDrawings.length, 'drawings');
+      console.log('Enhanced image status:', allDrawings.map(d => ({
+        player: d.playerName,
+        hasEnhanced: d.enhancedImage !== d.imageData,
+        enhancedLength: d.enhancedImage?.length
+      })));
       console.log('Transitioning to guessing phase');
       setDrawings(allDrawings);
       setGameState('guessing');
@@ -155,6 +160,7 @@ export default function DrawBattle() {
 
     // Enhance in background (non-blocking)
     if ((window as any).puter && puterLoaded) {
+      console.log('Starting AI enhancement in background...');
       setEnhancing(true);
       try {
         const base64Data = imageData.split(',')[1];
@@ -169,7 +175,8 @@ export default function DrawBattle() {
         );
         
         const enhancedImageUrl = imageElement.src;
-        console.log('Successfully enhanced drawing with Puter.js, updating server...');
+        console.log('Successfully enhanced drawing with Puter.js, URL length:', enhancedImageUrl.length);
+        console.log('Emitting updateDrawing to server...');
         
         // Update with enhanced version
         socket?.emit('updateDrawing', {
@@ -678,11 +685,18 @@ export default function DrawBattle() {
           )}
 
           <div className="bg-white rounded-2xl p-6 mb-6">
-            <img
-              src={currentDrawing.enhancedImage || currentDrawing.imageData}
-              alt="Drawing to guess"
-              className="w-full h-auto rounded-xl"
-            />
+            {currentDrawing.enhancedImage ? (
+              <img
+                src={currentDrawing.enhancedImage}
+                alt="Drawing to guess"
+                className="w-full h-auto rounded-xl"
+              />
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-red-500 text-2xl font-bold mb-4">❌ Error</p>
+                <p className="text-white text-lg">Couldn't generate AI images because Los fucked something up</p>
+              </div>
+            )}
           </div>
 
           <input
