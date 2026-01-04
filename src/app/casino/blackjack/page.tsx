@@ -263,7 +263,7 @@ function BlackjackGame() {
       setBalance(balance - totalBet);
       
       if (socket) {
-        socket.emit('casinoPlaceBet', { roomId, bet });
+        socket.emit('casinoPlaceBet', { roomId, bet, sideBets });
       } else {
         // Single player - deal cards immediately
         dealInitialCards(bet);
