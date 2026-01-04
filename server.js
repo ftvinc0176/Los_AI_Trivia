@@ -38,6 +38,9 @@ app.prepare().then(() => {
     },
   });
 
+  // Draw Battle lobbies Map (outside connection callback so it persists)
+  const drawBattleLobbies = new Map();
+
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
@@ -327,11 +330,7 @@ app.prepare().then(() => {
     }, 1000);
   }
 
-  expressApp.all('*', (req, res) => handler(req, res));
-
   // Draw Battle Socket handlers
-  const drawBattleLobbies = new Map();
-
   socket.on('createLobby', ({ playerName, isPrivate, gameType }) => {
     if (gameType !== 'drawBattle') return;
 
@@ -535,6 +534,62 @@ app.prepare().then(() => {
 
     io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
   });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    
+    // Handle Draw Battle disconnect
+    if (socket.lobbyId) {
+      const lobby = drawBattleLobbies.get(socket.lobbyId);
+      if (lobby) {
+        lobby.players = lobby.players.filter(p => p.id !== socket.id);
+        
+        if (lobby.players.length === 0) {
+          drawBattleLobbies.delete(socket.lobbyId);
+        } else if (lobby.host === socket.id) {
+          lobby.host = lobby.players[0].id;
+          lobby.players[0].ready = true;
+        }
+
+        if (lobby.players.length > 0) {
+          io.to(socket.lobbyId).emit('lobbyUpdate', lobby);
+          io.to(socket.lobbyId).emit('playerLeft', { playerId: socket.id });
+        }
+
+        io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
+      }
+    }
+    
+    // Handle regular room disconnect
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    room.players = room.players.filter(p => p.id !== socket.id);
+
+    if (room.players.length === 0) {
+      rooms.delete(roomId);
+    } else if (room.host === socket.id) {
+      room.host = room.players[0].id;
+    }
+
+    io.to(roomId).emit('gameState', {
+      players: room.players,
+      host: room.host,
+      category: room.category,
+      difficulty: room.difficulty,
+      started: room.started,
+      currentQuestion: room.currentQuestion,
+      questions: room.questions,
+      answers: room.answers,
+      timeLeft: room.timeLeft,
+      showAnswer: room.showAnswer,
+    });
+  });
+
+  expressApp.all('*', (req, res) => handler(req, res));
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);

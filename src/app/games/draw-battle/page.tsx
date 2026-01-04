@@ -71,13 +71,13 @@ export default function DrawBattle() {
 
     newSocket.on('lobbyUpdate', (lobby: Lobby) => {
       setCurrentLobby(lobby);
+      setGameState('lobby');
     });
 
     newSocket.on('gameStart', ({ round }: { round: number }) => {
       setCurrentRound(round);
       setGameState('drawing');
       setTimeLeft(60);
-      loadDrawingPrompt();
     });
 
     newSocket.on('drawingPhaseEnd', () => {
@@ -119,6 +119,18 @@ export default function DrawBattle() {
     }
   }, [timeLeft, gameState]);
 
+  useEffect(() => {
+    if (gameState === 'drawing' && !currentPrompt) {
+      loadDrawingPrompt();
+    }
+  }, [gameState, currentPrompt]);
+
+  useEffect(() => {
+    if (gameState === 'drawing') {
+      loadDrawingPrompt();
+    }
+  }, [gameState]);
+
   const loadDrawingPrompt = async () => {
     setLoadingPrompt(true);
     try {
@@ -137,12 +149,16 @@ export default function DrawBattle() {
       alert('Please enter your name!');
       return;
     }
-    socket?.emit('createLobby', {
+    if (!socket) {
+      alert('Not connected to server!');
+      return;
+    }
+    socket.emit('createLobby', {
       playerName: playerName.trim(),
       isPrivate,
       gameType: 'drawBattle'
     });
-    setGameState('lobby');
+    // State will be updated by lobbyUpdate event
   };
 
   const joinLobby = (lobbyId: string) => {
@@ -150,12 +166,16 @@ export default function DrawBattle() {
       alert('Please enter your name!');
       return;
     }
-    socket?.emit('joinLobby', {
+    if (!socket) {
+      alert('Not connected to server!');
+      return;
+    }
+    socket.emit('joinLobby', {
       lobbyId,
       playerName: playerName.trim(),
       gameType: 'drawBattle'
     });
-    setGameState('lobby');
+    // State will be updated by lobbyUpdate event
   };
 
   const leaveLobby = () => {
