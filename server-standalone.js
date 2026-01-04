@@ -236,32 +236,36 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('startGame', async ({ roomId, category }) => {
-    const room = rooms.get(roomId);
-    if (room && room.host === socket.id && !room.started) {
-      room.started = true;
-      room.currentQuestion = 0;
-      room.players.forEach((p) => (p.score = 0));
-      
-      const finalCategory = category || room.category;
-      const questions = await generateQuestions(finalCategory, room.difficulty, 10);
-      room.questions = questions;
+  socket.on('startGame', async (data) => {
+    // Handle trivia game start (has roomId and category parameters)
+    if (data && data.roomId) {
+      const { roomId, category } = data;
+      const room = rooms.get(roomId);
+      if (room && room.host === socket.id && !room.started) {
+        room.started = true;
+        room.currentQuestion = 0;
+        room.players.forEach((p) => (p.score = 0));
+        
+        const finalCategory = category || room.category;
+        const questions = await generateQuestions(finalCategory, room.difficulty, 10);
+        room.questions = questions;
 
-      io.to(roomId).emit('gameState', {
-        players: room.players,
-        host: room.host,
-        category: room.category,
-        difficulty: room.difficulty,
-        started: room.started,
-        currentQuestion: room.currentQuestion,
-        questions: room.questions,
-        answers: room.answers,
-        timeLeft: room.timeLeft,
-        showAnswer: room.showAnswer,
-      });
+        io.to(roomId).emit('gameState', {
+          players: room.players,
+          host: room.host,
+          category: room.category,
+          difficulty: room.difficulty,
+          started: room.started,
+          currentQuestion: room.currentQuestion,
+          questions: room.questions,
+          answers: room.answers,
+          timeLeft: room.timeLeft,
+          showAnswer: room.showAnswer,
+        });
 
-      startQuestionTimer(roomId);
-      console.log(`Game started in room ${roomId}`);
+        startQuestionTimer(roomId);
+        console.log(`Game started in room ${roomId}`);
+      }
     }
   });
 
@@ -999,9 +1003,11 @@ io.on('connection', (socket) => {
 
   socket.on('submitDrawing', ({ imageData, enhancedImage, prompt }) => {
     const lobbyId = socket.lobbyId;
+    console.log('submitDrawing called by socket', socket.id, 'lobbyId:', lobbyId);
     const lobby = drawBattleLobbies.get(lobbyId);
     if (!lobby) {
-      console.log('submitDrawing: Lobby not found for socket', socket.id);
+      console.log('submitDrawing: Lobby not found for socket', socket.id, 'lobbyId:', lobbyId);
+      console.log('Available lobbies:', Array.from(drawBattleLobbies.keys()));
       return;
     }
 
