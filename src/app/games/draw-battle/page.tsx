@@ -53,6 +53,7 @@ export default function DrawBattle() {
   const [enhancing, setEnhancing] = useState(false);
   const [guessResults, setGuessResults] = useState<{ playerId: string; correct: boolean; answer: string }[]>([]);
   const [roundScores, setRoundScores] = useState<{ [playerId: string]: number }>({});
+  const [privateLobbyCode, setPrivateLobbyCode] = useState('');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCanvasDrawing, setIsCanvasDrawing] = useState(false);
@@ -348,6 +349,12 @@ export default function DrawBattle() {
               🔒 Create Private Lobby
             </button>
             <button
+              onClick={() => setGameState('lobbies')}
+              className="w-full px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl hover:from-yellow-600 hover:to-orange-600 transition-all text-xl font-bold"
+            >
+              🔑 Join Private Lobby
+            </button>
+            <button
               onClick={() => router.push('/')}
               className="w-full px-8 py-4 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-all text-lg font-medium"
             >
@@ -361,6 +368,11 @@ export default function DrawBattle() {
 
   // LOBBIES LIST
   if (gameState === 'lobbies') {
+    // Request lobbies when entering this screen
+    useEffect(() => {
+      socket?.emit('getLobbies', { gameType: 'drawBattle' });
+    }, [socket]);
+
     const publicLobbies = lobbies.filter(l => !l.isPrivate && !l.inGame && l.gameType === 'drawBattle');
     
     return (
@@ -369,6 +381,30 @@ export default function DrawBattle() {
           <h1 className="text-5xl font-bold text-white mb-8 text-center">
             Public Draw Battle Lobbies 🎨
           </h1>
+
+          <div className="mb-8 bg-white/20 rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">Join with Code</h3>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                placeholder="Enter lobby code..."
+                value={privateLobbyCode}
+                onChange={(e) => setPrivateLobbyCode(e.target.value.toUpperCase())}
+                className="flex-1 px-6 py-3 bg-white/20 text-white rounded-xl text-lg placeholder-white/50 border border-white/30"
+              />
+              <button
+                onClick={() => {
+                  if (privateLobbyCode.trim()) {
+                    joinLobby(privateLobbyCode.trim());
+                  }
+                }}
+                disabled={!privateLobbyCode.trim()}
+                className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all font-bold disabled:opacity-50"
+              >
+                Join
+              </button>
+            </div>
+          </div>
 
           {publicLobbies.length === 0 ? (
             <div className="text-center text-white/60 text-xl py-12">

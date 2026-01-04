@@ -1109,6 +1109,12 @@ io.on('connection', (socket) => {
     io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
   });
 
+  socket.on('getLobbies', ({ gameType }) => {
+    if (gameType === 'drawBattle') {
+      socket.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
+    }
+  });
+
   // ============================================
   // CASINO GAME HANDLERS
   // ============================================
