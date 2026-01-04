@@ -34,7 +34,7 @@ function DrawAndGuessGame() {
   const [currentGuessIndex, setCurrentGuessIndex] = useState(0);
   const [myGuess, setMyGuess] = useState('');
   const [currentDrawingIndex, setCurrentDrawingIndex] = useState(0);
-  const [guessResult, setGuessResult] = useState<{ correct: boolean; answer: string } | null>(null);
+  const [guessResult, setGuessResult] = useState<{ correct: boolean; answer: string; score: number } | null>(null);
   const [currentRound, setCurrentRound] = useState(1);
   const [hasGuessed, setHasGuessed] = useState(false);
 
@@ -127,11 +127,15 @@ function DrawAndGuessGame() {
       });
 
       newSocket.on('drawGuessGuessFeedback', ({ correct, answer, score }) => {
-        setGuessResult({ correct, answer });
-        const myPlayer = players.find(p => p.id === newSocket.id);
-        if (myPlayer) {
-          myPlayer.score = score;
-        }
+        setGuessResult({ correct, answer, score });
+        setPlayers(prevPlayers => {
+          const updated = [...prevPlayers];
+          const myPlayer = updated.find(p => p.id === newSocket.id);
+          if (myPlayer) {
+            myPlayer.score = score;
+          }
+          return updated;
+        });
       });
 
       newSocket.on('drawGuessNextDrawing', ({ drawingIndex }) => {
@@ -150,6 +154,7 @@ function DrawAndGuessGame() {
         newSocket.close();
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   // Fetch public lobbies for browse mode
