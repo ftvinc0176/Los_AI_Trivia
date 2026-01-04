@@ -712,11 +712,13 @@ io.on('connection', (socket) => {
     const allSubmitted = room.players.every(p => p.drawing);
     if (allSubmitted) {
       room.state = 'guessing';
+      room.currentDrawingIndex = 0; // Start at first drawing
+      room.currentDrawingGuesses = new Map(); // Reset guesses
       io.to(`drawguess_${roomId}`).emit('drawGuessAllSubmitted', { players: room.players, state: 'guessing' });
     }
   });
 
-  socket.on('drawGuessSubmitGuess', ({ roomId, guess, targetPlayerId, drawingIndex }) => {
+  socket.on('drawGuessSubmitGuess', ({ roomId, guess, targetPlayerId }) => {
     const room = rooms.get(`drawguess_${roomId}`);
     if (!room) return;
 
@@ -736,22 +738,50 @@ io.on('connection', (socket) => {
         guessingPlayer.score += 1; // 1 point per correct guess
       }
 
+      // Track who has guessed for this drawing
+      if (!room.currentDrawingGuesses) {
+        room.currentDrawingGuesses = new Map();
+      }
+      room.currentDrawingGuesses.set(socket.id, { guess, correct });
+
       // Send immediate feedback to the guessing player
       io.to(socket.id).emit('drawGuessGuessFeedback', {
         correct,
         answer: targetPlayer.prompt,
         score: guessingPlayer.score
       });
+
+      // Check if all players (except the drawer) have guessed
+      const numPlayers = room.players.length;
+      const numGuesses = room.currentDrawingGuesses.size + 1; // +1 for the drawer who doesn't guess
+      
+      if (numGuesses >= numPlayers) {
+        // All players have guessed - move to next drawing
+        room.currentDrawingGuesses.clear();
+        const currentIndex = room.currentDrawingIndex || 0;
+        
+        setTimeout(() => {
+          if (currentIndex < numPlayers - 1) {
+            // Move to next drawing
+            room.currentDrawingIndex = currentIndex + 1;
+            io.to(`drawguess_${roomId}`).emit('drawGuessNextDrawing', { 
+              drawingIndex: room.currentDrawingIndex,
+              players: room.players
+            });
+          } else {
+            // Round complete
+            finishDrawGuessRound(roomId, room);
+          }
+        }, 2000); // 2 second delay to show results
+      }
     }
   });
 
-  socket.on('drawGuessFinishRound', ({ roomId }) => {
-    const room = rooms.get(`drawguess_${roomId}`);
-    if (!room) return;
-
+  function finishDrawGuessRound(roomId, room) {
     if (room.currentRound < room.maxRounds) {
       // Start next round
       room.currentRound++;
+      room.currentDrawingIndex = 0;
       room.players.forEach(player => {
         player.drawing = '';
         player.enhancedImage = '';
@@ -765,10 +795,45 @@ io.on('connection', (socket) => {
         players: room.players
       });
       
-      // Auto-start next round
-      setTimeout(() => {
-        socket.emit('drawGuessStartGame', { roomId });
-      }, 3000);
+      // Auto-start next round after 5 seconds
+      setTimeout(async () => {
+        room.state = 'drawing';
+
+        // Generate prompts for each player using OpenAI
+        const prompts = [];
+        for (let i = 0; i < room.players.length; i++) {
+          const OpenAI = require('openai').default;
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+          const response = await client.responses.create({
+            model: 'gpt-5-nano',
+            input: `Generate a single random object or thing for someone to draw. It should be simple enough to draw in 60 seconds and recognizable. Examples: "a cat", "a bicycle", "a tree". Respond with ONLY the thing to draw, nothing else.`
+          });
+
+          const prompt = response.output_text.trim();
+          prompts.push(prompt);
+        }
+
+        room.players.forEach((player, index) => {
+          player.prompt = prompts[index];
+          io.to(player.id).emit('drawGuessYourPrompt', { prompt: prompts[index] });
+        });
+
+        io.to(`drawguess_${roomId}`).emit('drawGuessGameStarted', { state: 'drawing' });
+        
+        // Start 60 second timer
+        let timeLeft = 60;
+        const timerInterval = setInterval(() => {
+          timeLeft--;
+          io.to(`drawguess_${roomId}`).emit('drawGuessTimerUpdate', { timeRemaining: timeLeft });
+          
+          if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            room.state = 'guessing';
+            io.to(`drawguess_${roomId}`).emit('drawGuessPhaseChange', { state: 'guessing' });
+          }
+        }, 1000);
+      }, 5000);
     } else {
       // Game over - show final results
       room.state = 'results';
@@ -777,6 +842,12 @@ io.on('connection', (socket) => {
         state: 'results'
       });
     }
+  }
+
+  socket.on('drawGuessFinishRound', ({ roomId }) => {
+    const room = rooms.get(`drawguess_${roomId}`);
+    if (!room) return;
+    finishDrawGuessRound(roomId, room);
   });
 
   socket.on('drawGuessPlayAgain', ({ roomId }) => {
