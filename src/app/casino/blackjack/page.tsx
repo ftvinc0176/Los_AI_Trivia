@@ -146,10 +146,13 @@ function BlackjackGame() {
       });
 
       newSocket.on('casinoRoundEnd', ({ players, dealer, results }: any) => {
-        console.log('Received casinoRoundEnd, players:', players.map((p: Player) => ({ 
-          name: p.name, 
-          sideBetResults: p.sideBetResults 
-        })));
+        console.log('=== RECEIVED casinoRoundEnd ===');
+        players.forEach((p: Player) => {
+          console.log(`Player: ${p.name}`);
+          console.log('  - sideBetResults:', p.sideBetResults);
+          console.log('  - sideBetResults type:', typeof p.sideBetResults);
+          console.log('  - sideBetResults keys:', p.sideBetResults ? Object.keys(p.sideBetResults) : 'null/undefined');
+        });
         
         setPlayers(players);
         setDealerHand(dealer.hand);

@@ -1868,10 +1868,12 @@ function checkBlackjackRoundEnd(roomId) {
 
     room.state = 'results';
     
-    console.log('Emitting casinoRoundEnd with players:', room.players.map(p => ({ 
-      name: p.name, 
-      sideBetResults: p.sideBetResults 
-    })));
+    console.log('=== EMITTING casinoRoundEnd ===');
+    room.players.forEach(p => {
+      console.log(`Player: ${p.name}`);
+      console.log('  - sideBets:', p.sideBets);
+      console.log('  - sideBetResults:', JSON.stringify(p.sideBetResults, null, 2));
+    });
     
     io.to(`casino_${roomId}`).emit('casinoRoundEnd', {
       players: room.players,
