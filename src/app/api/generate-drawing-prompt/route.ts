@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
-// Use DRAW_GAME_GEMINI_KEY for drawing game specifically (set on Vercel/Railway)
-const genAI = new GoogleGenerativeAI(process.env.DRAW_GAME_GEMINI_KEY || '');
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function GET() {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
     const prompt = `Generate a single random object or thing for someone to draw. It should be:
 - Simple enough to draw in 60 seconds
 - Recognizable
@@ -16,8 +13,12 @@ export async function GET() {
 
 Respond with ONLY the thing to draw, nothing else. No explanation or extra words.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      input: prompt
+    });
+
+    const text = response.output_text.trim();
 
     return NextResponse.json({ prompt: text });
   } catch (error) {

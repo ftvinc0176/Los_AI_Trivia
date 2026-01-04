@@ -1,13 +1,11 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { NextRequest, NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(request: NextRequest) {
   try {
     const { question, options, correctAnswer } = await request.json();
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `You are a helpful AI assistant for a trivia game show called "Who Wants to Be a Caseonaire?"
 
@@ -35,9 +33,12 @@ Be generous with information - this is their only AI hint for the entire game!
 
 Return ONLY the hint text, nothing else.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const hint = response.text().trim();
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      input: prompt
+    });
+
+    const hint = response.output_text.trim();
 
     return NextResponse.json({ hint });
   } catch (error) {

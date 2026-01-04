@@ -27,17 +27,20 @@ app.get('/health', (req, res) => {
 app.post('/api/generate-questions', async (req, res) => {
   try {
     const { category, difficulty, count } = req.body;
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const OpenAI = require('openai').default;
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const prompt = `Generate ${count} trivia questions about ${category} with ${difficulty} difficulty.
 Return ONLY a valid JSON array with this exact structure:
 [{"question": "question text", "options": ["A", "B", "C", "D"], "correctAnswer": 0}]
 correctAnswer is the index (0-3) of the correct option.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      input: prompt
+    });
+
+    const text = response.output_text;
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     
     if (!jsonMatch) throw new Error('No JSON found');
@@ -52,17 +55,20 @@ correctAnswer is the index (0-3) of the correct option.`;
 
 async function generateQuestions(category, difficulty, count) {
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const OpenAI = require('openai').default;
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const prompt = `Generate ${count} trivia questions about ${category} with ${difficulty} difficulty.
 Return ONLY a valid JSON array with this exact structure:
 [{"question": "question text", "options": ["A", "B", "C", "D"], "correctAnswer": 0}]
 correctAnswer is the index (0-3) of the correct option.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      input: prompt
+    });
+
+    const text = response.output_text;
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     
     if (!jsonMatch) throw new Error('No JSON found');
@@ -653,15 +659,18 @@ io.on('connection', (socket) => {
 
     room.state = 'drawing';
 
-    // Generate prompts for each player using Gemini
+    // Generate prompts for each player using OpenAI
     const prompts = [];
     for (let i = 0; i < room.players.length; i++) {
-      const { GoogleGenerativeAI } = require('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const OpenAI = require('openai').default;
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-      const result = await model.generateContent(`Generate a single random object or thing for someone to draw. It should be simple enough to draw in 60 seconds and recognizable. Examples: "a cat", "a bicycle", "a tree". Respond with ONLY the thing to draw, nothing else.`);
-      const prompt = result.response.text().trim();
+      const response = await client.responses.create({
+        model: 'gpt-5-nano',
+        input: `Generate a single random object or thing for someone to draw. It should be simple enough to draw in 60 seconds and recognizable. Examples: "a cat", "a bicycle", "a tree". Respond with ONLY the thing to draw, nothing else.`
+      });
+
+      const prompt = response.output_text.trim();
       prompts.push(prompt);
     }
 

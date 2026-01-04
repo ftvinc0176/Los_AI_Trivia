@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface Question {
   question: string;
@@ -12,8 +12,6 @@ interface Question {
 export async function POST(request: NextRequest) {
   try {
     const { category, difficulty, count, progressive, categories } = await request.json();
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     let prompt = '';
     
@@ -62,9 +60,13 @@ Make questions interesting and the difficulty level appropriate for ${difficulty
 IMPORTANT: Return ONLY the JSON array, no additional text, markdown formatting, or code blocks. Start with [ and end with ].`;
     }
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let text = response.text();
+    // Use OpenAI GPT-5-nano for free text generation
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      input: prompt
+    });
+    
+    let text = response.output_text;
 
     // Clean up the response - remove markdown code blocks if present
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
