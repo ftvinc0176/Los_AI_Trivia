@@ -11,9 +11,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ imageUrl: drawing });
     }
 
-    // Use Hugging Face's text-to-image with FLUX.1-dev model via new router endpoint
+    // Use Hugging Face's Stable Diffusion (free and reliable)
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
+      'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1',
       {
         method: 'POST',
         headers: {
