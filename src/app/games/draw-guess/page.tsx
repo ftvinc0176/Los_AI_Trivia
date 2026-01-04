@@ -193,19 +193,25 @@ export default function DrawAndGuess() {
     try {
       let enhancedImageUrl = drawing;
 
-      // Use Puter.js for FREE AI image generation (no API key needed!)
+      // Use Puter.js for FREE AI image-to-image enhancement (no API key needed!)
       if ((window as any).puter && puterLoaded) {
         try {
-          // Generate AI image using Puter's free service
+          // Convert base64 to raw image data for Puter
+          const base64Data = drawing.split(',')[1];
+          
+          // Generate AI-enhanced version of the actual drawing using image-to-image
           const imageElement = await (window as any).puter.ai.txt2img(
-            `realistic photo of ${myPrompt}, highly detailed, professional photography, 4k, sharp focus`,
-            { model: 'black-forest-labs/FLUX.1-schnell' }
+            `Transform this sketch into a realistic, highly detailed photo of ${myPrompt}, professional photography, 4k, sharp focus`,
+            { 
+              model: 'black-forest-labs/FLUX.1-schnell',
+              input_image: base64Data
+            }
           );
           
           // Convert image element to base64
           enhancedImageUrl = imageElement.src;
         } catch (puterError) {
-          console.error('Puter.js image generation error:', puterError);
+          console.error('Puter.js image enhancement error:', puterError);
           // Fall back to original drawing if Puter fails
         }
       }
@@ -510,20 +516,33 @@ export default function DrawAndGuess() {
   if (gameState === 'results') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-        <div className="max-w-4xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
+        <div className="max-w-6xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
           <h2 className="text-4xl font-bold text-white mb-8 text-center">Results!</h2>
           
-          <div className="space-y-6 mb-8">
+          <div className="space-y-8 mb-8">
             {players.map((player) => (
               <div key={player.id} className="bg-white/10 rounded-2xl p-6 border border-white/20">
-                <div className="flex items-center gap-6">
-                  <img src={player.enhancedImage} alt={player.name} className="w-40 h-40 rounded-lg object-cover" />
-                  <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-white mb-2">{player.name}</h3>
-                    <p className="text-xl text-yellow-300 mb-2">Prompt: {player.prompt}</p>
-                    {player.guess && <p className="text-lg text-white/70">Guessed: {player.guess}</p>}
-                    <p className="text-3xl font-bold text-green-400 mt-4">Score: {player.score}</p>
+                <h3 className="text-3xl font-bold text-white mb-4 text-center">{player.name}</h3>
+                <p className="text-2xl text-yellow-300 mb-6 text-center">Prompt: {player.prompt}</p>
+                
+                {/* Side-by-side images */}
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  {/* Original Drawing */}
+                  <div className="bg-white rounded-2xl p-4">
+                    <h4 className="text-lg font-bold text-gray-800 mb-3 text-center">Your Drawing</h4>
+                    <img src={player.drawing} alt="Original drawing" className="w-full rounded-lg" />
                   </div>
+                  
+                  {/* AI Enhanced Image */}
+                  <div className="bg-white rounded-2xl p-4">
+                    <h4 className="text-lg font-bold text-gray-800 mb-3 text-center">AI Enhanced</h4>
+                    <img src={player.enhancedImage} alt="AI enhanced" className="w-full rounded-lg" />
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  {player.guess && <p className="text-xl text-white/70 mb-2">Guessed: {player.guess}</p>}
+                  <p className="text-4xl font-bold text-green-400">Score: {player.score}</p>
                 </div>
               </div>
             ))}
