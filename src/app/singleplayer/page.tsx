@@ -46,6 +46,37 @@ export default function SinglePlayer() {
   const [loadingHint, setLoadingHint] = useState(false);
   const [loadingRemainingQuestions, setLoadingRemainingQuestions] = useState(false);
 
+  // Load remaining 6 questions in background when user answers question 3 correctly
+  const loadRemainingQuestions = useCallback(async () => {
+    if (loadingRemainingQuestions || questions.length >= 10) return;
+    
+    setLoadingRemainingQuestions(true);
+    
+    try {
+      const response = await fetch('/api/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ 
+          progressive: true,
+          categories: CATEGORIES,
+          batch: 'remaining',
+          timestamp: Date.now()
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.questions && data.questions.length === 6) {
+        setQuestions(prev => [...prev, ...data.questions]);
+      }
+    } catch (error) {
+      console.error('Error loading remaining questions:', error);
+    }
+    
+    setLoadingRemainingQuestions(false);
+  }, [loadingRemainingQuestions, questions.length]);
+
   const handleAnswerReveal = useCallback(() => {
     setShowAnswer(true);
     const isCorrect = selectedAnswer === questions[currentQuestion]?.correctAnswer;
@@ -131,37 +162,6 @@ export default function SinglePlayer() {
       setGameState('setup');
     }
     setLoading(false);
-  };
-
-  // Load remaining 6 questions in background when user answers question 3 correctly
-  const loadRemainingQuestions = async () => {
-    if (loadingRemainingQuestions || questions.length >= 10) return;
-    
-    setLoadingRemainingQuestions(true);
-    
-    try {
-      const response = await fetch('/api/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ 
-          progressive: true,
-          categories: CATEGORIES,
-          batch: 'remaining',
-          timestamp: Date.now()
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.questions && data.questions.length === 6) {
-        setQuestions(prev => [...prev, ...data.questions]);
-      }
-    } catch (error) {
-      console.error('Error loading remaining questions:', error);
-    }
-    
-    setLoadingRemainingQuestions(false);
   };
 
   const handleAnswerSelect = (index: number) => {
