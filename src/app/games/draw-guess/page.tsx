@@ -78,42 +78,42 @@ function DrawAndGuessGame() {
         setPublicLobbies(lobbies);
       });
 
-    socket.on('drawGuessYourPrompt', ({ prompt }) => {
-      setMyPrompt(prompt);
-      setGameState('drawing');
-      setTimeRemaining(60);
-    });
+      newSocket.on('drawGuessYourPrompt', ({ prompt }) => {
+        setMyPrompt(prompt);
+        setGameState('drawing');
+        setTimeRemaining(60);
+      });
 
-    socket.on('drawGuessGameStarted', ({ state }) => {
-      setGameState(state);
-    });
+      newSocket.on('drawGuessGameStarted', ({ state }) => {
+        setGameState(state);
+      });
 
-    socket.on('drawGuessTimerUpdate', ({ timeRemaining }) => {
-      setTimeRemaining(timeRemaining);
-    });
+      newSocket.on('drawGuessTimerUpdate', ({ timeRemaining }) => {
+        setTimeRemaining(timeRemaining);
+      });
 
-    socket.on('drawGuessPhaseChange', ({ state }) => {
-      setGameState(state);
-    });
+      newSocket.on('drawGuessPhaseChange', ({ state }) => {
+        setGameState(state);
+      });
 
-    socket.on('drawGuessAllSubmitted', ({ players, state }) => {
-      setPlayers(players);
-      setGameState(state);
-      setCurrentGuessIndex(0);
-    });
+      newSocket.on('drawGuessAllSubmitted', ({ players, state }) => {
+        setPlayers(players);
+        setGameState(state);
+        setCurrentGuessIndex(0);
+      });
 
-    socket.on('drawGuessResults', ({ players, state }) => {
-      setPlayers(players);
-      setGameState(state);
-    });
+      newSocket.on('drawGuessResults', ({ players, state }) => {
+        setPlayers(players);
+        setGameState(state);
+      });
 
-    socket.on('drawGuessReset', ({ players, state }) => {
-      setPlayers(players);
-      setGameState(state);
-      setMyPrompt('');
-      setCurrentGuessIndex(0);
-      setMyGuess('');
-    });
+      newSocket.on('drawGuessReset', ({ players, state }) => {
+        setPlayers(players);
+        setGameState(state);
+        setMyPrompt('');
+        setCurrentGuessIndex(0);
+        setMyGuess('');
+      });
 
       return () => {
         newSocket.close();
