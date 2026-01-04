@@ -1,6 +1,6 @@
 # Los_Trivia 1.0 🎯
 
-A premium AI-powered trivia web application with single and multiplayer modes, featuring real-time gameplay and dynamic question generation using Gemini AI.
+A premium AI-powered trivia web application with single and multiplayer modes, featuring real-time gameplay and dynamic question generation using OpenAI GPT-5-nano.
 
 ## ✨ Features
 
