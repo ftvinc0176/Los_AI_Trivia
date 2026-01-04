@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Use DRAW_GAME_GEMINI_KEY for drawing game specifically (set on Vercel/Railway)
+const genAI = new GoogleGenerativeAI(process.env.DRAW_GAME_GEMINI_KEY || '');
 
 export async function GET() {
   try {
