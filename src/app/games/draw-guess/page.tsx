@@ -32,6 +32,20 @@ export default function DrawAndGuess() {
 
   // Drawing state
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
+  const [puterLoaded, setPuterLoaded] = useState(false);
+
+  // Load Puter.js for free image generation
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).puter) {
+      const script = document.createElement('script');
+      script.src = 'https://js.puter.com/v2/';
+      script.async = true;
+      script.onload = () => setPuterLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setPuterLoaded(true);
+    }
+  }, []);
 
   // Socket listeners
   useEffect(() => {
@@ -176,18 +190,28 @@ export default function DrawAndGuess() {
     const drawing = canvasRef.current.toDataURL('image/png');
     setGameState('enhancing');
 
-    // Send drawing to AI enhancement API
     try {
-      const response = await fetch('/api/enhance-drawing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ drawing, prompt: myPrompt })
-      });
+      let enhancedImageUrl = drawing;
 
-      const data = await response.json();
+      // Use Puter.js for FREE AI image generation (no API key needed!)
+      if ((window as any).puter && puterLoaded) {
+        try {
+          // Generate AI image using Puter's free service
+          const imageElement = await (window as any).puter.ai.txt2img(
+            `realistic photo of ${myPrompt}, highly detailed, professional photography, 4k, sharp focus`,
+            { model: 'black-forest-labs/FLUX.1-schnell' }
+          );
+          
+          // Convert image element to base64
+          enhancedImageUrl = imageElement.src;
+        } catch (puterError) {
+          console.error('Puter.js image generation error:', puterError);
+          // Fall back to original drawing if Puter fails
+        }
+      }
       
       if (mode === 'multiplayer' && socket) {
-        socket.emit('drawGuessSubmitDrawing', { roomId, drawing, enhancedImage: data.imageUrl });
+        socket.emit('drawGuessSubmitDrawing', { roomId, drawing, enhancedImage: enhancedImageUrl });
       } else {
         // Single player - go to results
         setPlayers([{
@@ -195,7 +219,7 @@ export default function DrawAndGuess() {
           name: playerName,
           prompt: myPrompt,
           drawing,
-          enhancedImage: data.imageUrl,
+          enhancedImage: enhancedImageUrl,
           guess: '',
           score: 0
         }]);
