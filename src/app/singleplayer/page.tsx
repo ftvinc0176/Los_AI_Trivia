@@ -48,7 +48,7 @@ export default function SinglePlayer() {
 
   // Load remaining 6 questions in background when user answers question 3 correctly
   const loadRemainingQuestions = useCallback(async () => {
-    if (loadingRemainingQuestions || questions.length >= 10) return;
+    if (loadingRemainingQuestions || questions.length >= 10 || questions.length < 2) return;
     
     setLoadingRemainingQuestions(true);
     
@@ -67,7 +67,7 @@ export default function SinglePlayer() {
       
       const data = await response.json();
       
-      if (data.questions && data.questions.length === 6) {
+      if (data.questions && data.questions.length === 8) {
         setQuestions(prev => [...prev, ...data.questions]);
       }
     } catch (error) {
@@ -141,12 +141,14 @@ export default function SinglePlayer() {
       
       const data = await response.json();
       
-      if (!data.questions || data.questions.length !== 4) {
+      if (!data.questions || data.questions.length !== 2) {
         throw new Error('Invalid questions received');
       }
       
       setQuestions(data.questions);
       setGameState('playing');
+      // Start loading remaining 8 questions in background immediately
+      setTimeout(() => loadRemainingQuestions(), 100);
       setCurrentQuestion(0);
       setCasesWon(0);
       setTimeLeft(30);
