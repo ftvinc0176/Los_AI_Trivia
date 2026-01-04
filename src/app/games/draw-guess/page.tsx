@@ -199,9 +199,9 @@ export default function DrawAndGuess() {
           // Convert base64 to raw image data for Puter
           const base64Data = drawing.split(',')[1];
           
-          // Generate AI-enhanced version of the actual drawing using image-to-image
+          // Enhance the actual drawing - NO PROMPT, only the image itself
           const imageElement = await (window as any).puter.ai.txt2img(
-            `Transform this sketch into a realistic, highly detailed photo of ${myPrompt}, professional photography, 4k, sharp focus`,
+            `Transform this sketch into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus`,
             { 
               model: 'black-forest-labs/FLUX.1-schnell',
               input_image: base64Data
