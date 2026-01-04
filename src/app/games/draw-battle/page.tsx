@@ -146,7 +146,7 @@ export default function DrawBattle() {
           const base64Data = imageData.split(',')[1];
           
           const imageElement = await (window as any).puter.ai.txt2img(
-            `Transform this simple sketch of "${currentPrompt}" into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus, photorealistic`,
+            `Transform this simple sketch into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus, photorealistic. Enhance and clean up the drawing but keep the same subject and composition.`,
             { 
               model: 'gemini-2.5-flash-image-preview',
               input_image: base64Data,
