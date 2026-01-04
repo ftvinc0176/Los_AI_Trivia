@@ -700,17 +700,25 @@ io.on('connection', (socket) => {
 
   socket.on('drawGuessSubmitDrawing', ({ roomId, drawing, enhancedImage }) => {
     const room = rooms.get(`drawguess_${roomId}`);
-    if (!room) return;
+    if (!room) {
+      console.log('❌ Room not found:', roomId);
+      return;
+    }
 
     const player = room.players.find(p => p.id === socket.id);
     if (player) {
       player.drawing = drawing;
       player.enhancedImage = enhancedImage || drawing; // Fall back to original drawing if enhancement failed
+      console.log(`✓ Player ${player.name} submitted drawing`);
     }
 
     // Check if all players have submitted their drawing
     const allSubmitted = room.players.every(p => p.drawing);
+    const submittedCount = room.players.filter(p => p.drawing).length;
+    console.log(`Draw submissions: ${submittedCount}/${room.players.length}`);
+    
     if (allSubmitted) {
+      console.log('✓ All players submitted! Moving to guessing phase...');
       room.state = 'guessing';
       room.currentDrawingIndex = 0; // Start at first drawing
       room.currentDrawingGuesses = new Map(); // Reset guesses

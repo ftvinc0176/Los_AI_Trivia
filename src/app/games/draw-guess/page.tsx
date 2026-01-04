@@ -240,9 +240,11 @@ function DrawAndGuessGame() {
     if (!canvasRef.current) return;
     
     const drawing = canvasRef.current.toDataURL('image/png');
-    setGameState('enhancing');
-
-    try {
+    
+    if (mode !== 'single' && socket && roomId) {
+      // Multiplayer - start enhancement in background
+      setGameState('enhancing');
+      
       let enhancedImageUrl = drawing;
 
       // Use Puter.js for FREE AI image-to-image enhancement (no API key needed!)
@@ -264,18 +266,19 @@ function DrawAndGuessGame() {
           
           // Convert image element to base64
           enhancedImageUrl = imageElement.src;
+          console.log('✓ Image enhanced successfully');
         } catch (puterError) {
           console.error('Puter.js image enhancement error:', puterError);
           // Fall back to original drawing if Puter fails
         }
       }
       
-      if (mode !== 'single' && socket && roomId) {
-        // Multiplayer - emit drawing to server
-        socket.emit('drawGuessSubmitDrawing', { roomId, drawing, enhancedImage: enhancedImageUrl });
-        setGameState('enhancing'); // Show waiting state
-      } else {
-        // Single player - go to results
+      // Emit to server (with or without enhancement)
+      console.log('Submitting drawing to server...', { roomId, hasEnhancement: enhancedImageUrl !== drawing });
+      socket.emit('drawGuessSubmitDrawing', { roomId, drawing, enhancedImage: enhancedImageUrl });
+    } else {
+      // Single player
+      setGameState('enhancing');
         setPlayers([{
           id: myPlayerId,
           name: playerName,
