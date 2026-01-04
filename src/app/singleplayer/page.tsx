@@ -44,6 +44,7 @@ export default function SinglePlayer() {
   const [wonGame, setWonGame] = useState(false);
   const [timerPaused, setTimerPaused] = useState(false);
   const [loadingHint, setLoadingHint] = useState(false);
+  const [loadingRemainingQuestions, setLoadingRemainingQuestions] = useState(false);
 
   const handleAnswerReveal = useCallback(() => {
     setShowAnswer(true);
@@ -55,6 +56,11 @@ export default function SinglePlayer() {
       setCasesWon(0);
       setTimeout(() => setGameState('results'), 2000);
     } else {
+      // Trigger background loading of remaining questions after question 3 (index 2)
+      if (currentQuestion === 2 && questions.length === 4) {
+        loadRemainingQuestions();
+      }
+      
       // Correct answer - show decision screen only every 2 questions
       const questionNum = currentQuestion + 1;
       if (questionNum % 2 === 0) {
@@ -72,7 +78,7 @@ export default function SinglePlayer() {
         }, 2000);
       }
     }
-  }, [selectedAnswer, questions, currentQuestion]);
+  }, [selectedAnswer, questions, currentQuestion, loadRemainingQuestions]);
 
   // Timer countdown
   useEffect(() => {
@@ -89,23 +95,22 @@ export default function SinglePlayer() {
     setQuestions([]);
     
     try {
+      // Generate only first 4 questions initially for fast game start
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
         body: JSON.stringify({ 
-          category: 'Mixed - use all categories',
-          difficulty: 'Progressive',
-          count: 10,
           progressive: true,
           categories: CATEGORIES,
+          batch: 'initial',
           timestamp: Date.now()
         }),
       });
       
       const data = await response.json();
       
-      if (!data.questions || data.questions.length !== 10) {
+      if (!data.questions || data.questions.length !== 4) {
         throw new Error('Invalid questions received');
       }
       
@@ -126,6 +131,37 @@ export default function SinglePlayer() {
       setGameState('setup');
     }
     setLoading(false);
+  };
+
+  // Load remaining 6 questions in background when user answers question 3 correctly
+  const loadRemainingQuestions = async () => {
+    if (loadingRemainingQuestions || questions.length >= 10) return;
+    
+    setLoadingRemainingQuestions(true);
+    
+    try {
+      const response = await fetch('/api/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ 
+          progressive: true,
+          categories: CATEGORIES,
+          batch: 'remaining',
+          timestamp: Date.now()
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.questions && data.questions.length === 6) {
+        setQuestions(prev => [...prev, ...data.questions]);
+      }
+    } catch (error) {
+      console.error('Error loading remaining questions:', error);
+    }
+    
+    setLoadingRemainingQuestions(false);
   };
 
   const handleAnswerSelect = (index: number) => {

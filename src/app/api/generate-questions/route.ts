@@ -11,26 +11,64 @@ interface Question {
 
 export async function POST(request: NextRequest) {
   try {
-    const { category, difficulty, count, progressive, categories } = await request.json();
+    const { category, difficulty, count, progressive, categories, batch } = await request.json();
 
+    // Progressive loading: Generate initial 4 questions or remaining 6 questions
+    if (progressive && batch) {
+      if (batch === 'initial') {
+        // Generate first 4 questions (1-4, medium difficulty)
+        const response = await client.responses.create({
+          model: 'gpt-5-nano',
+          input: `Generate 4 medium difficulty trivia questions. Each from a different random category from: ${categories.join(', ')}. Return JSON array: [{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`
+        });
+
+        let text = response.output_text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const questions: Question[] = JSON.parse(text);
+
+        if (questions.length !== 4) {
+          throw new Error('Invalid response format from AI');
+        }
+
+        for (const q of questions) {
+          if (!q.question || !Array.isArray(q.options) || q.options.length !== 4 || 
+              typeof q.correctAnswer !== 'number' || q.correctAnswer < 0 || q.correctAnswer > 3) {
+            throw new Error('Invalid question format');
+          }
+        }
+
+        return NextResponse.json({ questions });
+      } else if (batch === 'remaining') {
+        // Generate remaining 6 questions (5-10, hard difficulty)
+        const response = await client.responses.create({
+          model: 'gpt-5-nano',
+          input: `Generate 6 hard difficulty trivia questions. Each from a different random category from: ${categories.join(', ')}. Return JSON array: [{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`
+        });
+
+        let text = response.output_text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const questions: Question[] = JSON.parse(text);
+
+        if (questions.length !== 6) {
+          throw new Error('Invalid response format from AI');
+        }
+
+        for (const q of questions) {
+          if (!q.question || !Array.isArray(q.options) || q.options.length !== 4 || 
+              typeof q.correctAnswer !== 'number' || q.correctAnswer < 0 || q.correctAnswer > 3) {
+            throw new Error('Invalid question format');
+          }
+        }
+
+        return NextResponse.json({ questions });
+      }
+    }
+
+    // Standard single request for multiplayer or non-progressive mode
     let prompt = '';
     
     if (progressive && categories) {
-      // Progressive difficulty mode for single player Caseonaire
-      prompt = `Generate ${count} unique trivia questions for a game show. Questions 1-3 are medium difficulty, questions 4-10 are hard difficulty. Each question must be from a different category: ${categories.join(', ')}.
-
-Return a JSON array of ${count} objects with this exact format:
-[{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]
-
-Rules: 4 options each, plausible wrong answers, avoid cliché questions, progressively harder.`;
+      prompt = `Generate ${count} unique trivia questions. Each from a different category: ${categories.join(', ')}. Progressive difficulty. Return JSON array: [{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`;
     } else {
-      // Standard mode for multiplayer
-      prompt = `Generate ${count} ${difficulty} difficulty trivia questions about ${category}.
-
-Return a JSON array of ${count} objects:
-[{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]
-
-4 options each, plausible wrong answers.`;
+      prompt = `Generate ${count} ${difficulty} trivia questions about ${category}. Return JSON array: [{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`;
     }
 
     // Use OpenAI GPT-5-nano for free text generation

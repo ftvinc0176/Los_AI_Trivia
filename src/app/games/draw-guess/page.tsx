@@ -237,7 +237,9 @@ function AIDrawingGame() {
         <div className="max-w-4xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
           <div className="mb-6 text-center">
             <h2 className="text-4xl font-bold text-white mb-4">Draw This!</h2>
-            <p className="text-3xl text-yellow-300 font-bold mb-4">{myPrompt}</p>
+            <div className="bg-yellow-400/20 border-2 border-yellow-300 rounded-2xl p-6 mb-4">
+              <p className="text-4xl text-yellow-300 font-bold">{myPrompt || 'Loading prompt...'}</p>
+            </div>
             <div className="flex items-center justify-center gap-4">
               <div className="text-2xl text-white font-bold">⏱️ {timeRemaining}s</div>
               <div className="h-3 flex-1 max-w-xs bg-white/20 rounded-full overflow-hidden">
