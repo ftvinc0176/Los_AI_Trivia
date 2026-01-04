@@ -240,7 +240,7 @@ export default function SinglePlayer() {
       
       // Load next batch of 2 questions when starting questions 2, 4, 6, 8
       if (nextQuestion === 2 || nextQuestion === 4 || nextQuestion === 6 || nextQuestion === 8) {
-        setTimeout(() => loadRemainingQuestions(), 100);
+        setTimeout(() => loadNextQuestions(), 100);
       }
     } else {
       // Won all 10 questions!
