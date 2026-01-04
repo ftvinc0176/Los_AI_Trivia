@@ -62,6 +62,7 @@ export default function DrawBattle() {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
+      console.log('Socket connected:', newSocket.id);
       setPlayerId(newSocket.id || '');
     });
 
@@ -70,6 +71,7 @@ export default function DrawBattle() {
     });
 
     newSocket.on('lobbyUpdate', (lobby: Lobby) => {
+      console.log('Received lobbyUpdate:', lobby);
       setCurrentLobby(lobby);
       setGameState('lobby');
     });
@@ -149,10 +151,15 @@ export default function DrawBattle() {
       alert('Please enter your name!');
       return;
     }
-    if (!socket) {
-      alert('Not connected to server!');
+    if (!socket || !socket.connected) {
+      alert('Not connected to server! Please wait...');
       return;
     }
+    if (!playerId) {
+      alert('Connection not ready! Please try again...');
+      return;
+    }
+    console.log('Creating lobby:', { playerName: playerName.trim(), isPrivate, gameType: 'drawBattle', socketId: playerId });
     socket.emit('createLobby', {
       playerName: playerName.trim(),
       isPrivate,

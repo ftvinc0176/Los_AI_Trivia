@@ -332,6 +332,7 @@ app.prepare().then(() => {
 
   // Draw Battle Socket handlers
   socket.on('createLobby', ({ playerName, isPrivate, gameType }) => {
+    console.log('Received createLobby:', { playerName, isPrivate, gameType, socketId: socket.id });
     if (gameType !== 'drawBattle') return;
 
     const lobbyId = Math.random().toString(36).substring(7);
@@ -360,6 +361,7 @@ app.prepare().then(() => {
     socket.join(lobbyId);
     socket.lobbyId = lobbyId;
 
+    console.log('Created lobby:', lobbyId, 'Emitting lobbyUpdate to socket:', socket.id);
     socket.emit('lobbyUpdate', lobby);
     io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
   });
