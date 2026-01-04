@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import io, { Socket } from 'socket.io-client';
 
@@ -113,6 +113,41 @@ export default function DrawBattle() {
     };
   }, []);
 
+  const submitDrawing = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    setEnhancing(true);
+    const imageData = canvas.toDataURL('image/png');
+
+    try {
+      const response = await fetch('/api/enhance-drawing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData, prompt: currentPrompt }),
+      });
+
+      const data = await response.json();
+      
+      socket?.emit('submitDrawing', {
+        imageData,
+        enhancedImage: data.enhancedImage,
+        prompt: currentPrompt,
+      });
+
+      setGameState('waiting');
+    } catch (error) {
+      console.error('Error enhancing drawing:', error);
+      socket?.emit('submitDrawing', {
+        imageData,
+        enhancedImage: imageData,
+        prompt: currentPrompt,
+      });
+      setGameState('waiting');
+    }
+    setEnhancing(false);
+  }, [socket, currentPrompt]);
+
   useEffect(() => {
     if (gameState === 'drawing' && timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
@@ -120,7 +155,7 @@ export default function DrawBattle() {
     } else if (timeLeft === 0 && gameState === 'drawing') {
       submitDrawing();
     }
-  }, [timeLeft, gameState]);
+  }, [timeLeft, gameState, submitDrawing]);
 
   useEffect(() => {
     if (gameState === 'drawing' && !currentPrompt) {
@@ -133,6 +168,12 @@ export default function DrawBattle() {
       loadDrawingPrompt();
     }
   }, [gameState]);
+
+  useEffect(() => {
+    if (gameState === 'lobbies') {
+      socket?.emit('getLobbies', { gameType: 'drawBattle' });
+    }
+  }, [gameState, socket]);
 
   const loadDrawingPrompt = async () => {
     setLoadingPrompt(true);
@@ -245,41 +286,6 @@ export default function DrawBattle() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  const submitDrawing = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    setEnhancing(true);
-    const imageData = canvas.toDataURL('image/png');
-
-    try {
-      const response = await fetch('/api/enhance-drawing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, prompt: currentPrompt }),
-      });
-
-      const data = await response.json();
-      
-      socket?.emit('submitDrawing', {
-        imageData,
-        enhancedImage: data.enhancedImage,
-        prompt: currentPrompt,
-      });
-
-      setGameState('waiting');
-    } catch (error) {
-      console.error('Error enhancing drawing:', error);
-      socket?.emit('submitDrawing', {
-        imageData,
-        enhancedImage: imageData,
-        prompt: currentPrompt,
-      });
-      setGameState('waiting');
-    }
-    setEnhancing(false);
-  };
-
   const submitGuess = () => {
     if (!myGuess.trim()) {
       alert('Please enter your guess!');
@@ -368,11 +374,6 @@ export default function DrawBattle() {
 
   // LOBBIES LIST
   if (gameState === 'lobbies') {
-    // Request lobbies when entering this screen
-    useEffect(() => {
-      socket?.emit('getLobbies', { gameType: 'drawBattle' });
-    }, [socket]);
-
     const publicLobbies = lobbies.filter(l => !l.isPrivate && !l.inGame && l.gameType === 'drawBattle');
     
     return (
