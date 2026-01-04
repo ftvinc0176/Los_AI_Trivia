@@ -37,6 +37,7 @@ function DrawAndGuessGame() {
   // Drawing state
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
   const [puterLoaded, setPuterLoaded] = useState(false);
+  const [hasStartedSingle, setHasStartedSingle] = useState(false);
 
   // Load Puter.js for free image generation
   useEffect(() => {
@@ -311,11 +312,12 @@ function DrawAndGuessGame() {
 
   // Auto-start single player mode
   useEffect(() => {
-    if (mode === 'single') {
+    if (mode === 'single' && !hasStartedSingle) {
+      setHasStartedSingle(true);
       startSinglePlayer();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, hasStartedSingle]);
 
   // Browse Public Lobbies
   if (mode === 'browse' && !roomId) {
