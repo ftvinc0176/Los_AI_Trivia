@@ -1722,25 +1722,35 @@ function checkBlackjackRoundEnd(roomId) {
       const betAmount = player.currentBet;
       let winAmount = 0;
       let message = '';
+      let mainHandWon = false;
       
-      // Evaluate side bets
-      let sideBetWinnings = 0;
-      let sideBetMessages = [];
-      let sideBetDetails = {};
+      // Initialize side bet results
+      const sideBetResults = {
+        perfectPairs: null,
+        twentyOnePlus3: null
+      };
       
+      // Evaluate side bets FIRST (they're independent of main hand)
       if (player.sideBets) {
         // Perfect Pairs
         if (player.sideBets.perfectPairs > 0) {
           const ppResult = evaluatePerfectPairs(player.hand);
           if (ppResult.payout > 0) {
-            const ppWin = player.sideBets.perfectPairs * ppResult.payout + player.sideBets.perfectPairs; // Original bet + winnings
-            sideBetWinnings += ppWin;
-            sideBetMessages.push(`${ppResult.name}: +${ppWin}`);
-            sideBetDetails.perfectPairs = { name: ppResult.name, win: ppWin, lost: false };
+            const ppWin = player.sideBets.perfectPairs * ppResult.payout + player.sideBets.perfectPairs;
+            sideBetResults.perfectPairs = { 
+              name: ppResult.name, 
+              betAmount: player.sideBets.perfectPairs,
+              win: ppWin, 
+              lost: false 
+            };
             player.balance += ppWin;
           } else {
-            sideBetMessages.push(`Perfect Pairs: Lost ${player.sideBets.perfectPairs}`);
-            sideBetDetails.perfectPairs = { name: 'No Pair', win: 0, lost: true };
+            sideBetResults.perfectPairs = { 
+              name: 'No Pair', 
+              betAmount: player.sideBets.perfectPairs,
+              win: 0, 
+              lost: true 
+            };
           }
         }
         
@@ -1748,20 +1758,27 @@ function checkBlackjackRoundEnd(roomId) {
         if (player.sideBets.twentyOnePlus3 > 0 && room.dealer.hand.length > 0) {
           const tp3Result = evaluate21Plus3(player.hand, room.dealer.hand[0]);
           if (tp3Result.payout > 0) {
-            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout + player.sideBets.twentyOnePlus3; // Original bet + winnings
-            sideBetWinnings += tp3Win;
-            sideBetMessages.push(`${tp3Result.name}: +${tp3Win}`);
-            sideBetDetails.twentyOnePlus3 = { name: tp3Result.name, win: tp3Win, lost: false };
+            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout + player.sideBets.twentyOnePlus3;
+            sideBetResults.twentyOnePlus3 = { 
+              name: tp3Result.name, 
+              betAmount: player.sideBets.twentyOnePlus3,
+              win: tp3Win, 
+              lost: false 
+            };
             player.balance += tp3Win;
           } else {
-            sideBetMessages.push(`21+3: Lost ${player.sideBets.twentyOnePlus3}`);
-            sideBetDetails.twentyOnePlus3 = { name: 'No Hand', win: 0, lost: true };
+            sideBetResults.twentyOnePlus3 = { 
+              name: 'No Hand', 
+              betAmount: player.sideBets.twentyOnePlus3,
+              win: 0, 
+              lost: true 
+            };
           }
         }
       }
       
-      // Store side bet details for this player
-      player.sideBetDetails = sideBetDetails;
+      // Attach side bet results to player object for client
+      player.sideBetResults = sideBetResults;
       
       // Main hand results
       if (player.splitHands && player.splitHands.length > 0) {
@@ -1795,36 +1812,34 @@ function checkBlackjackRoundEnd(roomId) {
         player.balance += totalWinnings;
         message = handResults.join(' | ');
         winAmount = totalWinnings;
+        mainHandWon = totalWinnings > 0;
       } else {
         // Normal single hand
         if (player.isBusted) {
-          message = `Bust! Lost ${betAmount} LosBucks`;
+          message = `Main: Lost ${betAmount}`;
           winAmount = 0;
+          mainHandWon = false;
         } else if (room.dealer.value > 21) {
-          message = `Dealer busts! Won ${betAmount} LosBucks`;
+          message = `Main: Won ${betAmount}`;
           winAmount = betAmount * 2;
           player.balance += winAmount;
+          mainHandWon = true;
         } else if (player.handValue > room.dealer.value) {
-          message = `You win! Won ${betAmount} LosBucks`;
+          message = `Main: Won ${betAmount}`;
           winAmount = betAmount * 2;
           player.balance += winAmount;
+          mainHandWon = true;
         } else if (player.handValue < room.dealer.value) {
-          message = `Dealer wins. Lost ${betAmount} LosBucks`;
+          message = `Main: Lost ${betAmount}`;
           winAmount = 0;
+          mainHandWon = false;
         } else {
-          message = `Push! ${betAmount} LosBucks returned`;
+          message = `Main: Push ${betAmount}`;
           winAmount = betAmount;
           player.balance += betAmount;
+          mainHandWon = null; // Push is neither win nor loss
         }
       }
-      
-      // Add side bet results to message
-      if (sideBetMessages.length > 0) {
-        message += ' | ' + sideBetMessages.join(', ');
-      }
-
-      // Store side bet details on player for client display
-      player.sideBetResults = sideBetDetails;
 
       results[player.id] = message;
       player.currentBet = 0;

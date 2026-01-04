@@ -21,8 +21,8 @@ interface Player {
   isBusted: boolean;
   sideBets?: { perfectPairs: number; twentyOnePlus3: number };
   sideBetResults?: {
-    perfectPairs?: { name: string; win: number; lost: boolean };
-    twentyOnePlus3?: { name: string; win: number; lost: boolean };
+    perfectPairs?: { name: string; betAmount: number; win: number; lost: boolean } | null;
+    twentyOnePlus3?: { name: string; betAmount: number; win: number; lost: boolean } | null;
   };
 }
 
@@ -1107,46 +1107,46 @@ function BlackjackGame() {
                         
                         {/* Result Message Above Hand */}
                         {result && (
-                          <div className="mb-2 max-w-full">
+                          <div className="mb-2 max-w-full space-y-1">
                             {/* Main Hand Result */}
                             <div className={`px-2 py-1 rounded-lg font-bold text-center text-xs sm:text-sm ${
-                              result.includes('win') || result.includes('Win') 
+                              result.includes('Won') 
                                 ? 'bg-green-600 text-white' 
                                 : result.includes('Push') 
                                   ? 'bg-yellow-600 text-black' 
                                   : 'bg-red-600 text-white'
                             }`}>
-                              <div className="break-words">{result.split('|')[0].trim()}</div>
+                              {result}
                             </div>
                             
                             {/* Side Bet Results */}
                             {player.sideBetResults && (
-                              <div className="mt-1 space-y-1">
+                              <>
                                 {player.sideBetResults.perfectPairs && (
-                                  <div className={`px-2 py-0.5 rounded text-xs font-semibold text-center ${
+                                  <div className={`px-2 py-1 rounded text-xs font-semibold text-center ${
                                     player.sideBetResults.perfectPairs.lost 
-                                      ? 'bg-red-500/80 text-white' 
-                                      : 'bg-green-500/80 text-white'
+                                      ? 'bg-red-500 text-white' 
+                                      : 'bg-green-500 text-white'
                                   }`}>
                                     {player.sideBetResults.perfectPairs.lost 
-                                      ? `PP: ${player.sideBetResults.perfectPairs.name}` 
-                                      : `PP: ${player.sideBetResults.perfectPairs.name} +${player.sideBetResults.perfectPairs.win}`
+                                      ? `Perfect Pairs: Lost ${player.sideBetResults.perfectPairs.betAmount}` 
+                                      : `${player.sideBetResults.perfectPairs.name}: Won ${player.sideBetResults.perfectPairs.win}`
                                     }
                                   </div>
                                 )}
                                 {player.sideBetResults.twentyOnePlus3 && (
-                                  <div className={`px-2 py-0.5 rounded text-xs font-semibold text-center ${
+                                  <div className={`px-2 py-1 rounded text-xs font-semibold text-center ${
                                     player.sideBetResults.twentyOnePlus3.lost 
-                                      ? 'bg-red-500/80 text-white' 
-                                      : 'bg-green-500/80 text-white'
+                                      ? 'bg-red-500 text-white' 
+                                      : 'bg-green-500 text-white'
                                   }`}>
                                     {player.sideBetResults.twentyOnePlus3.lost 
-                                      ? `21+3: ${player.sideBetResults.twentyOnePlus3.name}` 
-                                      : `21+3: ${player.sideBetResults.twentyOnePlus3.name} +${player.sideBetResults.twentyOnePlus3.win}`
+                                      ? `21+3: Lost ${player.sideBetResults.twentyOnePlus3.betAmount}` 
+                                      : `${player.sideBetResults.twentyOnePlus3.name}: Won ${player.sideBetResults.twentyOnePlus3.win}`
                                     }
                                   </div>
                                 )}
-                              </div>
+                              </>
                             )}
                           </div>
                         )}
