@@ -5,13 +5,19 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function GET() {
   try {
-    const prompt = `Generate a single random object or thing for someone to draw. It should be:
-- Simple enough to draw in 60 seconds
-- Recognizable
-- Not too abstract
-- Examples: "a cat", "a bicycle", "a tree", "a house", "a car", "a flower", "a dog", "pizza"
+    const prompt = `Generate a creative drawing prompt using this format: "a [NOUN] [VERB-ING] [NOUN]" or "a [ADJECTIVE] [NOUN] on a [NOUN]".
 
-Respond with ONLY the thing to draw, nothing else. No explanation or extra words.`;
+Examples:
+- "a cat riding a skateboard"
+- "a robot eating pizza"
+- "a dinosaur playing guitar"
+- "a small elephant on a bicycle"
+- "a chef juggling apples"
+- "a astronaut surfing waves"
+
+Be creative and unexpected! Mix animals, objects, actions, and settings. Keep it drawable in 60 seconds but fun and imaginative.
+
+Respond with ONLY the prompt phrase, nothing else.`;
 
     const response = await client.responses.create({
       model: 'gpt-5-nano',
