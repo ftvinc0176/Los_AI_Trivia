@@ -17,6 +17,7 @@ const io = new Server(httpServer, {
 });
 
 const rooms = new Map();
+const drawBattleLobbies = new Map();
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -575,6 +576,28 @@ io.on('connection', (socket) => {
       }
     }
 
+    // Handle Draw Battle disconnect
+    if (socket.lobbyId) {
+      const lobby = drawBattleLobbies.get(socket.lobbyId);
+      if (lobby) {
+        lobby.players = lobby.players.filter(p => p.id !== socket.id);
+        
+        if (lobby.players.length === 0) {
+          drawBattleLobbies.delete(socket.lobbyId);
+        } else if (lobby.host === socket.id) {
+          lobby.host = lobby.players[0].id;
+          lobby.players[0].ready = true;
+        }
+
+        if (lobby.players.length > 0) {
+          io.to(socket.lobbyId).emit('lobbyUpdate', lobby);
+          io.to(socket.lobbyId).emit('playerLeft', { playerId: socket.id });
+        }
+
+        io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
+      }
+    }
+
     console.log('Client disconnected:', socket.id);
   });
 
@@ -874,6 +897,216 @@ io.on('connection', (socket) => {
 
     room.state = 'lobby';
     io.to(`drawguess_${roomId}`).emit('drawGuessReset', { players: room.players, state: 'lobby' });
+  });
+
+  // ============================================
+  // DRAW BATTLE GAME HANDLERS
+  // ============================================
+
+  socket.on('createLobby', ({ playerName, isPrivate, gameType }) => {
+    console.log('Received createLobby:', { playerName, isPrivate, gameType, socketId: socket.id });
+    if (gameType !== 'drawBattle') return;
+
+    const lobbyId = Math.random().toString(36).substring(7);
+    const lobby = {
+      id: lobbyId,
+      name: `${playerName}'s Lobby`,
+      host: socket.id,
+      players: [{
+        id: socket.id,
+        name: playerName,
+        score: 0,
+        ready: true,
+        hasDrawn: false,
+        hasGuessed: false
+      }],
+      isPrivate,
+      maxPlayers: 4,
+      inGame: false,
+      gameType: 'drawBattle',
+      currentRound: 0,
+      drawings: [],
+      guesses: {}
+    };
+
+    drawBattleLobbies.set(lobbyId, lobby);
+    socket.join(lobbyId);
+    socket.lobbyId = lobbyId;
+
+    console.log('Created lobby:', lobbyId, 'Emitting lobbyUpdate to socket:', socket.id);
+    socket.emit('lobbyUpdate', lobby);
+    io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
+  });
+
+  socket.on('joinLobby', ({ lobbyId, playerName, gameType }) => {
+    if (gameType !== 'drawBattle') return;
+
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby || lobby.players.length >= lobby.maxPlayers || lobby.inGame) {
+      socket.emit('error', 'Cannot join lobby');
+      return;
+    }
+
+    lobby.players.push({
+      id: socket.id,
+      name: playerName,
+      score: 0,
+      ready: false,
+      hasDrawn: false,
+      hasGuessed: false
+    });
+
+    socket.join(lobbyId);
+    socket.lobbyId = lobbyId;
+
+    io.to(lobbyId).emit('lobbyUpdate', lobby);
+    io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
+  });
+
+  socket.on('toggleReady', () => {
+    const lobbyId = socket.lobbyId;
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby) return;
+
+    const player = lobby.players.find(p => p.id === socket.id);
+    if (player && player.id !== lobby.host) {
+      player.ready = !player.ready;
+      io.to(lobbyId).emit('lobbyUpdate', lobby);
+    }
+  });
+
+  socket.on('startGame', () => {
+    const lobbyId = socket.lobbyId;
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby || lobby.host !== socket.id) return;
+
+    const allReady = lobby.players.every(p => p.ready || p.id === lobby.host);
+    if (lobby.players.length < 2 || !allReady) return;
+
+    lobby.inGame = true;
+    lobby.currentRound = 1;
+    lobby.drawings = [];
+    lobby.guesses = {};
+    lobby.players.forEach(p => {
+      p.hasDrawn = false;
+      p.hasGuessed = false;
+      p.score = 0;
+    });
+
+    io.to(lobbyId).emit('gameStart', { round: 1 });
+    io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
+  });
+
+  socket.on('submitDrawing', ({ imageData, enhancedImage, prompt }) => {
+    const lobbyId = socket.lobbyId;
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby) return;
+
+    const player = lobby.players.find(p => p.id === socket.id);
+    if (player) {
+      player.hasDrawn = true;
+      lobby.drawings.push({
+        playerId: socket.id,
+        playerName: player.name,
+        prompt,
+        imageData,
+        enhancedImage
+      });
+
+      io.to(lobbyId).emit('lobbyUpdate', lobby);
+
+      // Check if all players have drawn
+      if (lobby.players.every(p => p.hasDrawn)) {
+        setTimeout(() => {
+          io.to(lobbyId).emit('allDrawingsReady', lobby.drawings);
+        }, 2000);
+      }
+    }
+  });
+
+  socket.on('submitGuess', ({ drawingPlayerId, correct }) => {
+    const lobbyId = socket.lobbyId;
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby) return;
+
+    if (!lobby.guesses[socket.id]) {
+      lobby.guesses[socket.id] = [];
+    }
+    
+    lobby.guesses[socket.id].push({
+      drawingPlayerId,
+      correct
+    });
+  });
+
+  socket.on('finishGuessing', () => {
+    const lobbyId = socket.lobbyId;
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby) return;
+
+    const player = lobby.players.find(p => p.id === socket.id);
+    if (player) {
+      player.hasGuessed = true;
+
+      // Check if all players have finished guessing
+      if (lobby.players.every(p => p.hasGuessed)) {
+        // Calculate scores for this round
+        const roundScores = {};
+        
+        lobby.players.forEach(player => {
+          const playerGuesses = lobby.guesses[player.id] || [];
+          const correctGuesses = playerGuesses.filter(g => g.correct).length;
+          player.score += correctGuesses;
+          roundScores[player.id] = correctGuesses;
+        });
+
+        io.to(lobbyId).emit('roundEnd', roundScores);
+        io.to(lobbyId).emit('lobbyUpdate', lobby);
+
+        // Start next round or end game
+        setTimeout(() => {
+          if (lobby.currentRound < 3) {
+            lobby.currentRound++;
+            lobby.drawings = [];
+            lobby.guesses = {};
+            lobby.players.forEach(p => {
+              p.hasDrawn = false;
+              p.hasGuessed = false;
+            });
+
+            io.to(lobbyId).emit('gameStart', { round: lobby.currentRound });
+          } else {
+            io.to(lobbyId).emit('gameEnd', lobby.players);
+            lobby.inGame = false;
+            io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
+          }
+        }, 5000);
+      }
+    }
+  });
+
+  socket.on('leaveLobby', () => {
+    const lobbyId = socket.lobbyId;
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby) return;
+
+    lobby.players = lobby.players.filter(p => p.id !== socket.id);
+    socket.leave(lobbyId);
+    delete socket.lobbyId;
+
+    if (lobby.players.length === 0) {
+      drawBattleLobbies.delete(lobbyId);
+    } else if (lobby.host === socket.id) {
+      lobby.host = lobby.players[0].id;
+      lobby.players[0].ready = true;
+    }
+
+    if (lobby.players.length > 0) {
+      io.to(lobbyId).emit('lobbyUpdate', lobby);
+      io.to(lobbyId).emit('playerLeft', { playerId: socket.id });
+    }
+
+    io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
   });
 
   // ============================================
