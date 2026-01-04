@@ -1013,6 +1013,7 @@ io.on('connection', (socket) => {
 
     const player = lobby.players.find(p => p.id === socket.id);
     if (player) {
+      console.log(`Before submission - Player ${player.name} hasDrawn:`, player.hasDrawn, 'Current drawings:', lobby.drawings.length);
       player.hasDrawn = true;
       lobby.drawings.push({
         playerId: socket.id,
@@ -1023,6 +1024,7 @@ io.on('connection', (socket) => {
       });
 
       console.log(`Player ${player.name} submitted drawing. Total: ${lobby.drawings.length}/${lobby.players.length}`);
+      console.log('All players and their hasDrawn status:', lobby.players.map(p => ({ name: p.name, hasDrawn: p.hasDrawn })));
       io.to(lobbyId).emit('lobbyUpdate', lobby);
 
       // Check if all players have drawn

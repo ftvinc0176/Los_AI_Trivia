@@ -74,7 +74,8 @@ export default function DrawBattle() {
     newSocket.on('lobbyUpdate', (lobby: Lobby) => {
       console.log('Received lobbyUpdate:', lobby);
       setCurrentLobby(lobby);
-      setGameState('lobby');
+      // Don't change game state if we're in active gameplay (drawing, waiting, guessing, results)
+      // Only set to 'lobby' state if the game hasn't started yet
     });
 
     newSocket.on('gameStart', ({ round }: { round: number }) => {
@@ -216,7 +217,8 @@ export default function DrawBattle() {
       isPrivate,
       gameType: 'drawBattle'
     });
-    // State will be updated by lobbyUpdate event
+    // Will receive lobbyUpdate event and set state to lobby there
+    setGameState('lobby');
   };
 
   const joinLobby = (lobbyId: string) => {
@@ -233,7 +235,8 @@ export default function DrawBattle() {
       playerName: playerName.trim(),
       gameType: 'drawBattle'
     });
-    // State will be updated by lobbyUpdate event
+    // Will receive lobbyUpdate event and set state to lobby there
+    setGameState('lobby');
   };
 
   const leaveLobby = () => {
