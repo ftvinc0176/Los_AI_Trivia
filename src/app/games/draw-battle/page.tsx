@@ -152,7 +152,7 @@ export default function DrawBattle() {
     console.log('Submitting drawing with prompt:', currentPrompt);
     socket?.emit('submitDrawing', {
       imageData,
-      enhancedImage: imageData, // Send original first
+      enhancedImage: undefined, // Will be set after AI enhancement
       prompt: currentPrompt,
     });
 
