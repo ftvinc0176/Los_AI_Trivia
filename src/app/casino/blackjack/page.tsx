@@ -25,8 +25,6 @@ interface Player {
     twentyOnePlus3?: { name: string; win: number; lost: boolean };
   };
 }
-  };
-}
 
 function BlackjackGame() {
   const router = useRouter();
