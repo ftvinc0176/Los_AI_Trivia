@@ -149,9 +149,11 @@ function BlackjackGame() {
         console.log('=== RECEIVED casinoRoundEnd ===');
         players.forEach((p: Player) => {
           console.log(`Player: ${p.name}`);
-          console.log('  - sideBetResults:', p.sideBetResults);
-          console.log('  - sideBetResults type:', typeof p.sideBetResults);
-          console.log('  - sideBetResults keys:', p.sideBetResults ? Object.keys(p.sideBetResults) : 'null/undefined');
+          console.log('  - sideBetResults:', JSON.stringify(p.sideBetResults, null, 2));
+          if (p.sideBetResults) {
+            console.log('  - perfectPairs:', p.sideBetResults.perfectPairs);
+            console.log('  - twentyOnePlus3:', p.sideBetResults.twentyOnePlus3);
+          }
         });
         
         setPlayers(players);
