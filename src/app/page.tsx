@@ -82,19 +82,42 @@ export default function Home() {
           </button>
 
           {/* Draw & Guess Card */}
-          <button
-            onClick={() => router.push('/games/draw-guess')}
-            className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-white/20"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <div className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20 rounded-3xl"></div>
             <div className="relative">
-              <div className="text-6xl mb-4">🎨</div>
-              <h2 className="text-3xl font-bold text-white mb-3">Draw & Guess</h2>
-              <p className="text-purple-100 font-light">
+              <div className="text-6xl mb-4 text-center">🎨</div>
+              <h2 className="text-3xl font-bold text-white mb-3 text-center">Draw & Guess</h2>
+              <p className="text-purple-100 font-light mb-6 text-center">
                 AI-enhanced drawings
               </p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => router.push('/games/draw-guess?mode=single')}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold transition-all"
+                >
+                  Practice Solo
+                </button>
+                <button
+                  onClick={() => router.push('/games/draw-guess?mode=browse')}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-bold transition-all"
+                >
+                  Public Lobbies
+                </button>
+                <button
+                  onClick={() => router.push('/games/draw-guess?mode=create')}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-xl font-bold transition-all"
+                >
+                  Create Private
+                </button>
+                <button
+                  onClick={() => router.push('/games/draw-guess?mode=join')}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-xl font-bold transition-all"
+                >
+                  Join Private
+                </button>
+              </div>
             </div>
-          </button>
+          </div>
 
           {/* Donate Card */}
           <a

@@ -576,7 +576,8 @@ io.on('connection', (socket) => {
   // DRAW & GUESS GAME HANDLERS
   // ============================================
 
-  socket.on('drawGuessCreateLobby', ({ roomId, playerName }) => {
+  socket.on('drawGuessCreateLobby', ({ playerName, isPublic = false }) => {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const player = {
       id: socket.id,
       name: playerName,
@@ -589,9 +590,12 @@ io.on('connection', (socket) => {
 
     rooms.set(`drawguess_${roomId}`, {
       players: [player],
-      state: 'lobby', // lobby, drawing, guessing, results
+      state: 'lobby',
       prompts: [],
-      timeRemaining: 60
+      timeRemaining: 60,
+      isPublic,
+      hostName: playerName,
+      maxPlayers: 4
     });
 
     socket.join(`drawguess_${roomId}`);
@@ -603,6 +607,11 @@ io.on('connection', (socket) => {
     const room = rooms.get(`drawguess_${roomId}`);
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+
+    if (room.players.length >= room.maxPlayers) {
+      socket.emit('error', { message: 'Room is full' });
       return;
     }
 
@@ -621,6 +630,21 @@ io.on('connection', (socket) => {
     
     io.to(`drawguess_${roomId}`).emit('drawGuessPlayerJoined', { players: room.players });
     socket.emit('drawGuessJoinedLobby', { roomId, players: room.players });
+  });
+
+  socket.on('getDrawGuessPublicLobbies', () => {
+    const publicLobbies = [];
+    for (const [key, room] of rooms.entries()) {
+      if (key.startsWith('drawguess_') && room.isPublic && room.state === 'lobby') {
+        publicLobbies.push({
+          roomId: key.replace('drawguess_', ''),
+          hostName: room.hostName,
+          playerCount: room.players.length,
+          maxPlayers: room.maxPlayers
+        });
+      }
+    }
+    socket.emit('drawGuessPublicLobbies', { lobbies: publicLobbies });
   });
 
   socket.on('drawGuessStartGame', async ({ roomId }) => {

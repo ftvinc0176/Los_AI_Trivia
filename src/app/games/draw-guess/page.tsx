@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import io, { Socket } from 'socket.io-client';
 
 interface Player {
@@ -14,16 +14,20 @@ interface Player {
   score: number;
 }
 
-export default function DrawAndGuess() {
+function DrawAndGuessGame() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const mode = searchParams.get('mode') || 'single';
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [gameState, setGameState] = useState<'menu' | 'lobby' | 'drawing' | 'enhancing' | 'guessing' | 'results'>('menu');
-  const [mode, setMode] = useState<'single' | 'multiplayer'>('single');
+  const [gameState, setGameState] = useState<'lobby' | 'drawing' | 'enhancing' | 'guessing' | 'results'>('lobby');
+  const [lobbyCode, setLobbyCode] = useState('');
   const [roomId, setRoomId] = useState('');
   const [myPlayerId, setMyPlayerId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [players, setPlayers] = useState<Player[]>([]);
+  const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; hostName: string; playerCount: number; maxPlayers: number }>>([]);
   const [myPrompt, setMyPrompt] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(60);
@@ -47,23 +51,32 @@ export default function DrawAndGuess() {
     }
   }, []);
 
-  // Socket listeners
+  // Socket.io setup for multiplayer
   useEffect(() => {
-    if (!socket) return;
+    if (mode !== 'single') {
+      const socketUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
+      const newSocket = io(socketUrl);
+      setSocket(newSocket);
 
-    socket.on('drawGuessLobbyCreated', ({ roomId, players }) => {
-      setRoomId(roomId);
-      setPlayers(players);
-    });
+      newSocket.on('drawGuessLobbyCreated', ({ roomId, players }) => {
+        setRoomId(roomId);
+        setPlayers(players);
+        setGameState('lobby');
+      });
 
-    socket.on('drawGuessPlayerJoined', ({ players }) => {
-      setPlayers(players);
-    });
+      newSocket.on('drawGuessPlayerJoined', ({ players }) => {
+        setPlayers(players);
+      });
 
-    socket.on('drawGuessJoinedLobby', ({ roomId, players }) => {
-      setRoomId(roomId);
-      setPlayers(players);
-    });
+      newSocket.on('drawGuessJoinedLobby', ({ roomId, players }) => {
+        setRoomId(roomId);
+        setPlayers(players);
+        setGameState('lobby');
+      });
+
+      newSocket.on('drawGuessPublicLobbies', ({ lobbies }) => {
+        setPublicLobbies(lobbies);
+      });
 
     socket.on('drawGuessYourPrompt', ({ prompt }) => {
       setMyPrompt(prompt);
@@ -102,19 +115,22 @@ export default function DrawAndGuess() {
       setMyGuess('');
     });
 
-    return () => {
-      socket.off('drawGuessLobbyCreated');
-      socket.off('drawGuessPlayerJoined');
-      socket.off('drawGuessJoinedLobby');
-      socket.off('drawGuessYourPrompt');
-      socket.off('drawGuessGameStarted');
-      socket.off('drawGuessTimerUpdate');
-      socket.off('drawGuessPhaseChange');
-      socket.off('drawGuessAllSubmitted');
-      socket.off('drawGuessResults');
-      socket.off('drawGuessReset');
-    };
-  }, [socket]);
+      return () => {
+        newSocket.close();
+      };
+    }
+  }, [mode]);
+
+  // Fetch public lobbies for browse mode
+  useEffect(() => {
+    if (mode === 'browse' && socket) {
+      socket.emit('getDrawGuessPublicLobbies');
+      const interval = setInterval(() => {
+        socket.emit('getDrawGuessPublicLobbies');
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [mode, socket]);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -240,173 +256,227 @@ export default function DrawAndGuess() {
     }
   };
 
-  const startGame = async (selectedMode: 'single' | 'multiplayer') => {
-    setMode(selectedMode);
+  const startSinglePlayer = async () => {
+    setGameState('enhancing');
     
-    if (selectedMode === 'single') {
-      // Show loading state first
-      setGameState('enhancing'); // Use enhancing state as loading
+    try {
+      const response = await fetch('/api/generate-drawing-prompt');
+      const data = await response.json();
       
-      try {
-        // Generate prompt from Gemini
-        const response = await fetch('/api/generate-drawing-prompt');
-        const data = await response.json();
-        
-        if (data.prompt) {
-          setMyPrompt(data.prompt);
-          setMyPlayerId('player1');
-          setPlayerName('You');
-          setTimeRemaining(60);
-          setGameState('drawing'); // Only set to drawing after prompt is loaded
-        } else {
-          alert('Failed to generate prompt. Please try again.');
-          setGameState('menu');
-        }
-      } catch (error) {
-        console.error('Error fetching prompt:', error);
-        alert('Failed to generate prompt. Please try again.');
-        setGameState('menu');
+      if (data.prompt) {
+        setMyPrompt(data.prompt);
+        setMyPlayerId('player1');
+        setPlayerName('You');
+        setTimeRemaining(60);
+        setGameState('drawing');
+      } else {
+        alert('Failed to generate prompt.');
+        router.push('/losgames');
       }
-    } else {
-      // Multiplayer mode
-      setGameState('lobby');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to generate prompt.');
+      router.push('/losgames');
     }
   };
 
   const createLobby = () => {
-    if (!playerName.trim()) {
-      alert('Please enter your name');
-      return;
+    if (socket && playerName) {
+      socket.emit('drawGuessCreateLobby', { playerName, isPublic: mode === 'browse' });
+      setMyPlayerId(socket.id!);
     }
-    
-    const newSocket = io(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000');
-    setSocket(newSocket);
-    
-    const newRoomId = Math.random().toString(36).substring(7).toUpperCase();
-    setRoomId(newRoomId);
-    setMyPlayerId(newSocket.id || '');
-    
-    newSocket.emit('drawGuessCreateLobby', { roomId: newRoomId, playerName });
   };
 
   const joinLobby = () => {
-    if (!playerName.trim() || !roomId.trim()) {
-      alert('Please enter your name and room code');
-      return;
+    if (socket && playerName && lobbyCode) {
+      socket.emit('drawGuessJoinLobby', { roomId: lobbyCode.toUpperCase(), playerName });
+      setMyPlayerId(socket.id!);
     }
-    
-    const newSocket = io(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000');
-    setSocket(newSocket);
-    setMyPlayerId(newSocket.id || '');
-    
-    newSocket.emit('drawGuessJoinLobby', { roomId: roomId.toUpperCase(), playerName });
   };
 
-  // Menu Screen
-  if (gameState === 'menu') {
+  const joinPublicLobby = (lobbyRoomId: string) => {
+    if (socket && playerName) {
+      socket.emit('drawGuessJoinLobby', { roomId: lobbyRoomId, playerName });
+      setMyPlayerId(socket.id!);
+    }
+  };
+
+  const startGame = () => {
+    if (socket && mode !== 'single') {
+      socket.emit('drawGuessStartGame', { roomId });
+    } else {
+      startSinglePlayer();
+    }
+  };
+
+  // Single Player Mode
+  if (mode === 'single') {
+    useEffect(() => {
+      startSinglePlayer();
+    }, []);
+  }
+
+  // Browse Public Lobbies
+  if (mode === 'browse' && !roomId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
         <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
-          <button onClick={() => router.push('/losgames')} className="mb-6 text-white/80 hover:text-white flex items-center gap-2">
+          <h1 className="text-4xl font-bold text-white mb-8 text-center">🎨 Public Draw & Guess Lobbies</h1>
+          
+          <div className="space-y-4 mb-6">
+            <input
+              type="text"
+              placeholder="Your Name"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-white/40"
+            />
+          </div>
+
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Available Lobbies</h2>
+              <button
+                onClick={() => socket?.emit('getDrawGuessPublicLobbies')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-all"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+            
+            {publicLobbies.length === 0 ? (
+              <div className="bg-white/5 rounded-xl p-8 text-center">
+                <p className="text-white/60">No public lobbies available</p>
+                <p className="text-white/40 text-sm mt-2">Create your own lobby to start playing!</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {publicLobbies.map((lobby) => (
+                  <div key={lobby.roomId} className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 transition-all">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-white font-bold text-lg">{lobby.hostName}'s Game</p>
+                        <p className="text-white/60 text-sm">{lobby.playerCount}/{lobby.maxPlayers} players • Room: {lobby.roomId}</p>
+                      </div>
+                      <button
+                        onClick={() => joinPublicLobby(lobby.roomId)}
+                        disabled={!playerName || lobby.playerCount >= lobby.maxPlayers}
+                        className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold transition-all disabled:cursor-not-allowed"
+                      >
+                        {lobby.playerCount >= lobby.maxPlayers ? 'Full' : 'Join'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <button
+            onClick={() => router.push('/losgames')}
+            className="w-full text-white/60 hover:text-white"
+          >
             ← Back to Games
           </button>
-          
-          <h1 className="text-5xl font-bold text-white mb-4 text-center">Draw & Guess</h1>
-          <p className="text-white/80 text-center mb-8">Draw your prompt, AI enhances it, friends guess it!</p>
-          
-          <div className="space-y-4">
-            <button
-              onClick={() => startGame('single')}
-              className="w-full px-8 py-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-2xl transition-all shadow-lg"
-            >
-              Practice Solo
-            </button>
-            
-            <button
-              onClick={() => startGame('multiplayer')}
-              className="w-full px-8 py-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-2xl font-bold text-2xl transition-all shadow-lg"
-            >
-              Play with Friends
-            </button>
-          </div>
         </div>
       </div>
     );
   }
 
-  // Lobby Screen
-  if (gameState === 'lobby') {
+  // Create or Join Lobby
+  if (mode !== 'single' && gameState === 'lobby' && !roomId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-        <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
-          <button onClick={() => setGameState('menu')} className="mb-6 text-white/80 hover:text-white">
-            ← Back
-          </button>
+        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
+          <h1 className="text-4xl font-bold text-white mb-8 text-center">
+            {mode === 'create' ? '🎨 Create Game' : '🔗 Join Game'}
+          </h1>
           
-          <h2 className="text-4xl font-bold text-white mb-6 text-center">Multiplayer Lobby</h2>
-          
-          {!roomId ? (
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Enter your name"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full px-6 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 text-lg"
-              />
-              
+          <div className="space-y-4">
+            <input
+              type="text"
+              placeholder="Your Name"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full px-6 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 text-lg"
+            />
+            
+            {mode === 'create' ? (
               <button
                 onClick={createLobby}
-                className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg"
+                disabled={!playerName}
+                className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold text-lg transition-all"
               >
-                Create Room
+                Create Lobby
               </button>
-              
-              <div className="flex gap-4">
+            ) : (
+              <>
                 <input
                   type="text"
                   placeholder="Room Code"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                  className="flex-1 px-6 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 text-lg uppercase"
+                  value={lobbyCode}
+                  onChange={(e) => setLobbyCode(e.target.value.toUpperCase())}
+                  className="w-full px-6 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 text-lg uppercase"
                   maxLength={7}
                 />
                 <button
                   onClick={joinLobby}
-                  className="px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-bold text-lg"
+                  disabled={!playerName || !lobbyCode}
+                  className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold text-lg transition-all"
                 >
-                  Join
+                  Join Lobby
                 </button>
+              </>
+            )}
+          </div>
+          
+          <button
+            onClick={() => router.push('/losgames')}
+            className="w-full mt-6 text-white/60 hover:text-white"
+          >
+            ← Back to Games
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Waiting Lobby (after joining/creating)
+  if (mode !== 'single' && gameState === 'lobby' && roomId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <div className="max-w-2xl w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
+          <h2 className="text-4xl font-bold text-white mb-6 text-center">Game Lobby</h2>
+          
+          <div className="bg-white/10 rounded-2xl p-6 mb-6">
+            <p className="text-white/60 text-sm mb-2">Room Code</p>
+            <p className="text-5xl font-bold text-yellow-300 text-center">{roomId}</p>
+          </div>
+          
+          <div className="space-y-3 mb-8">
+            <h3 className="text-xl font-bold text-white">Players ({players.length}/4)</h3>
+            {players.map((player) => (
+              <div key={player.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                <div className="flex justify-between items-center">
+                  <span className="text-white font-bold text-lg">
+                    {player.name} {player.id === myPlayerId && '(You)'}
+                  </span>
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
+          
+          {players.length > 0 && players[0].id === myPlayerId ? (
+            <button
+              onClick={startGame}
+              disabled={players.length < 2}
+              className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold text-lg transition-all"
+            >
+              {players.length < 2 ? 'Waiting for players...' : `Start Game (${players.length} Players)`}
+            </button>
           ) : (
-            <div>
-              <div className="bg-white/10 rounded-2xl p-6 mb-6">
-                <p className="text-white/60 text-sm mb-2">Room Code</p>
-                <p className="text-5xl font-bold text-yellow-300">{roomId}</p>
-              </div>
-              
-              <div className="space-y-3 mb-8">
-                {players.map((player) => (
-                  <div key={player.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                    <div className="flex justify-between items-center">
-                      <span className="text-white font-bold">
-                        {player.name} {player.id === myPlayerId && '(You)'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {players.length > 0 && players[0].id === myPlayerId && (
-                <button
-                  onClick={() => socket?.emit('drawGuessStartGame', { roomId })}
-                  disabled={players.length < 2}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-xl font-bold text-lg transition-all"
-                >
-                  Start Game {players.length > 1 && `(${players.length} Players)`}
-                </button>
-              )}
+            <div className="text-center text-white/60 py-4">
+              Waiting for host to start the game...
             </div>
           )}
         </div>
@@ -552,17 +622,17 @@ export default function DrawAndGuess() {
           
           <div className="flex gap-4">
             <button
-              onClick={() => setGameState('menu')}
+              onClick={() => router.push('/losgames')}
               className="flex-1 px-6 py-4 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold text-lg"
             >
               Main Menu
             </button>
             <button
               onClick={() => {
-                if (mode === 'multiplayer' && socket) {
+                if (mode === 'single') {
+                  startSinglePlayer();
+                } else if (socket) {
                   socket.emit('drawGuessPlayAgain', { roomId });
-                } else {
-                  startGame('single');
                 }
               }}
               className="flex-1 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg"
@@ -576,4 +646,12 @@ export default function DrawAndGuess() {
   }
 
   return null;
+}
+
+export default function DrawAndGuess() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}><div className="text-white text-2xl">Loading...</div></div>}>
+      <DrawAndGuessGame />
+    </Suspense>
+  );
 }
