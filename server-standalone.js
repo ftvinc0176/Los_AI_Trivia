@@ -1156,7 +1156,7 @@ io.on('connection', (socket) => {
     const player = {
       id: socket.id,
       name: playerName,
-      balance: 1000,
+      balance: 25000,
       currentBet: 0,
       hand: [],
       handValue: 0,
@@ -1209,7 +1209,7 @@ io.on('connection', (socket) => {
     const player = {
       id: socket.id,
       name: playerName,
-      balance: 1000,
+      balance: 25000,
       currentBet: 0,
       hand: [],
       handValue: 0,
@@ -1732,7 +1732,7 @@ function checkBlackjackRoundEnd(roomId) {
         if (player.sideBets.perfectPairs > 0) {
           const ppResult = evaluatePerfectPairs(player.hand);
           if (ppResult.payout > 0) {
-            const ppWin = player.sideBets.perfectPairs * ppResult.payout; // Just the winnings (bet was already deducted)
+            const ppWin = player.sideBets.perfectPairs * ppResult.payout + player.sideBets.perfectPairs; // Original bet + winnings
             sideBetWinnings += ppWin;
             sideBetMessages.push(`${ppResult.name}: +${ppWin}`);
             player.balance += ppWin;
@@ -1743,7 +1743,7 @@ function checkBlackjackRoundEnd(roomId) {
         if (player.sideBets.twentyOnePlus3 > 0 && room.dealer.hand.length > 0) {
           const tp3Result = evaluate21Plus3(player.hand, room.dealer.hand[0]);
           if (tp3Result.payout > 0) {
-            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout; // Just the winnings (bet was already deducted)
+            const tp3Win = player.sideBets.twentyOnePlus3 * tp3Result.payout + player.sideBets.twentyOnePlus3; // Original bet + winnings
             sideBetWinnings += tp3Win;
             sideBetMessages.push(`${tp3Result.name}: +${tp3Win}`);
             player.balance += tp3Win;
@@ -1814,6 +1814,25 @@ function checkBlackjackRoundEnd(roomId) {
       results[player.id] = message;
       player.currentBet = 0;
     });
+
+    // Kick players with 0 balance
+    const brokePlayers = room.players.filter(p => p.balance <= 0);
+    brokePlayers.forEach(player => {
+      const playerSocket = io.sockets.sockets.get(player.id);
+      if (playerSocket) {
+        playerSocket.emit('casinoKicked', { reason: 'Insufficient balance' });
+        playerSocket.leave(`casino_${roomId}`);
+      }
+    });
+    
+    // Remove broke players from room
+    room.players = room.players.filter(p => p.balance > 0);
+    
+    // Check if room is now empty
+    if (room.players.length === 0) {
+      rooms.delete(`casino_${roomId}`);
+      return;
+    }
 
     room.state = 'results';
     io.to(`casino_${roomId}`).emit('casinoRoundEnd', {

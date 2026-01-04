@@ -34,7 +34,7 @@ function BlackjackGame() {
   const [roomId, setRoomId] = useState('');
   const [players, setPlayers] = useState<Player[]>([]);
   const [myPlayerId, setMyPlayerId] = useState('');
-  const [balance, setBalance] = useState(1000);
+  const [balance, setBalance] = useState(25000);
   const [currentBet, setBetAmount] = useState(0);
   const [betInput, setBetInput] = useState('');
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
@@ -165,6 +165,11 @@ function BlackjackGame() {
         setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
         setBetInput('');
         setGameState('betting');
+      });
+
+      newSocket.on('casinoKicked', ({ reason }: { reason: string }) => {
+        alert(`You have been removed from the lobby: ${reason}`);
+        router.push('/casino');
       });
 
       return () => {
@@ -1315,7 +1320,7 @@ function BlackjackGame() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 text-center">
           <h1 className="text-5xl font-bold text-white mb-6">♠️ Blackjack ♥️</h1>
-          <p className="text-3xl text-yellow-300 mb-8">Starting Balance: 1000 LosBucks</p>
+          <p className="text-3xl text-yellow-300 mb-8">Starting Balance: 25000 LosBucks</p>
           
           <button
             onClick={startGame}
