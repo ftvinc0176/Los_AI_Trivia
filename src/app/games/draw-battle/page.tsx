@@ -112,6 +112,11 @@ export default function DrawBattle() {
       setGuessResults([]);
     });
 
+    newSocket.on('drawingsUpdated', (updatedDrawings: Drawing[]) => {
+      console.log('Drawings updated with enhanced versions');
+      setDrawings(updatedDrawings);
+    });
+
     newSocket.on('roundEnd', (scores: { [playerId: string]: number }) => {
       setRoundScores(scores);
       setGameState('roundResults');
@@ -134,54 +139,46 @@ export default function DrawBattle() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    setEnhancing(true);
     const imageData = canvas.toDataURL('image/png');
 
-    try {
-      let enhancedImageUrl = imageData;
+    // Immediately submit drawing and move to waiting state
+    console.log('Submitting drawing with prompt:', currentPrompt);
+    socket?.emit('submitDrawing', {
+      imageData,
+      enhancedImage: imageData, // Send original first
+      prompt: currentPrompt,
+    });
 
-      // Use Puter.js for FREE AI image-to-image enhancement
-      if ((window as any).puter && puterLoaded) {
-        try {
-          const base64Data = imageData.split(',')[1];
-          
-          const imageElement = await (window as any).puter.ai.txt2img(
-            `Transform this simple sketch into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus, photorealistic. Enhance and clean up the drawing but keep the same subject and composition.`,
-            { 
-              model: 'gemini-2.5-flash-image-preview',
-              input_image: base64Data,
-              input_image_mime_type: 'image/png'
-            }
-          );
-          
-          enhancedImageUrl = imageElement.src;
-          console.log('Successfully enhanced drawing with Puter.js');
-        } catch (puterError) {
-          console.error('Puter.js enhancement error:', puterError);
-        }
+    console.log('Moving to waiting state');
+    setGameState('waiting');
+
+    // Enhance in background (non-blocking)
+    if ((window as any).puter && puterLoaded) {
+      setEnhancing(true);
+      try {
+        const base64Data = imageData.split(',')[1];
+        
+        const imageElement = await (window as any).puter.ai.txt2img(
+          `Transform this simple sketch into a highly detailed, realistic photograph with professional quality, 4k resolution, sharp focus, photorealistic. Enhance and clean up the drawing but keep the same subject and composition.`,
+          { 
+            model: 'gemini-2.5-flash-image-preview',
+            input_image: base64Data,
+            input_image_mime_type: 'image/png'
+          }
+        );
+        
+        const enhancedImageUrl = imageElement.src;
+        console.log('Successfully enhanced drawing with Puter.js, updating server...');
+        
+        // Update with enhanced version
+        socket?.emit('updateDrawing', {
+          enhancedImage: enhancedImageUrl,
+        });
+      } catch (puterError) {
+        console.error('Puter.js enhancement error:', puterError);
       }
-      
-      console.log('Submitting drawing with prompt:', currentPrompt);
-      socket?.emit('submitDrawing', {
-        imageData,
-        enhancedImage: enhancedImageUrl,
-        prompt: currentPrompt,
-      });
-
-      console.log('Moving to waiting state');
-      setGameState('waiting');
-    } catch (error) {
-      console.error('Error enhancing drawing:', error);
-      console.log('Submitting drawing without enhancement, prompt:', currentPrompt);
-      socket?.emit('submitDrawing', {
-        imageData,
-        enhancedImage: imageData,
-        prompt: currentPrompt,
-      });
-      console.log('Moving to waiting state (no enhancement)');
-      setGameState('waiting');
+      setEnhancing(false);
     }
-    setEnhancing(false);
   }, [socket, currentPrompt, puterLoaded]);
 
   useEffect(() => {

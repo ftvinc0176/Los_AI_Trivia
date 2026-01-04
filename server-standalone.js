@@ -1040,6 +1040,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('updateDrawing', ({ enhancedImage }) => {
+    const lobbyId = socket.lobbyId;
+    const lobby = drawBattleLobbies.get(lobbyId);
+    if (!lobby) return;
+
+    // Find and update the drawing with enhanced version
+    const drawing = lobby.drawings.find(d => d.playerId === socket.id);
+    if (drawing) {
+      drawing.enhancedImage = enhancedImage;
+      console.log(`Updated enhanced image for player ${drawing.playerName}`);
+      
+      // Emit updated drawings to all players in case they're already in guessing phase
+      io.to(lobbyId).emit('drawingsUpdated', lobby.drawings);
+    }
+  });
+
   socket.on('submitGuess', ({ drawingPlayerId, correct }) => {
     const lobbyId = socket.lobbyId;
     const lobby = drawBattleLobbies.get(lobbyId);
