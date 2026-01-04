@@ -6,7 +6,7 @@ const genAI = new GoogleGenerativeAI(process.env.DRAW_GAME_GEMINI_KEY || '');
 
 export async function GET() {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `Generate a single random object or thing for someone to draw. It should be:
 - Simple enough to draw in 60 seconds
