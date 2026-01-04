@@ -11,14 +11,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ imageUrl: drawing });
     }
 
-    // Use Hugging Face's text-to-image with FLUX.1-dev model
+    // Use Hugging Face's text-to-image with FLUX.1-dev model via new router endpoint
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev',
+      'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${HF_TOKEN}`,
-          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           inputs: `realistic photo of ${prompt}, highly detailed, professional photography, 4k, sharp focus`,
