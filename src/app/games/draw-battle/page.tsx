@@ -87,7 +87,8 @@ export default function DrawBattle() {
 
     newSocket.on('lobbyUpdate', (lobby: Lobby) => {
       console.log('Received lobbyUpdate:', lobby);
-      setCurrentLobby(lobby);
+      console.log('Player hasDrawn statuses:', lobby.players.map(p => ({ name: p.name, hasDrawn: p.hasDrawn })));
+      setCurrentLobby({...lobby}); // Force new object reference to trigger re-render
       // Don't change game state if we're in active gameplay (drawing, waiting, guessing, results)
       // Only set to 'lobby' state if the game hasn't started yet
     });
