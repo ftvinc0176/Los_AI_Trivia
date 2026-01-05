@@ -850,11 +850,51 @@ export default function FPSArena() {
     bombSiteA.position.set(50, 0.1, -20); // A Site center
     scene.add(bombSiteA);
     
+    // Bomb Site A label
+    const bombSiteALabelDiv = document.createElement('div');
+    bombSiteALabelDiv.className = 'bomb-site-label';
+    bombSiteALabelDiv.textContent = 'BOMB SITE A';
+    bombSiteALabelDiv.style.cssText = `
+      color: #ff0000;
+      font-size: 24px;
+      font-weight: bold;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 8px 16px;
+      border: 2px solid #ff0000;
+      border-radius: 4px;
+      text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+      pointer-events: none;
+      user-select: none;
+    `;
+    const bombSiteALabel = new CSS2DObject(bombSiteALabelDiv);
+    bombSiteALabel.position.set(50, 3, -20); // Above the marker
+    scene.add(bombSiteALabel);
+    
     // Bomb Site B marker
     const bombSiteB = new THREE.Mesh(bombSiteAGeometry, bombSiteAMaterial);
     bombSiteB.rotation.x = -Math.PI / 2;
     bombSiteB.position.set(-35, 0.1, -10); // B Site center
     scene.add(bombSiteB);
+    
+    // Bomb Site B label
+    const bombSiteBLabelDiv = document.createElement('div');
+    bombSiteBLabelDiv.className = 'bomb-site-label';
+    bombSiteBLabelDiv.textContent = 'BOMB SITE B';
+    bombSiteBLabelDiv.style.cssText = `
+      color: #ff0000;
+      font-size: 24px;
+      font-weight: bold;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 8px 16px;
+      border: 2px solid #ff0000;
+      border-radius: 4px;
+      text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+      pointer-events: none;
+      user-select: none;
+    `;
+    const bombSiteBLabel = new CSS2DObject(bombSiteBLabelDiv);
+    bombSiteBLabel.position.set(-35, 3, -10); // Above the marker
+    scene.add(bombSiteBLabel);
 
     // === C4 BOMB MODEL (hidden until planted) ===
     const bombGroup = new THREE.Group();

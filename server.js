@@ -40,6 +40,10 @@ app.prepare().then(() => {
 
   // Draw Battle lobbies Map (outside connection callback so it persists)
   const drawBattleLobbies = new Map();
+  
+  // FPS Arena players Map
+  const fpsPlayers = new Map();
+  const fpsTeamCounts = { T: 0, CT: 0 };
 
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -537,8 +541,84 @@ app.prepare().then(() => {
     io.emit('lobbiesUpdate', Array.from(drawBattleLobbies.values()));
   });
 
+  // ============================================
+  // FPS ARENA HANDLERS
+  // ============================================
+  
+  socket.on('fpsJoin', ({ name, team }) => {
+    fpsPlayers.set(socket.id, {
+      name,
+      team,
+      position: [0, 0, 0],
+      rotation: 0,
+    });
+    
+    // Update team counts
+    if (team === 'T') {
+      fpsTeamCounts.T++;
+    } else if (team === 'CT') {
+      fpsTeamCounts.CT++;
+    }
+    
+    // Broadcast updated team counts to all players
+    io.emit('fpsTeamCounts', fpsTeamCounts);
+    
+    // Send current players to new joiner
+    const playersData = {};
+    fpsPlayers.forEach((player, id) => {
+      playersData[id] = player;
+    });
+    socket.emit('fpsPlayers', playersData);
+    
+    // Notify others
+    socket.broadcast.emit('fpsPlayerJoined', { id: socket.id, player: fpsPlayers.get(socket.id) });
+  });
+  
+  socket.on('fpsMove', ({ position, rotation }) => {
+    const player = fpsPlayers.get(socket.id);
+    if (player) {
+      player.position = position;
+      player.rotation = rotation;
+    }
+  });
+  
+  socket.on('fpsShoot', ({ position, direction, damage }) => {
+    socket.broadcast.emit('fpsShot', {
+      id: socket.id,
+      position,
+      direction,
+      damage,
+    });
+  });
+  
+  socket.on('fpsHit', ({ victim, damage }) => {
+    io.to(victim).emit('fpsHit', { damage, victim });
+    socket.emit('fpsHit', { damage, victim });
+  });
+  
+  socket.on('fpsPlantBomb', ({ position, site }) => {
+    io.emit('fpsBombPlanted', { position, site });
+  });
+  
+  socket.on('fpsDefuseBomb', () => {
+    io.emit('fpsBombDefused');
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    
+    // Handle FPS Arena disconnect
+    const fpsPlayer = fpsPlayers.get(socket.id);
+    if (fpsPlayer) {
+      if (fpsPlayer.team === 'T') {
+        fpsTeamCounts.T = Math.max(0, fpsTeamCounts.T - 1);
+      } else if (fpsPlayer.team === 'CT') {
+        fpsTeamCounts.CT = Math.max(0, fpsTeamCounts.CT - 1);
+      }
+      fpsPlayers.delete(socket.id);
+      io.emit('fpsTeamCounts', fpsTeamCounts);
+      socket.broadcast.emit('fpsPlayerLeft', { id: socket.id });
+    }
     
     // Handle Draw Battle disconnect
     if (socket.lobbyId) {
