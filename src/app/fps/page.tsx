@@ -8,26 +8,40 @@ import { Octree } from 'three/examples/jsm/math/Octree.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
 type WeaponType = 'awp' | 'm4' | 'ak47';
+type TeamType = 'T' | 'CT';
 
 export default function FPSArena() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [playerName, setPlayerName] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState<TeamType>('T');
   const [selectedWeapon, setSelectedWeapon] = useState<WeaponType>('awp');
   const [gameStarted, setGameStarted] = useState(false);
   const [showWeaponMenu, setShowWeaponMenu] = useState(false);
   const [health, setHealth] = useState(100);
   const [kills, setKills] = useState(0);
   const [deaths, setDeaths] = useState(0);
-  const [currentAmmo, setCurrentAmmo] = useState(1); // AWP starts with 1
+  const [currentAmmo, setCurrentAmmo] = useState(1);
   const [isReloading, setIsReloading] = useState(false);
-  const ammoRef = useRef(1); // Track ammo immediately to prevent race conditions
+  const [roundTime, setRoundTime] = useState(115); // CS round time (1:55)
+  const [bombPlanted, setBombPlanted] = useState(false);
+  const [bombTimer, setBombTimer] = useState(40); // 40 seconds to defuse
+  const [roundPhase, setRoundPhase] = useState<'buy' | 'active' | 'end'>('buy');
+  const [hasBomb, setHasBomb] = useState(false);
+  const [isPlanting, setIsPlanting] = useState(false);
+  const [isDefusing, setIsDefusing] = useState(false);
+  const [tScore, setTScore] = useState(0);
+  const [ctScore, setCtScore] = useState(0);
+  
+  const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
+  const isShootingRef = useRef(false); // For full auto
+  const lastShotTimeRef = useRef(0); // Rate of fire control
 
   // Weapon configs
   const weaponConfig = {
-    awp: { maxAmmo: 1, damage: 100, reloadTime: 2000 },
-    m4: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
-    ak47: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
+    awp: { maxAmmo: 1, damage: 100, reloadTime: 2000, fireRate: 1000, auto: false },
+    m4: { maxAmmo: 30, damage: 20, reloadTime: 1000, fireRate: 100, auto: true },
+    ak47: { maxAmmo: 30, damage: 20, reloadTime: 1000, fireRate: 100, auto: true },
   };
 
   // Sync ammo when weapon changes
@@ -987,9 +1001,14 @@ export default function FPSArena() {
     };
 
     // Player capsule collision
+    // Team-based spawns: T spawn at bottom, CT spawn at top
+    const spawnPos = selectedTeam === 'T' 
+      ? { x: -15, y: 0.35, z: -75 } // T Spawn area
+      : { x: 25, y: 0.35, z: 20 };  // CT Spawn area
+      
     const playerCapsule = new Capsule(
-      new THREE.Vector3(0, 0.35, 0),
-      new THREE.Vector3(0, 1.8, 0),
+      new THREE.Vector3(spawnPos.x, spawnPos.y, spawnPos.z),
+      new THREE.Vector3(spawnPos.x, 1.8, spawnPos.z),
       0.35
     );
 
@@ -1016,6 +1035,32 @@ export default function FPSArena() {
       // R key to reload
       if (event.code === 'KeyR' && document.pointerLockElement === document.body) {
         reloadWeapon();
+      }
+      
+      // E key to plant/defuse bomb
+      if (event.code === 'KeyE' && document.pointerLockElement === document.body) {
+        if (selectedTeam === 'T' && hasBomb && !bombPlanted && roundPhase === 'active') {
+          // Check if at bomb site (simplified - anywhere on map for now)
+          setIsPlanting(true);
+          setTimeout(() => {
+            setBombPlanted(true);
+            setIsPlanting(false);
+            if (socketRef.current) {
+              socketRef.current.emit('fpsPlantBomb', { position: [camera.position.x, camera.position.y, camera.position.z] });
+            }
+          }, 3000); // 3 second plant time
+        } else if (selectedTeam === 'CT' && bombPlanted && !isDefusing) {
+          // Check if near bomb (simplified)
+          setIsDefusing(true);
+          setTimeout(() => {
+            setBombPlanted(false);
+            setIsDefusing(false);
+            setCtScore(prev => prev + 1);
+            if (socketRef.current) {
+              socketRef.current.emit('fpsDefuseBomb');
+            }
+          }, 10000); // 10 second defuse time
+        }
       }
     });
 
@@ -1210,15 +1255,18 @@ export default function FPSArena() {
         if (victim === socket.id) {
           setDeaths((prev) => prev + 1);
           setHealth(100);
+          const spawn = selectedTeam === 'T'
+            ? { x: -15 + Math.random() * 10, z: -75 + Math.random() * 10 }
+            : { x: 25 + Math.random() * 10, z: 20 + Math.random() * 10 };
           playerCapsule.start.set(
-            Math.random() * 40 - 20,
+            spawn.x,
             0.35,
-            Math.random() * 40 - 20
+            spawn.z
           );
           playerCapsule.end.set(
-            playerCapsule.start.x,
+            spawn.x,
             1.8,
-            playerCapsule.start.z
+            spawn.z
           );
           playerVelocity.set(0, 0, 0);
         }
@@ -1305,11 +1353,41 @@ export default function FPSArena() {
       }
     };
 
+    // Full auto shooting system
+    const tryShoot = () => {
+      const now = Date.now();
+      const config = weaponConfig[selectedWeapon];
+      
+      // Check fire rate
+      if (now - lastShotTimeRef.current < config.fireRate) {
+        return;
+      }
+      
+      if (isReloadingRef.current || ammoRef.current <= 0) {
+        return;
+      }
+      
+      lastShotTimeRef.current = now;
+      shootRocket();
+    };
+
     document.addEventListener('mousedown', () => {
       if (document.pointerLockElement === document.body) {
-        shootRocket();
+        isShootingRef.current = true;
+        tryShoot(); // Shoot immediately
       }
     });
+
+    document.addEventListener('mouseup', () => {
+      isShootingRef.current = false;
+    });
+
+    // Auto-fire loop for full auto weapons
+    const autoFireInterval = setInterval(() => {
+      if (isShootingRef.current && weaponConfig[selectedWeapon].auto) {
+        tryShoot();
+      }
+    }, 50); // Check every 50ms
 
     // Player movement functions
     const getForwardVector = () => {
@@ -1390,8 +1468,11 @@ export default function FPSArena() {
 
     const teleportPlayerIfOob = () => {
       if (camera.position.y <= -25) {
-        playerCapsule.start.set(0, 0.35, 0);
-        playerCapsule.end.set(0, 1.8, 0);
+        const spawn = selectedTeam === 'T'
+          ? { x: -15, z: -75 }
+          : { x: 25, z: 20 };
+        playerCapsule.start.set(spawn.x, 0.35, spawn.z);
+        playerCapsule.end.set(spawn.x, 1.8, spawn.z);
         playerCapsule.radius = 0.35;
         camera.position.copy(playerCapsule.end);
         camera.rotation.set(0, 0, 0);
@@ -1475,8 +1556,7 @@ export default function FPSArena() {
     window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      if (containerRef.current) {
+      clearInterval(autoFireInterval);\n      window.removeEventListener('resize', handleResize);\n      if (containerRef.current) {
         if (renderer.domElement) {
           containerRef.current.removeChild(renderer.domElement);
         }
@@ -1489,7 +1569,72 @@ export default function FPSArena() {
         socketRef.current.disconnect();
       }
     };
-  }, [gameStarted, playerName, selectedWeapon]);
+  }, [gameStarted, playerName, selectedWeapon, selectedTeam]);
+
+  // Round timer system
+  useEffect(() => {
+    if (!gameStarted || roundPhase !== 'active') return;
+    
+    const timer = setInterval(() => {
+      setRoundTime(prev => {
+        if (prev <= 1) {
+          // Time's up - CTs win
+          setCtScore(s => s + 1);
+          setRoundPhase('end');
+          setTimeout(() => {
+            setRoundPhase('buy');
+            setRoundTime(115);
+            setHealth(100);
+          }, 5000);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [gameStarted, roundPhase]);
+
+  // Bomb timer
+  useEffect(() => {
+    if (!bombPlanted) return;
+    
+    const timer = setInterval(() => {
+      setBombTimer(prev => {
+        if (prev <= 1) {
+          // Bomb explodes - Ts win
+          setTScore(s => s + 1);
+          setBombPlanted(false);
+          setRoundPhase('end');
+          setTimeout(() => {
+            setRoundPhase('buy');
+            setRoundTime(115);
+            setBombTimer(40);
+            setHealth(100);
+          }, 5000);
+          return 40;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [bombPlanted]);
+
+  // Buy phase timer
+  useEffect(() => {
+    if (!gameStarted || roundPhase !== 'buy') return;
+    
+    const timer = setTimeout(() => {
+      setRoundPhase('active');
+      // Assign bomb to random T player (for now, just give it to everyone on T team)
+      if (selectedTeam === 'T') {
+        setHasBomb(true);
+      }
+    }, 15000); // 15 second buy time
+    
+    return () => clearTimeout(timer);
+  }, [gameStarted, roundPhase, selectedTeam]);
 
   // Handle weapon change from menu
   const handleWeaponSelect = (weapon: WeaponType) => {
@@ -1516,7 +1661,7 @@ export default function FPSArena() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
         <div className="bg-black/50 backdrop-blur-xl rounded-3xl p-12 border border-white/10 max-w-2xl w-full mx-4">
           <h1 className="text-5xl font-bold text-center mb-8 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            FPS Arena
+            Counter-Strike Arena
           </h1>
           
           <input
@@ -1527,6 +1672,37 @@ export default function FPSArena() {
             className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 mb-6 focus:outline-none focus:border-purple-500"
             onKeyDown={(e) => e.key === 'Enter' && playerName && setGameStarted(true)}
           />
+
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Select Your Team</h2>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <button
+                onClick={() => setSelectedTeam('T')}
+                className={`p-6 rounded-xl border-2 transition-all ${
+                  selectedTeam === 'T'
+                    ? 'border-yellow-500 bg-yellow-500/20'
+                    : 'border-white/20 bg-white/5 hover:border-white/40'
+                }`}
+              >
+                <div className="text-white text-xl font-bold mb-2">Terrorists</div>
+                <div className="text-gray-400 text-sm">Plant the bomb</div>
+                <div className="text-xs text-yellow-400 mt-2">Objective: Plant C4</div>
+              </button>
+              
+              <button
+                onClick={() => setSelectedTeam('CT')}
+                className={`p-6 rounded-xl border-2 transition-all ${
+                  selectedTeam === 'CT'
+                    ? 'border-blue-500 bg-blue-500/20'
+                    : 'border-white/20 bg-white/5 hover:border-white/40'
+                }`}
+              >
+                <div className="text-white text-xl font-bold mb-2">Counter-Terrorists</div>
+                <div className="text-gray-400 text-sm">Defuse the bomb</div>
+                <div className="text-xs text-blue-400 mt-2">Objective: Stop Ts</div>
+              </button>
+            </div>
+          </div>
 
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-white mb-4">Select Your Weapon</h2>
@@ -1591,22 +1767,49 @@ export default function FPSArena() {
     <div className="relative w-full h-screen overflow-hidden">
       <div ref={containerRef} className="w-full h-full" />
       
+      {/* Top HUD - Score and Timer */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-sm rounded-lg px-8 py-3 text-white">
+        <div className="flex items-center gap-8 text-xl font-bold">
+          <div className="text-yellow-400">T: {tScore}</div>
+          <div className="text-2xl">{Math.floor(roundTime / 60)}:{(roundTime % 60).toString().padStart(2, '0')}</div>
+          <div className="text-blue-400">CT: {ctScore}</div>
+        </div>
+        {roundPhase === 'buy' && (
+          <div className="text-center text-sm text-green-400 mt-1">BUY PHASE</div>
+        )}
+        {bombPlanted && (
+          <div className="text-center text-sm text-red-400 mt-1 animate-pulse">BOMB PLANTED - {bombTimer}s</div>
+        )}
+      </div>
+
+      {/* Player Info HUD */}
       <div className="absolute top-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white space-y-2">
+        <div className="text-lg font-bold" style={{ color: selectedTeam === 'T' ? '#fbbf24' : '#60a5fa' }}>
+          {selectedTeam === 'T' ? 'TERRORIST' : 'COUNTER-TERRORIST'}
+        </div>
         <div>Health: {health}</div>
-        <div>Kills: {kills}</div>
-        <div>Deaths: {deaths}</div>
+        <div>K/D: {kills}/{deaths}</div>
         <div className="text-sm text-gray-300 mt-2 pt-2 border-t border-white/20">
-          Weapon: {selectedWeapon.toUpperCase()}
+          {selectedWeapon.toUpperCase()}
         </div>
         <div className="text-lg font-bold mt-1">
           {isReloading ? (
             <span className="text-yellow-400">Reloading...</span>
           ) : (
             <span className={currentAmmo === 0 ? 'text-red-400' : 'text-white'}>
-              Ammo: {currentAmmo}/{weaponConfig[selectedWeapon].maxAmmo}
+              {currentAmmo}/{weaponConfig[selectedWeapon].maxAmmo}
             </span>
           )}
         </div>
+        {hasBomb && selectedTeam === 'T' && !bombPlanted && (
+          <div className="text-sm text-red-400 font-bold mt-2 animate-pulse">YOU HAVE THE BOMB</div>
+        )}
+        {isPlanting && (
+          <div className="text-sm text-yellow-400 font-bold mt-2">PLANTING...</div>
+        )}
+        {isDefusing && (
+          <div className="text-sm text-blue-400 font-bold mt-2">DEFUSING...</div>
+        )}
       </div>
 
       {/* In-game weapon menu */}
@@ -1680,8 +1883,9 @@ export default function FPSArena() {
       <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
         <div>WASD - Move</div>
         <div>Mouse - Look</div>
-        <div>Click - Shoot</div>
+        <div>Hold Click - Shoot (Auto for rifles)</div>
         <div>R - Reload</div>
+        <div>E - Plant/Defuse Bomb</div>
         <div>Space - Jump</div>
         <div>B - Change Weapon</div>
         <div className="text-xs text-gray-400 mt-2">Click screen to lock pointer</div>
