@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import * as THREE from 'three';
 import { Octree } from 'three/examples/jsm/math/Octree.js';
 import { Capsule } from 'three/examples/jsm/math/Capsule.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { OctreeHelper } from 'three/examples/jsm/helpers/OctreeHelper.js';
 
 type TeamType = 'T' | 'CT';
 
@@ -23,6 +23,14 @@ interface Bot {
   plantProgress: number;
   lastShotTime: number;
   facingDirection: THREE.Vector3;
+}
+
+interface Bullet {
+  mesh: THREE.Mesh;
+  startPos: THREE.Vector3;
+  endPos: THREE.Vector3;
+  progress: number;
+  speed: number;
 }
 
 export default function CSBetting() {
@@ -118,148 +126,453 @@ export default function CSBetting() {
     // World octree for collision
     const worldOctree = new Octree();
     worldOctreeRef.current = worldOctree;
+    
+    // Bullets array for tracers
+    const bullets: Bullet[] = [];
+    const raycaster = new THREE.Raycaster();
 
-    // Create simplified CS-style map
-    const createMap = () => {
-      const mapGroup = new THREE.Group();
-      
-      // Ground
-      const groundGeo = new THREE.PlaneGeometry(200, 200);
-      const groundMat = new THREE.MeshStandardMaterial({ 
-        color: 0x4a4a4a,
-        roughness: 0.9 
-      });
-      const ground = new THREE.Mesh(groundGeo, groundMat);
-      ground.rotation.x = -Math.PI / 2;
-      ground.receiveShadow = true;
-      mapGroup.add(ground);
+    // === TEXTURE GENERATION ===
+    const createBrickTexture = (baseColor: number, groutColor: number) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#' + groutColor.toString(16).padStart(6, '0');
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.fillStyle = '#' + baseColor.toString(16).padStart(6, '0');
+      for (let row = 0; row < 8; row++) {
+        const offset = row % 2 ? 8 : 0;
+        for (let col = -1; col < 8; col++) {
+          ctx.fillRect(offset + col * 16 + 1, row * 16 + 1, 14, 14);
+        }
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 2);
+      return texture;
+    };
 
-      // Wall material
-      const wallMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.8 });
-      const concreteMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.7 });
+    const createSandTexture = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#c9b896';
+      ctx.fillRect(0, 0, 128, 128);
+      for (let i = 0; i < 500; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        const shade = Math.random() * 30 - 15;
+        ctx.fillStyle = `rgb(${201 + shade}, ${184 + shade}, ${150 + shade})`;
+        ctx.fillRect(x, y, 2, 2);
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(10, 10);
+      return texture;
+    };
 
-      // Create walls
-      const createWall = (x: number, z: number, w: number, h: number, d: number, mat: THREE.Material) => {
-        const geo = new THREE.BoxGeometry(w, h, d);
-        const wall = new THREE.Mesh(geo, mat);
-        wall.position.set(x, h / 2, z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        return wall;
+    const createWoodTexture = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#8b5a2b';
+      ctx.fillRect(0, 0, 64, 128);
+      for (let i = 0; i < 20; i++) {
+        ctx.strokeStyle = `rgba(60, 30, 15, ${Math.random() * 0.3})`;
+        ctx.beginPath();
+        ctx.moveTo(0, i * 6 + Math.random() * 3);
+        ctx.bezierCurveTo(16, i * 6 + Math.random() * 6, 48, i * 6 - Math.random() * 6, 64, i * 6 + Math.random() * 3);
+        ctx.stroke();
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1, 2);
+      return texture;
+    };
+
+    const brickTex = createBrickTexture(0xa08060, 0x605040);
+    brickTex.repeat.set(4, 2);
+    const sandTex = createSandTexture();
+    const woodTex = createWoodTexture();
+
+    // === MATERIALS ===
+    const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, roughness: 0.9 });
+    const wallMat = new THREE.MeshStandardMaterial({ map: brickTex, roughness: 0.8 });
+    const darkWallMat = new THREE.MeshStandardMaterial({ 
+      map: createBrickTexture(0x8b7355, 0x5a4a3a),
+      roughness: 0.85 
+    });
+    const tileMat = new THREE.MeshStandardMaterial({ 
+      map: createBrickTexture(0x888888, 0x666666), 
+      roughness: 0.7 
+    });
+    const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.8 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.9 });
+
+    const wallH = 6;
+    const wallThick = 1;
+
+    // Helper to add mesh with collision
+    const addMesh = (mesh: THREE.Mesh) => {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      worldOctree.fromGraphNode(mesh);
+    };
+
+    // ===== ROOM BUILDER =====
+    const buildRoom = (
+      x: number, z: number,
+      w: number, d: number,
+      doors: { side: 'n' | 's' | 'e' | 'w', pos: number, width: number }[] = [],
+      hasRoof: boolean = true,
+      mat: THREE.Material = wallMat
+    ) => {
+      // Floor
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), tileMat);
+      floor.position.set(x, 0.15, z);
+      addMesh(floor);
+
+      const buildWallWithDoor = (
+        wx: number, wz: number, 
+        wWidth: number, wDepth: number,
+        doorPos: number, doorWidth: number
+      ) => {
+        if (doorWidth <= 0) {
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(wWidth, wallH, wDepth), mat);
+          wall.position.set(wx, wallH / 2, wz);
+          addMesh(wall);
+        } else {
+          const isHorizontal = wWidth > wDepth;
+          const totalLen = isHorizontal ? wWidth : wDepth;
+          const doorStart = totalLen / 2 + doorPos - doorWidth / 2;
+          const doorEnd = totalLen / 2 + doorPos + doorWidth / 2;
+
+          if (doorStart > 0.5) {
+            const leftLen = doorStart;
+            const leftWall = new THREE.Mesh(
+              new THREE.BoxGeometry(isHorizontal ? leftLen : wWidth, wallH, isHorizontal ? wDepth : leftLen),
+              mat
+            );
+            leftWall.position.set(
+              isHorizontal ? wx - (totalLen - leftLen) / 2 : wx,
+              wallH / 2,
+              isHorizontal ? wz : wz - (totalLen - leftLen) / 2
+            );
+            addMesh(leftWall);
+          }
+
+          if (totalLen - doorEnd > 0.5) {
+            const rightLen = totalLen - doorEnd;
+            const rightWall = new THREE.Mesh(
+              new THREE.BoxGeometry(isHorizontal ? rightLen : wWidth, wallH, isHorizontal ? wDepth : rightLen),
+              mat
+            );
+            rightWall.position.set(
+              isHorizontal ? wx + (totalLen - rightLen) / 2 : wx,
+              wallH / 2,
+              isHorizontal ? wz : wz + (totalLen - rightLen) / 2
+            );
+            addMesh(rightWall);
+          }
+        }
       };
 
-      // Outer walls
-      mapGroup.add(createWall(0, -50, 100, 6, 2, wallMat)); // South
-      mapGroup.add(createWall(0, 50, 100, 6, 2, wallMat));  // North
-      mapGroup.add(createWall(-50, 0, 2, 6, 100, wallMat)); // West
-      mapGroup.add(createWall(50, 0, 2, 6, 100, wallMat));  // East
+      const northDoor = doors.find(d => d.side === 'n');
+      const southDoor = doors.find(d => d.side === 's');
+      const eastDoor = doors.find(d => d.side === 'e');
+      const westDoor = doors.find(d => d.side === 'w');
 
-      // Center divider with gap
-      mapGroup.add(createWall(-20, 0, 2, 5, 40, concreteMat));
-      mapGroup.add(createWall(20, 0, 2, 5, 40, concreteMat));
+      // North wall
+      buildWallWithDoor(x, z + d/2 + wallThick/2, w + wallThick*2, wallThick,
+        northDoor?.pos || 0, northDoor?.width || 0);
+      // South wall
+      buildWallWithDoor(x, z - d/2 - wallThick/2, w + wallThick*2, wallThick,
+        southDoor?.pos || 0, southDoor?.width || 0);
+      // East wall
+      buildWallWithDoor(x + w/2 + wallThick/2, z, wallThick, d,
+        eastDoor?.pos || 0, eastDoor?.width || 0);
+      // West wall
+      buildWallWithDoor(x - w/2 - wallThick/2, z, wallThick, d,
+        westDoor?.pos || 0, westDoor?.width || 0);
 
-      // Bomb site A marker (left side)
-      const siteAGeo = new THREE.PlaneGeometry(15, 15);
-      const siteAMat = new THREE.MeshStandardMaterial({ color: 0xff4444, transparent: true, opacity: 0.3 });
-      const siteA = new THREE.Mesh(siteAGeo, siteAMat);
-      siteA.rotation.x = -Math.PI / 2;
-      siteA.position.set(-30, 0.1, 30);
-      mapGroup.add(siteA);
-
-      // Bomb site B marker (right side)
-      const siteBGeo = new THREE.PlaneGeometry(15, 15);
-      const siteBMat = new THREE.MeshStandardMaterial({ color: 0xff4444, transparent: true, opacity: 0.3 });
-      const siteB = new THREE.Mesh(siteBGeo, siteBMat);
-      siteB.rotation.x = -Math.PI / 2;
-      siteB.position.set(30, 0.1, 30);
-      mapGroup.add(siteB);
-
-      // Cover boxes
-      const boxMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
-      mapGroup.add(createWall(-30, 10, 4, 3, 4, boxMat));
-      mapGroup.add(createWall(30, 10, 4, 3, 4, boxMat));
-      mapGroup.add(createWall(-10, -20, 6, 2, 6, boxMat));
-      mapGroup.add(createWall(10, -20, 6, 2, 6, boxMat));
-      mapGroup.add(createWall(0, 20, 8, 3, 4, boxMat));
-
-      // T Spawn area marker
-      const tSpawnGeo = new THREE.PlaneGeometry(20, 10);
-      const tSpawnMat = new THREE.MeshStandardMaterial({ color: 0xffa500, transparent: true, opacity: 0.2 });
-      const tSpawn = new THREE.Mesh(tSpawnGeo, tSpawnMat);
-      tSpawn.rotation.x = -Math.PI / 2;
-      tSpawn.position.set(0, 0.1, -40);
-      mapGroup.add(tSpawn);
-
-      // CT Spawn area marker
-      const ctSpawnGeo = new THREE.PlaneGeometry(20, 10);
-      const ctSpawnMat = new THREE.MeshStandardMaterial({ color: 0x4444ff, transparent: true, opacity: 0.2 });
-      const ctSpawn = new THREE.Mesh(ctSpawnGeo, ctSpawnMat);
-      ctSpawn.rotation.x = -Math.PI / 2;
-      ctSpawn.position.set(0, 0.1, 45);
-      mapGroup.add(ctSpawn);
-
-      return mapGroup;
+      if (hasRoof) {
+        const ceiling = new THREE.Mesh(new THREE.BoxGeometry(w + wallThick*2, 0.3, d + wallThick*2), roofMat);
+        ceiling.position.set(x, wallH, z);
+        addMesh(ceiling);
+      }
     };
 
-    const map = createMap();
-    scene.add(map);
-    worldOctree.fromGraphNode(map);
+    // === GROUND ===
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), sandMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.1;
+    ground.receiveShadow = true;
+    scene.add(ground);
+    worldOctree.fromGraphNode(ground);
 
-    // Create bot model
-    const createBotModel = (team: TeamType) => {
-      const botGroup = new THREE.Group();
-      
-      const bodyColor = team === 'T' ? 0xc9a227 : 0x4169e1;
-      const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor });
-      const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+    // ============================================
+    // MIRAGE MAP LAYOUT
+    // ============================================
 
-      // Body
-      const body = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.3, 0.35, 1.2, 8),
-        bodyMat
-      );
-      body.position.y = 0.8;
+    // === T SPAWN ===
+    const tSpawnFloor = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 20), sandMat);
+    tSpawnFloor.position.set(0, -0.25, -70);
+    addMesh(tSpawnFloor);
+
+    // === T APARTMENTS ===
+    buildRoom(-20, -55, 10, 15, [
+      { side: 's', pos: 0, width: 5 },
+      { side: 'n', pos: 0, width: 4 },
+    ]);
+
+    // === B APARTMENTS CORRIDOR ===
+    buildRoom(-30, -35, 12, 25, [
+      { side: 's', pos: 0, width: 4 },
+      { side: 'n', pos: 0, width: 5 },
+      { side: 'e', pos: 5, width: 4 },
+    ]);
+
+    // === B SITE ===
+    buildRoom(-40, -5, 25, 25, [
+      { side: 's', pos: 5, width: 5 },
+      { side: 'e', pos: 0, width: 6 },
+      { side: 'e', pos: -8, width: 4 },
+    ], false);
+
+    const bBox = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
+    bBox.position.set(-45, 1.25, 0);
+    addMesh(bBox);
+    const bBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    bBox2.position.set(-35, 1, -8);
+    addMesh(bBox2);
+
+    // === UNDERPASS ===
+    buildRoom(-18, -25, 10, 20, [
+      { side: 'w', pos: 5, width: 4 },
+      { side: 'n', pos: 0, width: 4 },
+      { side: 'e', pos: -5, width: 4 },
+    ]);
+
+    // === MID ===
+    buildRoom(0, -35, 15, 40, [
+      { side: 's', pos: 0, width: 5 },
+      { side: 'n', pos: 0, width: 6 },
+      { side: 'w', pos: 5, width: 4 },
+      { side: 'e', pos: -10, width: 4 },
+      { side: 'e', pos: 10, width: 4 },
+    ], false);
+
+    const midBox = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
+    midBox.position.set(-3, 1.25, -35);
+    addMesh(midBox);
+
+    // === WINDOW ROOM ===
+    buildRoom(20, -45, 12, 12, [
+      { side: 'w', pos: 0, width: 4 },
+      { side: 'e', pos: 0, width: 4 },
+    ]);
+
+    // === A SHORT ===
+    buildRoom(20, -20, 12, 15, [
+      { side: 'w', pos: 0, width: 4 },
+      { side: 'e', pos: 0, width: 5 },
+    ]);
+
+    // === CONNECTOR ===
+    buildRoom(0, -5, 15, 20, [
+      { side: 's', pos: 0, width: 6 },
+      { side: 'n', pos: 0, width: 6 },
+    ]);
+
+    // === T RAMP ===
+    buildRoom(20, -60, 10, 20, [
+      { side: 's', pos: 0, width: 4 },
+      { side: 'n', pos: 0, width: 4 },
+    ]);
+
+    // === PALACE ===
+    buildRoom(35, -45, 15, 15, [
+      { side: 's', pos: 0, width: 4 },
+      { side: 'e', pos: 0, width: 5 },
+      { side: 'n', pos: 3, width: 4 },
+    ]);
+
+    buildRoom(35, -30, 12, 12, [
+      { side: 's', pos: 3, width: 4 },
+      { side: 'e', pos: 0, width: 4 },
+    ]);
+
+    // === A SITE ===
+    buildRoom(50, -20, 30, 35, [
+      { side: 'w', pos: 5, width: 5 },
+      { side: 'w', pos: -8, width: 5 },
+      { side: 's', pos: 0, width: 4 },
+      { side: 'n', pos: 5, width: 6 },
+    ], false);
+
+    const aDefault = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), woodMat);
+    aDefault.position.set(50, 1.5, -15);
+    addMesh(aDefault);
+    const aTriple = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 3), woodMat);
+    aTriple.position.set(55, 1.25, -20);
+    addMesh(aTriple);
+
+    // === CT SPAWN ===
+    buildRoom(25, 15, 40, 20, [
+      { side: 's', pos: -12, width: 6 },
+      { side: 's', pos: 12, width: 6 },
+      { side: 'w', pos: 0, width: 5 },
+    ], false);
+
+    // === MARKET ===
+    buildRoom(-10, 10, 15, 15, [
+      { side: 'e', pos: 0, width: 5 },
+      { side: 'w', pos: 0, width: 5 },
+    ]);
+
+    // === BOUNDARY WALLS ===
+    const boundaryWalls = [
+      { x: 0, z: -95, w: 150, d: 2 },
+      { x: 0, z: 40, w: 150, d: 2 },
+      { x: -70, z: -25, w: 2, d: 140 },
+      { x: 80, z: -25, w: 2, d: 140 },
+    ];
+    boundaryWalls.forEach(b => {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(b.w, 12, b.d), darkWallMat);
+      wall.position.set(b.x, 6, b.z);
+      addMesh(wall);
+    });
+
+    // === BOMB SITE MARKERS ===
+    const bombSiteAGeo = new THREE.CircleGeometry(8, 32);
+    const bombSiteMat = new THREE.MeshStandardMaterial({ 
+      color: 0xff0000, transparent: true, opacity: 0.3, side: THREE.DoubleSide 
+    });
+    const bombSiteAMesh = new THREE.Mesh(bombSiteAGeo, bombSiteMat);
+    bombSiteAMesh.rotation.x = -Math.PI / 2;
+    bombSiteAMesh.position.set(50, 0.2, -20);
+    scene.add(bombSiteAMesh);
+
+    const bombSiteBMesh = new THREE.Mesh(bombSiteAGeo.clone(), bombSiteMat);
+    bombSiteBMesh.rotation.x = -Math.PI / 2;
+    bombSiteBMesh.position.set(-35, 0.2, -10);
+    scene.add(bombSiteBMesh);
+
+    // Create soldier model with weapon
+    const createSoldierModel = (team: TeamType) => {
+      const soldier = new THREE.Group();
+
+      // Team colors
+      const teamColor = team === 'T' ? 0xc9a227 : 0x4169e1;
+      const darkTeamColor = team === 'T' ? 0x8b7318 : 0x2a4890;
+
+      // Body (torso)
+      const bodyGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.3);
+      const bodyMaterial = new THREE.MeshStandardMaterial({ color: teamColor });
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      body.position.y = 0.9;
       body.castShadow = true;
-      botGroup.add(body);
+      soldier.add(body);
 
       // Head
-      const head = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2, 8, 8),
-        skinMat
-      );
-      head.position.y = 1.6;
+      const headGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+      const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+      const head = new THREE.Mesh(headGeometry, headMaterial);
+      head.position.y = 1.5;
       head.castShadow = true;
-      botGroup.add(head);
+      soldier.add(head);
 
-      // Weapon (simple rifle shape)
-      const weapon = new THREE.Mesh(
-        new THREE.BoxGeometry(0.08, 0.08, 0.6),
-        new THREE.MeshStandardMaterial({ color: 0x333333 })
-      );
-      weapon.position.set(0.3, 1.0, 0.3);
-      weapon.rotation.x = -0.1;
-      botGroup.add(weapon);
+      // Helmet
+      const helmetGeometry = new THREE.BoxGeometry(0.32, 0.2, 0.32);
+      const helmetMaterial = new THREE.MeshStandardMaterial({ color: darkTeamColor });
+      const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
+      helmet.position.y = 1.65;
+      helmet.castShadow = true;
+      soldier.add(helmet);
 
-      return botGroup;
+      // Arms
+      const armGeometry = new THREE.BoxGeometry(0.15, 0.6, 0.15);
+      const armMaterial = new THREE.MeshStandardMaterial({ color: teamColor });
+      
+      const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+      leftArm.position.set(-0.35, 0.9, 0);
+      leftArm.castShadow = true;
+      soldier.add(leftArm);
+
+      const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+      rightArm.position.set(0.35, 0.9, 0);
+      rightArm.castShadow = true;
+      soldier.add(rightArm);
+
+      // Legs
+      const legGeometry = new THREE.BoxGeometry(0.18, 0.6, 0.18);
+      const legMaterial = new THREE.MeshStandardMaterial({ color: darkTeamColor });
+      
+      const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+      leftLeg.position.set(-0.12, 0.3, 0);
+      leftLeg.castShadow = true;
+      soldier.add(leftLeg);
+
+      const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+      rightLeg.position.set(0.12, 0.3, 0);
+      rightLeg.castShadow = true;
+      soldier.add(rightLeg);
+
+      // Weapon (AK47 style for T, M4 style for CT)
+      const weaponGroup = new THREE.Group();
+      const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8 });
+      const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 });
+      const gunWoodMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+
+      // Barrel
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 8), darkMetalMat);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.z = 0.3;
+      weaponGroup.add(barrel);
+
+      // Receiver
+      const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.2), darkMetalMat);
+      receiver.position.z = 0;
+      weaponGroup.add(receiver);
+
+      // Stock
+      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.2), team === 'T' ? gunWoodMat : metalMat);
+      stock.position.z = -0.2;
+      weaponGroup.add(stock);
+
+      // Magazine
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.04), team === 'T' ? gunWoodMat : metalMat);
+      mag.position.set(0, -0.1, -0.02);
+      mag.rotation.x = team === 'T' ? 0.2 : 0;
+      weaponGroup.add(mag);
+
+      weaponGroup.position.set(0.3, 0.85, 0.25);
+      weaponGroup.rotation.x = Math.PI / 6;
+      soldier.add(weaponGroup);
+
+      return soldier;
     };
 
-    // Initialize bots
+    // Initialize bots with proper spawn positions for Mirage
     const initializeBots = () => {
       const bots: Bot[] = [];
       
-      // T bots (spawn at south)
+      // T bots (spawn at T spawn area - south)
       for (let i = 0; i < 5; i++) {
-        const mesh = createBotModel('T');
-        const xOffset = (i - 2) * 4;
-        mesh.position.set(xOffset, 0, -40);
+        const mesh = createSoldierModel('T');
+        const xOffset = (i - 2) * 3;
+        mesh.position.set(xOffset, 0, -70);
         scene.add(mesh);
         
         bots.push({
           id: `T${i}`,
           team: 'T',
           capsule: new Capsule(
-            new THREE.Vector3(xOffset, 0.35, -40),
-            new THREE.Vector3(xOffset, 1.5, -40),
+            new THREE.Vector3(xOffset, 0.35, -70),
+            new THREE.Vector3(xOffset, 1.7, -70),
             0.35
           ),
           velocity: new THREE.Vector3(),
@@ -267,7 +580,7 @@ export default function CSBetting() {
           isAlive: true,
           mesh,
           targetPosition: null,
-          hasBomb: i === 0, // First T has bomb
+          hasBomb: i === 0,
           isPlanting: false,
           plantProgress: 0,
           lastShotTime: 0,
@@ -275,19 +588,19 @@ export default function CSBetting() {
         });
       }
 
-      // CT bots (spawn at north)
+      // CT bots (spawn at CT spawn - north)
       for (let i = 0; i < 5; i++) {
-        const mesh = createBotModel('CT');
-        const xOffset = (i - 2) * 4;
-        mesh.position.set(xOffset, 0, 45);
+        const mesh = createSoldierModel('CT');
+        const xOffset = (i - 2) * 3 + 25;
+        mesh.position.set(xOffset, 0, 15);
         scene.add(mesh);
         
         bots.push({
           id: `CT${i}`,
           team: 'CT',
           capsule: new Capsule(
-            new THREE.Vector3(xOffset, 0.35, 45),
-            new THREE.Vector3(xOffset, 1.5, 45),
+            new THREE.Vector3(xOffset, 0.35, 15),
+            new THREE.Vector3(xOffset, 1.7, 15),
             0.35
           ),
           velocity: new THREE.Vector3(),
@@ -309,16 +622,101 @@ export default function CSBetting() {
     initializeBots();
 
     // Bomb mesh
-    const bombGeo = new THREE.BoxGeometry(0.5, 0.3, 0.3);
-    const bombMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    const bombMesh = new THREE.Mesh(bombGeo, bombMat);
+    const bombGeo = new THREE.BoxGeometry(1.0, 0.5, 0.6);
+    const bombMatRed = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8 });
+    const bombMesh = new THREE.Mesh(bombGeo, bombMatRed);
+    // Add LED display to bomb
+    const ledDisplay = new THREE.Mesh(
+      new THREE.BoxGeometry(0.6, 0.25, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.8 })
+    );
+    ledDisplay.position.set(0, 0.15, 0.35);
+    bombMesh.add(ledDisplay);
     bombMesh.visible = false;
     scene.add(bombMesh);
 
-    // Bot AI
-    const bombSiteA = new THREE.Vector3(-30, 0, 30);
-    const bombSiteB = new THREE.Vector3(30, 0, 30);
+    // Updated bomb site positions for Mirage map
+    const bombSiteA = new THREE.Vector3(50, 0, -20);
+    const bombSiteB = new THREE.Vector3(-35, 0, -10);
     let targetSite = Math.random() > 0.5 ? bombSiteA : bombSiteB;
+
+    // Check line of sight between two positions
+    const checkLineOfSight = (from: THREE.Vector3, to: THREE.Vector3): boolean => {
+      const direction = to.clone().sub(from).normalize();
+      const distance = from.distanceTo(to);
+      
+      raycaster.set(from, direction);
+      raycaster.far = distance;
+      
+      // Cast ray against world geometry
+      const fromPos = from.clone();
+      const toPos = to.clone();
+      
+      // Simple step-based collision check
+      const steps = Math.ceil(distance / 2);
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const checkPos = new THREE.Vector3().lerpVectors(fromPos, toPos, t);
+        checkPos.y = 1; // Check at body height
+        
+        const testCapsule = new Capsule(
+          checkPos.clone().setY(0.5),
+          checkPos.clone().setY(1.5),
+          0.1
+        );
+        
+        const result = worldOctree.capsuleIntersect(testCapsule);
+        if (result) {
+          return false; // Wall in the way
+        }
+      }
+      return true;
+    };
+
+    // Create bullet tracer
+    const createBulletTracer = (from: THREE.Vector3, to: THREE.Vector3) => {
+      const direction = to.clone().sub(from);
+      const length = direction.length();
+      
+      const bulletGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6);
+      const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const bullet = new THREE.Mesh(bulletGeo, bulletMat);
+      
+      // Position at start
+      bullet.position.copy(from);
+      bullet.position.y = 1;
+      
+      // Rotate to face target
+      bullet.lookAt(to.clone().setY(1));
+      bullet.rotateX(Math.PI / 2);
+      
+      scene.add(bullet);
+      
+      bullets.push({
+        mesh: bullet,
+        startPos: from.clone().setY(1),
+        endPos: to.clone().setY(1),
+        progress: 0,
+        speed: 200 // units per second
+      });
+    };
+
+    // Update bullets
+    const updateBullets = (deltaTime: number) => {
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        bullet.progress += deltaTime * bullet.speed / bullet.startPos.distanceTo(bullet.endPos);
+        
+        if (bullet.progress >= 1) {
+          scene.remove(bullet.mesh);
+          bullet.mesh.geometry.dispose();
+          (bullet.mesh.material as THREE.Material).dispose();
+          bullets.splice(i, 1);
+        } else {
+          bullet.mesh.position.lerpVectors(bullet.startPos, bullet.endPos, bullet.progress);
+        }
+      }
+    };
 
     const updateBotAI = (deltaTime: number) => {
       if (roundPhaseRef.current !== 'playing') return;
@@ -398,56 +796,106 @@ export default function CSBetting() {
 
             if (nearestT) {
               const distToT = botPos.distanceTo(nearestT.capsule.start);
-              if (distToT < 30) {
+              if (distToT < 40) {
                 // Engage enemy
                 bot.targetPosition = nearestT.capsule.start.clone();
               } else {
-                // Patrol
+                // Patrol between bomb sites
                 if (!bot.targetPosition || botPos.distanceTo(bot.targetPosition) < 3) {
-                  bot.targetPosition = new THREE.Vector3(
-                    (Math.random() - 0.5) * 60,
-                    0,
-                    20 + Math.random() * 20
-                  );
+                  // Alternate between A and B site
+                  bot.targetPosition = Math.random() > 0.5 ? bombSiteA.clone() : bombSiteB.clone();
                 }
               }
             }
           }
         }
 
-        // Movement
+        // Movement with wall collision
         if (bot.targetPosition && !bot.isPlanting) {
           const direction = bot.targetPosition.clone().sub(botPos).normalize();
           bot.facingDirection.copy(direction);
-          const speed = 8;
-          bot.velocity.x = direction.x * speed * deltaTime;
-          bot.velocity.z = direction.z * speed * deltaTime;
+          const speed = 6;
           
-          bot.capsule.start.x += bot.velocity.x;
-          bot.capsule.start.z += bot.velocity.z;
-          bot.capsule.end.x += bot.velocity.x;
-          bot.capsule.end.z += bot.velocity.z;
+          // Calculate new position
+          const newX = bot.capsule.start.x + direction.x * speed * deltaTime;
+          const newZ = bot.capsule.start.z + direction.z * speed * deltaTime;
+          
+          // Create test capsule at new position
+          const testCapsule = new Capsule(
+            new THREE.Vector3(newX, 0.35, newZ),
+            new THREE.Vector3(newX, 1.7, newZ),
+            0.35
+          );
+          
+          // Check collision with world
+          const result = worldOctree.capsuleIntersect(testCapsule);
+          
+          if (!result) {
+            // No collision - move freely
+            bot.capsule.start.x = newX;
+            bot.capsule.start.z = newZ;
+            bot.capsule.end.x = newX;
+            bot.capsule.end.z = newZ;
+          } else {
+            // Collision detected - try to slide along wall
+            const normal = result.normal;
+            
+            // Try moving only in X
+            const testX = new Capsule(
+              new THREE.Vector3(newX, 0.35, bot.capsule.start.z),
+              new THREE.Vector3(newX, 1.7, bot.capsule.start.z),
+              0.35
+            );
+            if (!worldOctree.capsuleIntersect(testX)) {
+              bot.capsule.start.x = newX;
+              bot.capsule.end.x = newX;
+            }
+            
+            // Try moving only in Z
+            const testZ = new Capsule(
+              new THREE.Vector3(bot.capsule.start.x, 0.35, newZ),
+              new THREE.Vector3(bot.capsule.start.x, 1.7, newZ),
+              0.35
+            );
+            if (!worldOctree.capsuleIntersect(testZ)) {
+              bot.capsule.start.z = newZ;
+              bot.capsule.end.z = newZ;
+            }
+          }
         }
 
-        // Combat - shoot at enemies
+        // Combat - shoot at enemies with line of sight check
         const enemies = bot.team === 'T' ? aliveCTBots : aliveTBots;
         const now = Date.now();
         
         enemies.forEach(enemy => {
           const distToEnemy = bot.capsule.start.distanceTo(enemy.capsule.start);
-          if (distToEnemy < 25 && now - bot.lastShotTime > 500) {
-            // Check line of sight (simplified)
-            const hitChance = Math.max(0.1, 1 - distToEnemy / 30);
-            if (Math.random() < hitChance * 0.3) {
-              enemy.health -= 25;
-              if (enemy.health <= 0) {
-                enemy.isAlive = false;
-                enemy.mesh.visible = false;
-                // Transfer bomb if T with bomb dies
-                if (enemy.hasBomb) {
-                  const otherT = aliveTBots.find(t => t.id !== enemy.id && t.isAlive);
-                  if (otherT) {
-                    otherT.hasBomb = true;
+          if (distToEnemy < 40 && now - bot.lastShotTime > 400) {
+            // Check line of sight before shooting
+            const botShootPos = bot.capsule.start.clone();
+            botShootPos.y = 1;
+            const enemyPos = enemy.capsule.start.clone();
+            enemyPos.y = 1;
+            
+            const hasLOS = checkLineOfSight(botShootPos, enemyPos);
+            
+            if (hasLOS) {
+              // Create bullet tracer
+              createBulletTracer(botShootPos, enemyPos);
+              
+              // Calculate hit chance based on distance
+              const hitChance = Math.max(0.15, 1 - distToEnemy / 50);
+              if (Math.random() < hitChance * 0.4) {
+                enemy.health -= 20 + Math.floor(Math.random() * 15);
+                if (enemy.health <= 0) {
+                  enemy.isAlive = false;
+                  enemy.mesh.visible = false;
+                  // Transfer bomb if T with bomb dies
+                  if (enemy.hasBomb) {
+                    const otherT = aliveTBots.find(t => t.id !== enemy.id && t.isAlive);
+                    if (otherT) {
+                      otherT.hasBomb = true;
+                    }
                   }
                 }
               }
@@ -495,12 +943,13 @@ export default function CSBetting() {
       lastTime = currentTime;
 
       updateBotAI(deltaTime);
+      updateBullets(deltaTime);
 
-      // Update camera position
-      camera.position.x = Math.sin(cameraAngle) * cameraDistance;
-      camera.position.z = Math.cos(cameraAngle) * cameraDistance;
+      // Update camera position - centered on action area
+      camera.position.x = Math.sin(cameraAngle) * cameraDistance + 10;
+      camera.position.z = Math.cos(cameraAngle) * cameraDistance - 25;
       camera.position.y = cameraHeight;
-      camera.lookAt(0, 0, 0);
+      camera.lookAt(10, 0, -25);
 
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
@@ -648,7 +1097,7 @@ export default function CSBetting() {
     setRoundResult('');
     plantedPositionRef.current = null;
 
-    // Reset bots
+    // Reset bots to correct Mirage spawn positions
     botsRef.current.forEach((bot, i) => {
       bot.health = 100;
       bot.isAlive = true;
@@ -658,15 +1107,15 @@ export default function CSBetting() {
       bot.hasBomb = bot.team === 'T' && i === 0;
       
       if (bot.team === 'T') {
-        const xOffset = (i % 5 - 2) * 4;
-        bot.capsule.start.set(xOffset, 0.35, -40);
-        bot.capsule.end.set(xOffset, 1.5, -40);
-        bot.mesh.position.set(xOffset, 0, -40);
+        const xOffset = (i % 5 - 2) * 3;
+        bot.capsule.start.set(xOffset, 0.35, -70);
+        bot.capsule.end.set(xOffset, 1.7, -70);
+        bot.mesh.position.set(xOffset, 0, -70);
       } else {
-        const xOffset = ((i - 5) - 2) * 4;
-        bot.capsule.start.set(xOffset, 0.35, 45);
-        bot.capsule.end.set(xOffset, 1.5, 45);
-        bot.mesh.position.set(xOffset, 0, 45);
+        const xOffset = ((i - 5) - 2) * 3 + 25;
+        bot.capsule.start.set(xOffset, 0.35, 15);
+        bot.capsule.end.set(xOffset, 1.7, 15);
+        bot.mesh.position.set(xOffset, 0, 15);
       }
     });
   };
