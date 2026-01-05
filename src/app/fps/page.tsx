@@ -36,6 +36,7 @@ export default function FPSArena() {
   const [atBombSite, setAtBombSite] = useState<'A' | 'B' | null>(null);
   const [bombPosition, setBombPosition] = useState<{x: number, y: number, z: number} | null>(null);
   const [teamCounts, setTeamCounts] = useState({T: 0, CT: 0});
+  const [roundWinner, setRoundWinner] = useState<'T' | 'CT' | null>(null);
   
   const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
@@ -1207,6 +1208,15 @@ export default function FPSArena() {
               setBombPosition(null);
               bombGroup.visible = false;
               setCtScore(prev => prev + 1);
+              setRoundPhase('end');
+              setRoundWinner('CT');
+              setTimeout(() => {
+                setRoundPhase('buy');
+                setRoundTime(115);
+                setRoundWinner(null);
+                setCountdown(10);
+                setWaitingForPlayers(false);
+              }, 5000);
               if (socketRef.current) {
                 socketRef.current.emit('fpsDefuseBomb');
               }
@@ -1590,8 +1600,8 @@ export default function FPSArena() {
     };
 
     const controls = (deltaTime: number) => {
-      // Freeze players during countdown
-      if (countdown > 0 && roundPhase === 'buy') {
+      // Freeze players during countdown in buy phase
+      if (roundPhase === 'buy' && countdown > 0) {
         return;
       }
       
@@ -1656,7 +1666,8 @@ export default function FPSArena() {
     };
 
     const teleportPlayerIfOob = () => {
-      if (camera.position.y <= -25) {
+      // Teleport if out of bounds OR if round just ended
+      if (camera.position.y <= -25 || roundPhase === 'buy') {
         const spawn = selectedTeam === 'T'
           ? { x: 0, z: -70 }
           : { x: 25, z: 20 };
@@ -1841,10 +1852,15 @@ export default function FPSArena() {
           // Time's up - CTs win
           setCtScore(s => s + 1);
           setRoundPhase('end');
+          setRoundWinner('CT');
           setTimeout(() => {
             setRoundPhase('buy');
             setRoundTime(115);
             setHealth(100);
+            setRoundWinner(null);
+            setCountdown(10);
+            setWaitingForPlayers(false);
+            // Reset to spawn will happen in teleport function
           }, 5000);
           return 0;
         }
@@ -1866,11 +1882,15 @@ export default function FPSArena() {
           setTScore(s => s + 1);
           setBombPlanted(false);
           setRoundPhase('end');
+          setRoundWinner('T');
           setTimeout(() => {
             setRoundPhase('buy');
             setRoundTime(115);
             setBombTimer(40);
             setHealth(100);
+            setRoundWinner(null);
+            setCountdown(10);
+            setWaitingForPlayers(false);
           }, 5000);
           return 40;
         }
@@ -2068,6 +2088,20 @@ export default function FPSArena() {
           <div className="text-center text-sm text-red-400 mt-1 animate-pulse">BOMB PLANTED - {bombTimer}s</div>
         )}
       </div>
+
+      {/* Round Winner Popup */}
+      {roundWinner && roundPhase === 'end' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border-4 rounded-xl p-12 text-center animate-pulse"
+               style={{ borderColor: roundWinner === 'T' ? '#fbbf24' : '#60a5fa' }}>
+            <div className="text-6xl font-bold mb-4"
+                 style={{ color: roundWinner === 'T' ? '#fbbf24' : '#60a5fa' }}>
+              {roundWinner === 'T' ? 'TERRORISTS WIN' : 'COUNTER-TERRORISTS WIN'}
+            </div>
+            <div className="text-2xl text-gray-300">Next round starting...</div>
+          </div>
+        </div>
+      )}
 
       {/* Player Info HUD */}
       <div className="absolute top-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white space-y-2">
