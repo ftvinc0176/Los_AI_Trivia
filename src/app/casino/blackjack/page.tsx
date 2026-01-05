@@ -1096,7 +1096,7 @@ function BlackjackGame() {
 
             {/* Players Area - Show all players in multiplayer */}
             <div className="relative">
-              {socket && players.length > 1 ? (
+              {socket && players.length > 0 ? (
                 /* Multiplayer: Show all players */
                 <div className="flex flex-wrap justify-center items-end gap-2 sm:gap-4 max-w-full">
                   {players.map((player) => {

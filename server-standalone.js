@@ -138,8 +138,24 @@ function startQuestionTimer(roomId) {
 
       setTimeout(() => {
         room.currentQuestion++;
+        
+        // Generate next batch of questions when we're at question 6 (after showing answer to question 5)
+        if (room.currentQuestion === 6 && room.questions.length < room.totalQuestionsNeeded) {
+          generateQuestions(room.category, room.difficulty, 2).then(newQuestions => {
+            room.questions = room.questions.concat(newQuestions);
+          });
+        }
+        
         if (room.currentQuestion < room.questions.length) {
           startQuestionTimer(roomId);
+        } else if (room.currentQuestion < room.totalQuestionsNeeded) {
+          // Wait for questions to be generated
+          const checkInterval = setInterval(() => {
+            if (room.questions.length > room.currentQuestion) {
+              clearInterval(checkInterval);
+              startQuestionTimer(roomId);
+            }
+          }, 500);
         } else {
           clearInterval(room.timer);
           room.started = false;
@@ -247,8 +263,11 @@ io.on('connection', (socket) => {
         room.players.forEach((p) => (p.score = 0));
         
         const finalCategory = category || room.category;
-        const questions = await generateQuestions(finalCategory, room.difficulty, 10);
+        // Generate first 2 questions immediately
+        const questions = await generateQuestions(finalCategory, room.difficulty, 2);
         room.questions = questions;
+        room.totalQuestionsNeeded = 10;
+        room.category = finalCategory;
 
         io.to(roomId).emit('gameState', {
           players: room.players,

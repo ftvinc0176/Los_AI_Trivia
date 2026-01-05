@@ -58,6 +58,7 @@ export default function Multiplayer() {
   const [publicLobbies, setPublicLobbies] = useState<Array<{roomId: string; hostName: string; playerCount: number}>>([]);
   const [customCategory, setCustomCategory] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('General Knowledge');
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
 
   useEffect(() => {
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
@@ -77,6 +78,9 @@ export default function Multiplayer() {
     newSocket.on('gameState', (state: GameState) => {
       console.log('Received gameState:', state);
       setGameState(state);
+      if (state.started && isGeneratingQuestions) {
+        setIsGeneratingQuestions(false);
+      }
     });
 
     newSocket.on('questionUpdate', (data: { currentQuestion: number; timeLeft: number; showAnswer: boolean }) => {
@@ -147,6 +151,7 @@ export default function Multiplayer() {
     if (socket && roomId && gameState) {
       const finalCategory = selectedCategory === 'Custom' ? customCategory : selectedCategory;
       if (selectedCategory !== 'Custom' || customCategory.trim()) {
+        setIsGeneratingQuestions(true);
         socket.emit('startGame', { roomId, category: finalCategory });
       }
     }
@@ -433,10 +438,19 @@ export default function Multiplayer() {
 
                 <button
                   onClick={startGame}
-                  disabled={playerCount < 2}
-                  className="w-full px-8 py-4 bg-white text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xl font-bold disabled:opacity-50"
+                  disabled={playerCount < 2 || isGeneratingQuestions}
+                  className="w-full px-8 py-4 bg-white text-purple-700 rounded-xl hover:bg-purple-50 transition-all text-xl font-bold disabled:opacity-50 relative"
                 >
-                  {playerCount < 2 ? 'Waiting for Players...' : 'Start Game!'}
+                  {isGeneratingQuestions ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin">⏳</span>
+                      Generating Questions...
+                    </span>
+                  ) : playerCount < 2 ? (
+                    'Waiting for Players...'
+                  ) : (
+                    'Start Game!'
+                  )}
                 </button>
               </div>
             )}
