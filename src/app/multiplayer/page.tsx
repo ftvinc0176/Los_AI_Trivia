@@ -102,6 +102,10 @@ export default function Multiplayer() {
       setShowResults(true);
     });
 
+    newSocket.on('generatingQuestions', () => {
+      setIsGeneratingQuestions(true);
+    });
+
     newSocket.on('publicLobbies', (lobbies: Array<{roomId: string; hostName: string; playerCount: number}>) => {
       setPublicLobbies(lobbies);
     });
@@ -597,8 +601,7 @@ export default function Multiplayer() {
                 {option}
               </button>
             ))}
-          </div>
-        </div>
+          </div>          )}        </div>
       </div>
     );
   }

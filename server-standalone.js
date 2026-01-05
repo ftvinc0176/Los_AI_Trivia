@@ -59,14 +59,12 @@ async function generateQuestions(category, difficulty, count) {
     const OpenAI = require('openai').default;
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const prompt = `Generate ${count} trivia questions about ${category} with ${difficulty} difficulty.
-Return ONLY a valid JSON array with this exact structure:
-[{"question": "question text", "options": ["A", "B", "C", "D"], "correctAnswer": 0}]
-correctAnswer is the index (0-3) of the correct option.`;
+    const prompt = `${count} ${difficulty} ${category} trivia. JSON array:\n[{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`;
 
     const response = await client.responses.create({
       model: 'gpt-5-nano',
-      input: prompt
+      input: prompt,
+      max_tokens: 2000
     });
 
     const text = response.output_text;
@@ -139,23 +137,8 @@ function startQuestionTimer(roomId) {
       setTimeout(() => {
         room.currentQuestion++;
         
-        // Generate next batch of questions when we're at question 6 (after showing answer to question 5)
-        if (room.currentQuestion === 6 && room.questions.length < room.totalQuestionsNeeded) {
-          generateQuestions(room.category, room.difficulty, 2).then(newQuestions => {
-            room.questions = room.questions.concat(newQuestions);
-          });
-        }
-        
-        if (room.currentQuestion < room.questions.length) {
+        if (room.currentQuestion < 10) {
           startQuestionTimer(roomId);
-        } else if (room.currentQuestion < room.totalQuestionsNeeded) {
-          // Wait for questions to be generated
-          const checkInterval = setInterval(() => {
-            if (room.questions.length > room.currentQuestion) {
-              clearInterval(checkInterval);
-              startQuestionTimer(roomId);
-            }
-          }, 500);
         } else {
           clearInterval(room.timer);
           room.started = false;
@@ -262,9 +245,12 @@ io.on('connection', (socket) => {
         room.currentQuestion = 0;
         room.players.forEach((p) => (p.score = 0));
         
+        // Emit loading state
+        io.to(roomId).emit('generatingQuestions', { message: 'Generating questions...' });
+        
         const finalCategory = category || room.category;
-        // Generate first 2 questions immediately
-        const questions = await generateQuestions(finalCategory, room.difficulty, 2);
+        // Generate all 10 questions at once for faster game start
+        const questions = await generateQuestions(finalCategory, room.difficulty, 10);
         room.questions = questions;
         room.totalQuestionsNeeded = 10;
         room.category = finalCategory;
