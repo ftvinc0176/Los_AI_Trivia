@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Question {
@@ -37,6 +37,7 @@ export default function AITrivia() {
   const [timeLeft, setTimeLeft] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startGame = async () => {
     setIsLoading(true);
@@ -69,11 +70,19 @@ export default function AITrivia() {
   };
 
   const startQuestionTimer = () => {
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
     setTimeLeft(10);
-    const interval = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(interval);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
           handleTimeUp();
           return 0;
         }
@@ -91,6 +100,12 @@ export default function AITrivia() {
 
   const handleAnswer = (answerIndex: number) => {
     if (showAnswer || selectedAnswer !== null) return;
+
+    // Stop the timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
     setSelectedAnswer(answerIndex);
     setShowAnswer(true);
