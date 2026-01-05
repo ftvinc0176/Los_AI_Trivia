@@ -40,9 +40,11 @@ export default function FPSArena() {
   const [roundWinner, setRoundWinner] = useState<'T' | 'CT' | null>(null);
   const [plantedSite, setPlantedSite] = useState<'A' | 'B' | null>(null);
   const [isDead, setIsDead] = useState(false);
+  const [isScoped, setIsScoped] = useState(false);
   
   const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
+  const isScopedRef = useRef(false);
   const isShootingRef = useRef(false); // For full auto
   const lastShotTimeRef = useRef(0); // Rate of fire control
   const countdownRef = useRef(5);
@@ -60,6 +62,7 @@ export default function FPSArena() {
   const plantTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPlantingRef = useRef(false);
   const plantStartPosRef = useRef<{x: number, z: number} | null>(null);
+  const selectedTeamRef = useRef<TeamType>('T');
 
   // Weapon configs
   const weaponConfig = {
@@ -128,6 +131,11 @@ export default function FPSArena() {
       socketRef.current.emit('fpsRoundReset');
     }
   };
+
+  // Keep selectedTeamRef in sync with state
+  useEffect(() => {
+    selectedTeamRef.current = selectedTeam;
+  }, [selectedTeam]);
 
   // Sync ammo when weapon changes
   useEffect(() => {
@@ -1104,16 +1112,15 @@ export default function FPSArena() {
     // Bomb Site A label
     const bombSiteALabelDiv = document.createElement('div');
     bombSiteALabelDiv.className = 'bomb-site-label';
-    bombSiteALabelDiv.textContent = 'BOMB SITE A';
+    bombSiteALabelDiv.textContent = 'SITE A';
     bombSiteALabelDiv.style.cssText = `
       color: #ff0000;
-      font-size: 24px;
+      font-size: 12px;
       font-weight: bold;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 8px 16px;
-      border: 2px solid #ff0000;
-      border-radius: 4px;
-      text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.5);
+      padding: 3px 6px;
+      border: 1px solid #ff0000;
+      border-radius: 2px;
       pointer-events: none;
       user-select: none;
     `;
@@ -1130,16 +1137,15 @@ export default function FPSArena() {
     // Bomb Site B label
     const bombSiteBLabelDiv = document.createElement('div');
     bombSiteBLabelDiv.className = 'bomb-site-label';
-    bombSiteBLabelDiv.textContent = 'BOMB SITE B';
+    bombSiteBLabelDiv.textContent = 'SITE B';
     bombSiteBLabelDiv.style.cssText = `
       color: #ff0000;
-      font-size: 24px;
+      font-size: 12px;
       font-weight: bold;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 8px 16px;
-      border: 2px solid #ff0000;
-      border-radius: 4px;
-      text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.5);
+      padding: 3px 6px;
+      border: 1px solid #ff0000;
+      border-radius: 2px;
       pointer-events: none;
       user-select: none;
     `;
@@ -1866,8 +1872,49 @@ export default function FPSArena() {
       // Listen for round reset from server (triggered when any player calls respawnPlayer)
       socket.on('fpsRoundReset', () => {
         console.log('Round reset received from server');
+        // Reset player position to team spawn
+        const team = selectedTeamRef.current;
+        const spawnPos = team === 'T' 
+          ? { x: 0, y: 0.35, z: -70 } 
+          : { x: 25, y: 0.35, z: 20 };
+        
+        if (playerCapsule) {
+          playerCapsule.start.set(spawnPos.x, spawnPos.y, spawnPos.z);
+          playerCapsule.end.set(spawnPos.x, 1.8, spawnPos.z);
+        }
+        if (camera) {
+          camera.position.set(spawnPos.x, 1.8, spawnPos.z);
+        }
+        
+        // Reset game state
         setHealth(100);
         setIsDead(false);
+        setRoundPhase('buy');
+        roundPhaseRef.current = 'buy';
+        setRoundTime(115);
+        setRoundWinner(null);
+        setCountdown(5);
+        countdownRef.current = 5;
+        setWaitingForPlayers(false);
+        setBombPlanted(false);
+        bombPlantedRef.current = false;
+        setBombPosition(null);
+        bombPositionRef.current = null;
+        setPlantedSite(null);
+        setBombTimer(40);
+        setIsPlanting(false);
+        isPlantingRef.current = false;
+        setIsDefusing(false);
+        isDefusingRef.current = false;
+        setDefuseTimer(5);
+        // Hide bomb model on round reset
+        bombGroup.visible = false;
+        
+        // Reset bomb for Terrorists
+        if (team === 'T') {
+          setHasBomb(true);
+          hasBombRef.current = true;
+        }
       });
 
       socket.on('fpsTeamEliminated', ({ winner }: any) => {
@@ -2026,15 +2073,35 @@ export default function FPSArena() {
       shootRocket();
     };
 
-    document.addEventListener('mousedown', () => {
+    document.addEventListener('mousedown', (event) => {
       if (document.pointerLockElement === document.body && !(countdownRef.current > 0 && roundPhaseRef.current === 'buy')) {
-        isShootingRef.current = true;
-        tryShoot(); // Shoot immediately
+        if (event.button === 0) {
+          // Left click - shoot
+          isShootingRef.current = true;
+          tryShoot();
+        } else if (event.button === 2 && selectedWeapon === 'awp') {
+          // Right click - scope (AWP only)
+          isScopedRef.current = !isScopedRef.current;
+          setIsScoped(isScopedRef.current);
+          if (isScopedRef.current) {
+            camera.fov = 20; // Zoomed in
+          } else {
+            camera.fov = 75; // Normal
+          }
+          camera.updateProjectionMatrix();
+        }
       }
     });
 
-    document.addEventListener('mouseup', () => {
-      isShootingRef.current = false;
+    document.addEventListener('mouseup', (event) => {
+      if (event.button === 0) {
+        isShootingRef.current = false;
+      }
+    });
+    
+    // Prevent right-click context menu
+    document.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
     });
 
     // Auto-fire loop for full auto weapons
@@ -2433,6 +2500,13 @@ export default function FPSArena() {
   const handleWeaponSelect = (weapon: WeaponType) => {
     setSelectedWeapon(weapon);
     setShowWeaponMenu(false);
+    // Unscope when switching weapons
+    setIsScoped(false);
+    isScopedRef.current = false;
+    if (cameraRef.current) {
+      cameraRef.current.fov = 75;
+      cameraRef.current.updateProjectionMatrix();
+    }
     // Reset ammo to max for new weapon
     const weaponConfig = {
       awp: { maxAmmo: 1, damage: 100, reloadTime: 2000 },
@@ -2714,17 +2788,48 @@ export default function FPSArena() {
         </div>
       )}
 
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-        <div className="relative w-6 h-6">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/70 -translate-y-1/2" />
-          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-white/70 -translate-x-1/2" />
+      {/* Crosshair - hide when scoped */}
+      {!isScoped && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          <div className="relative w-6 h-6">
+            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/70 -translate-y-1/2" />
+            <div className="absolute left-1/2 top-0 w-0.5 h-full bg-white/70 -translate-x-1/2" />
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Scope Overlay */}
+      {isScoped && (
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Black bars on sides */}
+          <div className="absolute top-0 left-0 w-[15%] h-full bg-black" />
+          <div className="absolute top-0 right-0 w-[15%] h-full bg-black" />
+          {/* Scope circle */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative w-[70vh] h-[70vh] rounded-full border-[3px] border-black/90 bg-transparent">
+              {/* Crosshair lines */}
+              <div className="absolute top-1/2 left-0 w-full h-[2px] bg-black -translate-y-1/2" />
+              <div className="absolute left-1/2 top-0 w-[2px] h-full bg-black -translate-x-1/2" />
+              {/* Center dot */}
+              <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-red-600 rounded-full -translate-x-1/2 -translate-y-1/2" />
+              {/* Distance markers */}
+              <div className="absolute top-1/2 left-1/4 w-3 h-[1px] bg-black -translate-y-1/2" />
+              <div className="absolute top-1/2 right-1/4 w-3 h-[1px] bg-black -translate-y-1/2" />
+              <div className="absolute left-1/2 top-1/4 w-[1px] h-3 bg-black -translate-x-1/2" />
+              <div className="absolute left-1/2 bottom-1/4 w-[1px] h-3 bg-black -translate-x-1/2" />
+            </div>
+          </div>
+          {/* Black corners outside circle */}
+          <div className="absolute top-0 left-[15%] right-[15%] h-[15%] bg-gradient-to-b from-black to-transparent" />
+          <div className="absolute bottom-0 left-[15%] right-[15%] h-[15%] bg-gradient-to-t from-black to-transparent" />
+        </div>
+      )}
 
       <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
         <div>WASD - Move</div>
         <div>Mouse - Look</div>
         <div>Hold Click - Shoot (Auto for rifles)</div>
+        <div>Right Click - Scope (AWP)</div>
         <div>R - Reload</div>
         <div>E - Plant/Defuse Bomb</div>
         <div>Space - Jump</div>
