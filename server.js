@@ -546,7 +546,7 @@ app.prepare().then(() => {
   // ============================================
   
   socket.on('fpsJoin', ({ name, team }) => {
-    fpsPlayers.set(socket.id, {
+    console.log(`FPS Player joined: ${name} on team ${team}, socket: ${socket.id}`);\n    \n    fpsPlayers.set(socket.id, {
       name,
       team,
       position: [0, 0, 0],
@@ -559,6 +559,8 @@ app.prepare().then(() => {
     } else if (team === 'CT') {
       fpsTeamCounts.CT++;
     }
+    
+    console.log('Updated team counts:', fpsTeamCounts);
     
     // Broadcast updated team counts to all players
     io.emit('fpsTeamCounts', fpsTeamCounts);

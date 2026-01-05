@@ -1268,10 +1268,12 @@ export default function FPSArena() {
       const socket = io(serverUrl);
       socketRef.current = socket;
 
+      console.log('Emitting fpsJoin with:', { name: playerName, team: selectedTeam });
       socket.emit('fpsJoin', { name: playerName, team: selectedTeam });
 
       // Listen for team counts
       socket.on('fpsTeamCounts', (counts: {T: number, CT: number}) => {
+        console.log('Received fpsTeamCounts:', counts);
         setTeamCounts(counts);
         // Check if both teams have at least 1 player
         if (counts.T > 0 && counts.CT > 0) {
@@ -1699,10 +1701,37 @@ export default function FPSArena() {
       });
     };
 
+    const raycaster = new THREE.Raycaster();
+    
     const updateRemotePlayers = () => {
       remotePlayers.forEach((player: any) => {
         player.mesh.position.copy(player.position);
         player.mesh.rotation.y = player.rotation;
+        
+        // Check if nameplate is occluded by walls
+        const direction = new THREE.Vector3();
+        direction.subVectors(player.position, camera.position).normalize();
+        raycaster.set(camera.position, direction);
+        
+        const distance = camera.position.distanceTo(player.position);
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        
+        // Hide nameplate if something is between camera and player
+        let occluded = false;
+        for (const intersect of intersects) {
+          // Skip the player mesh itself and rockets
+          if (intersect.object === player.mesh || intersect.object.parent === player.mesh) continue;
+          if (intersect.object.name === 'rocket') continue;
+          
+          if (intersect.distance < distance - 0.5) {
+            occluded = true;
+            break;
+          }
+        }
+        
+        if (player.nameplate && player.nameplate.element) {
+          player.nameplate.element.style.display = occluded ? 'none' : 'block';
+        }
       });
     };
 
