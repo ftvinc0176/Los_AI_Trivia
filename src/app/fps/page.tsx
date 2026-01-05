@@ -51,12 +51,60 @@ export default function FPSArena() {
   const bombPositionRef = useRef<{x: number, y: number, z: number} | null>(null);
   const bombPlantedRef = useRef(false);
   const socketRef = useRef<Socket | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const playerCapsuleRef = useRef<Capsule | null>(null);
 
   // Weapon configs
   const weaponConfig = {
     awp: { maxAmmo: 1, damage: 100, reloadTime: 2000, fireRate: 1000, auto: false },
     m4: { maxAmmo: 30, damage: 20, reloadTime: 1000, fireRate: 100, auto: true },
     ak47: { maxAmmo: 30, damage: 20, reloadTime: 1000, fireRate: 100, auto: true },
+  };
+
+  // Helper function to respawn player at team spawn
+  const respawnPlayer = () => {
+    const spawnPos = selectedTeam === 'T' 
+      ? { x: 0, y: 0.35, z: -70 } 
+      : { x: 25, y: 0.35, z: 20 };
+    
+    // Reset player position via capsule and camera refs
+    if (playerCapsuleRef.current) {
+      playerCapsuleRef.current.start.set(spawnPos.x, spawnPos.y, spawnPos.z);
+      playerCapsuleRef.current.end.set(spawnPos.x, 1.8, spawnPos.z);
+    }
+    if (cameraRef.current) {
+      cameraRef.current.position.set(spawnPos.x, 1.8, spawnPos.z);
+    }
+    
+    // Reset game state
+    setHealth(100);
+    setIsDead(false);
+    setRoundPhase('buy');
+    roundPhaseRef.current = 'buy';
+    setRoundTime(115);
+    setRoundWinner(null);
+    setCountdown(5);
+    countdownRef.current = 5;
+    setWaitingForPlayers(false);
+    setBombPlanted(false);
+    bombPlantedRef.current = false;
+    setBombPosition(null);
+    bombPositionRef.current = null;
+    setPlantedSite(null);
+    setBombTimer(40);
+    setIsPlanting(false);
+    setIsDefusing(false);
+    
+    // Reset bomb for Terrorists
+    if (selectedTeam === 'T') {
+      setHasBomb(true);
+      hasBombRef.current = true;
+    }
+    
+    // Notify server to reset health for all players
+    if (socketRef.current) {
+      socketRef.current.emit('fpsRoundReset');
+    }
   };
 
   // Sync ammo when weapon changes
@@ -1147,6 +1195,10 @@ export default function FPSArena() {
       new THREE.Vector3(spawnPos.x, 1.8, spawnPos.z),
       0.35
     );
+    
+    // Store references for respawn
+    cameraRef.current = camera;
+    playerCapsuleRef.current = playerCapsule;
 
     const playerVelocity = new THREE.Vector3();
     const playerDirection = new THREE.Vector3();
@@ -1217,27 +1269,18 @@ export default function FPSArena() {
           if (distToBomb < 2) {
             setIsDefusing(true);
             setTimeout(() => {
-              setBombPlanted(false);
-              setIsDefusing(false);
-              setBombPosition(null);
-              setPlantedSite(null);
               bombGroup.visible = false;
               setCtScore(prev => prev + 1);
               setRoundPhase('end');
               roundPhaseRef.current = 'end';
               setRoundWinner('CT');
-              setTimeout(() => {
-                setRoundPhase('buy');
-                roundPhaseRef.current = 'buy';
-                setRoundTime(115);
-                setRoundWinner(null);
-                setCountdown(5);
-                countdownRef.current = 5;
-                setWaitingForPlayers(false);
-              }, 5000);
+              setIsDefusing(false);
               if (socketRef.current) {
                 socketRef.current.emit('fpsDefuseBomb');
               }
+              setTimeout(() => {
+                respawnPlayer();
+              }, 5000);
             }, 10000); // 10 second defuse time
           }
         }
@@ -1409,9 +1452,18 @@ export default function FPSArena() {
 
       socket.on('fpsBombDefused', () => {
         setBombPlanted(false);
+        bombPlantedRef.current = false;
         setBombPosition(null);
+        bombPositionRef.current = null;
         setPlantedSite(null);
         bombGroup.visible = false;
+      });
+
+      // Listen for round reset from server (triggered when any player calls respawnPlayer)
+      socket.on('fpsRoundReset', () => {
+        console.log('Round reset received from server');
+        setHealth(100);
+        setIsDead(false);
       });
 
       socket.on('fpsTeamEliminated', ({ winner }: any) => {
@@ -1425,14 +1477,7 @@ export default function FPSArena() {
           setCtScore(s => s + 1);
         }
         setTimeout(() => {
-          setRoundPhase('buy');
-          roundPhaseRef.current = 'buy';
-          setRoundTime(115);
-          setHealth(100);
-          setRoundWinner(null);
-          setCountdown(5);
-          countdownRef.current = 5;
-          setWaitingForPlayers(false);
+          respawnPlayer();
         }, 5000);
       });
 
@@ -1875,15 +1920,7 @@ export default function FPSArena() {
           roundPhaseRef.current = 'end';
           setRoundWinner('CT');
           setTimeout(() => {
-            setRoundPhase('buy');
-            roundPhaseRef.current = 'buy';
-            setRoundTime(115);
-            setHealth(100);
-            setRoundWinner(null);
-            setCountdown(5);
-            countdownRef.current = 5;
-            setWaitingForPlayers(false);
-            // Reset to spawn will happen in teleport function
+            respawnPlayer();
           }, 5000);
           return 0;
         }
@@ -1903,20 +1940,11 @@ export default function FPSArena() {
         if (prev <= 1) {
           // Bomb explodes - Ts win
           setTScore(s => s + 1);
-          setBombPlanted(false);
           setRoundPhase('end');
           roundPhaseRef.current = 'end';
           setRoundWinner('T');
           setTimeout(() => {
-            setRoundPhase('buy');
-            roundPhaseRef.current = 'buy';
-            setRoundTime(115);
-            setBombTimer(40);
-            setHealth(100);
-            setRoundWinner(null);
-            setCountdown(5);
-            countdownRef.current = 5;
-            setWaitingForPlayers(false);
+            respawnPlayer();
           }, 5000);
           return 40;
         }

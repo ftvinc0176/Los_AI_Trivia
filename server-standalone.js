@@ -1983,6 +1983,27 @@ io.on('connection', (socket) => {
       }
     }
   });
+
+  // Bomb plant handler - broadcast to all players
+  socket.on('fpsPlantBomb', ({ position, site }) => {
+    console.log('Bomb planted at', site, 'position:', position);
+    io.emit('fpsBombPlanted', { position, site });
+  });
+
+  // Bomb defuse handler - broadcast to all players
+  socket.on('fpsDefuseBomb', () => {
+    console.log('Bomb defused!');
+    io.emit('fpsBombDefused');
+  });
+
+  // Round reset handler - reset all player health
+  socket.on('fpsRoundReset', () => {
+    console.log('Round reset - resetting all player health');
+    Object.keys(fpsPlayers).forEach(id => {
+      fpsPlayers[id].health = 100;
+    });
+    io.emit('fpsRoundReset');
+  });
   
   socket.on('disconnect', () => {
     if (fpsPlayers[socket.id]) {
