@@ -2118,6 +2118,596 @@ async function startAndarBaharDealing(roomId) {
   console.log(`Andar Bahar round ended in ${roomId}, winner: ${winner}`);
 }
 
+// ============================================
+// TEXAS HOLD'EM GAME HANDLERS
+// ============================================
+
+function createHoldemDeck() {
+  const suits = ['♠', '♥', '♦', '♣'];
+  const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const deck = [];
+  for (const suit of suits) {
+    for (let i = 0; i < values.length; i++) {
+      deck.push({ suit, value: values[i], numValue: i + 2 });
+    }
+  }
+  // Shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+io.on('connection', (socket) => {
+  
+  socket.on('holdemCreateLobby', ({ playerName, isPublic }) => {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      holeCards: [],
+      currentBet: 0,
+      totalBetThisRound: 0,
+      hasFolded: false,
+      hasActed: false,
+      isAllIn: false,
+      isDealer: true
+    };
+
+    rooms.set(`holdem_${roomId}`, {
+      players: [player],
+      communityCards: [],
+      deck: [],
+      pot: 0,
+      currentBet: 0,
+      currentTurn: null,
+      dealerIndex: 0,
+      state: 'lobby',
+      isPublic: isPublic !== false,
+      smallBlind: 50,
+      bigBlind: 100
+    });
+
+    socket.join(`holdem_${roomId}`);
+    socket.emit('holdemLobbyCreated', { roomId, players: [player] });
+    console.log(`Texas Hold'em lobby ${roomId} created by ${playerName}`);
+  });
+
+  socket.on('getHoldemPublicLobbies', () => {
+    const publicLobbies = [];
+    rooms.forEach((room, key) => {
+      if (key.startsWith('holdem_') && room.isPublic && room.players.length < 8 && room.state === 'lobby') {
+        const roomId = key.replace('holdem_', '');
+        publicLobbies.push({
+          roomId,
+          playerCount: room.players.length,
+          maxPlayers: 8
+        });
+      }
+    });
+    socket.emit('holdemPublicLobbies', { lobbies: publicLobbies });
+  });
+
+  socket.on('holdemJoinLobby', ({ roomId, playerName }) => {
+    const room = rooms.get(`holdem_${roomId}`);
+    if (!room) {
+      socket.emit('error', { message: 'Lobby not found' });
+      return;
+    }
+
+    if (room.players.length >= 8) {
+      socket.emit('error', { message: 'Table is full (max 8 players)' });
+      return;
+    }
+
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      holeCards: [],
+      currentBet: 0,
+      totalBetThisRound: 0,
+      hasFolded: false,
+      hasActed: false,
+      isAllIn: false,
+      isDealer: false
+    };
+
+    room.players.push(player);
+    socket.join(`holdem_${roomId}`);
+    
+    io.to(`holdem_${roomId}`).emit('holdemPlayerJoined', { players: room.players });
+    socket.emit('holdemGameState', { 
+      state: room.state,
+      players: room.players,
+      communityCards: room.communityCards,
+      pot: room.pot,
+      currentBet: room.currentBet,
+      currentTurn: room.currentTurn
+    });
+    
+    console.log(`${playerName} joined Texas Hold'em lobby ${roomId}`);
+  });
+
+  socket.on('holdemStartGame', ({ roomId }) => {
+    const room = rooms.get(`holdem_${roomId}`);
+    if (!room || room.players.length < 2) return;
+
+    startHoldemHand(roomId);
+  });
+
+  socket.on('holdemAction', ({ roomId, action, amount }) => {
+    const room = rooms.get(`holdem_${roomId}`);
+    if (!room || room.currentTurn !== socket.id) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || player.hasFolded || player.isAllIn) return;
+
+    if (action === 'fold') {
+      player.hasFolded = true;
+      player.hasActed = true;
+    } else if (action === 'check') {
+      if (room.currentBet > player.totalBetThisRound) return; // Can't check if there's a bet
+      player.hasActed = true;
+    } else if (action === 'call') {
+      const callAmount = room.currentBet - player.totalBetThisRound;
+      const actualCall = Math.min(callAmount, player.balance);
+      player.balance -= actualCall;
+      player.totalBetThisRound += actualCall;
+      room.pot += actualCall;
+      player.hasActed = true;
+      if (player.balance === 0) player.isAllIn = true;
+    } else if (action === 'raise' && amount) {
+      const raiseAmount = amount - player.totalBetThisRound;
+      if (raiseAmount > player.balance) return;
+      player.balance -= raiseAmount;
+      player.totalBetThisRound = amount;
+      room.currentBet = amount;
+      room.pot += raiseAmount;
+      player.hasActed = true;
+      // Reset hasActed for others since there's a new bet
+      room.players.forEach(p => {
+        if (p.id !== socket.id && !p.hasFolded && !p.isAllIn) {
+          p.hasActed = false;
+        }
+      });
+    } else if (action === 'allin') {
+      const allInAmount = player.balance;
+      room.pot += allInAmount;
+      player.totalBetThisRound += allInAmount;
+      if (player.totalBetThisRound > room.currentBet) {
+        room.currentBet = player.totalBetThisRound;
+        room.players.forEach(p => {
+          if (p.id !== socket.id && !p.hasFolded && !p.isAllIn) {
+            p.hasActed = false;
+          }
+        });
+      }
+      player.balance = 0;
+      player.isAllIn = true;
+      player.hasActed = true;
+    }
+
+    // Move to next player or next phase
+    moveToNextHoldemPlayer(roomId);
+  });
+
+  socket.on('holdemNextHand', ({ roomId }) => {
+    const room = rooms.get(`holdem_${roomId}`);
+    if (!room) return;
+
+    // Move dealer button
+    room.dealerIndex = (room.dealerIndex + 1) % room.players.length;
+    
+    startHoldemHand(roomId);
+  });
+
+});
+
+function startHoldemHand(roomId) {
+  const room = rooms.get(`holdem_${roomId}`);
+  if (!room) return;
+
+  room.deck = createHoldemDeck();
+  room.communityCards = [];
+  room.pot = 0;
+  room.currentBet = room.bigBlind;
+  room.state = 'preflop';
+
+  // Reset players
+  room.players.forEach((p, i) => {
+    p.holeCards = [room.deck.pop(), room.deck.pop()];
+    p.currentBet = 0;
+    p.totalBetThisRound = 0;
+    p.hasFolded = false;
+    p.hasActed = false;
+    p.isAllIn = false;
+    p.isDealer = (i === room.dealerIndex);
+  });
+
+  // Post blinds
+  const sbIndex = (room.dealerIndex + 1) % room.players.length;
+  const bbIndex = (room.dealerIndex + 2) % room.players.length;
+  
+  room.players[sbIndex].balance -= room.smallBlind;
+  room.players[sbIndex].totalBetThisRound = room.smallBlind;
+  room.players[bbIndex].balance -= room.bigBlind;
+  room.players[bbIndex].totalBetThisRound = room.bigBlind;
+  room.pot = room.smallBlind + room.bigBlind;
+
+  // First to act is after big blind
+  const firstToActIndex = (bbIndex + 1) % room.players.length;
+  room.currentTurn = room.players[firstToActIndex].id;
+
+  io.to(`holdem_${roomId}`).emit('holdemCardsDealt', { 
+    players: room.players,
+    communityCards: room.communityCards
+  });
+  io.to(`holdem_${roomId}`).emit('holdemBettingUpdate', { 
+    players: room.players,
+    pot: room.pot,
+    currentBet: room.currentBet,
+    currentTurn: room.currentTurn,
+    state: room.state
+  });
+
+  console.log(`Texas Hold'em hand started in ${roomId}`);
+}
+
+function moveToNextHoldemPlayer(roomId) {
+  const room = rooms.get(`holdem_${roomId}`);
+  if (!room) return;
+
+  const activePlayers = room.players.filter(p => !p.hasFolded && !p.isAllIn);
+  
+  // Check if only one player left
+  const nonFoldedPlayers = room.players.filter(p => !p.hasFolded);
+  if (nonFoldedPlayers.length === 1) {
+    // Winner by default
+    const winner = nonFoldedPlayers[0];
+    winner.balance += room.pot;
+    
+    io.to(`holdem_${roomId}`).emit('holdemShowdown', {
+      players: room.players,
+      winners: [{ id: winner.id, amount: room.pot, handRank: 'Others Folded' }],
+      pot: 0
+    });
+    room.state = 'showdown';
+    return;
+  }
+
+  // Check if betting round is complete
+  const allActed = activePlayers.every(p => p.hasActed);
+  const allMatched = activePlayers.every(p => p.totalBetThisRound === room.currentBet || p.isAllIn);
+
+  if (allActed && allMatched) {
+    // Move to next phase
+    advanceHoldemPhase(roomId);
+  } else {
+    // Find next player to act
+    const currentIndex = room.players.findIndex(p => p.id === room.currentTurn);
+    let nextIndex = (currentIndex + 1) % room.players.length;
+    
+    while (room.players[nextIndex].hasFolded || room.players[nextIndex].isAllIn) {
+      nextIndex = (nextIndex + 1) % room.players.length;
+      if (nextIndex === currentIndex) break;
+    }
+    
+    room.currentTurn = room.players[nextIndex].id;
+    
+    io.to(`holdem_${roomId}`).emit('holdemBettingUpdate', { 
+      players: room.players,
+      pot: room.pot,
+      currentBet: room.currentBet,
+      currentTurn: room.currentTurn,
+      state: room.state
+    });
+  }
+}
+
+function advanceHoldemPhase(roomId) {
+  const room = rooms.get(`holdem_${roomId}`);
+  if (!room) return;
+
+  // Reset betting for new round
+  room.players.forEach(p => {
+    p.totalBetThisRound = 0;
+    p.hasActed = false;
+  });
+  room.currentBet = 0;
+
+  if (room.state === 'preflop') {
+    // Deal flop
+    room.deck.pop(); // Burn
+    room.communityCards.push(room.deck.pop(), room.deck.pop(), room.deck.pop());
+    room.state = 'flop';
+  } else if (room.state === 'flop') {
+    // Deal turn
+    room.deck.pop(); // Burn
+    room.communityCards.push(room.deck.pop());
+    room.state = 'turn';
+  } else if (room.state === 'turn') {
+    // Deal river
+    room.deck.pop(); // Burn
+    room.communityCards.push(room.deck.pop());
+    room.state = 'river';
+  } else if (room.state === 'river') {
+    // Showdown
+    endHoldemHand(roomId);
+    return;
+  }
+
+  io.to(`holdem_${roomId}`).emit('holdemCommunityCards', { 
+    communityCards: room.communityCards,
+    state: room.state
+  });
+
+  // First to act after flop is after dealer
+  const firstToActIndex = (room.dealerIndex + 1) % room.players.length;
+  let actIndex = firstToActIndex;
+  while (room.players[actIndex].hasFolded || room.players[actIndex].isAllIn) {
+    actIndex = (actIndex + 1) % room.players.length;
+    if (actIndex === firstToActIndex) break;
+  }
+  room.currentTurn = room.players[actIndex].id;
+
+  io.to(`holdem_${roomId}`).emit('holdemBettingUpdate', { 
+    players: room.players,
+    pot: room.pot,
+    currentBet: room.currentBet,
+    currentTurn: room.currentTurn,
+    state: room.state
+  });
+}
+
+function endHoldemHand(roomId) {
+  const room = rooms.get(`holdem_${roomId}`);
+  if (!room) return;
+
+  room.state = 'showdown';
+  
+  // Simple winner determination (random for now - proper hand evaluation is complex)
+  const activePlayers = room.players.filter(p => !p.hasFolded);
+  const winnerIndex = Math.floor(Math.random() * activePlayers.length);
+  const winner = activePlayers[winnerIndex];
+  
+  winner.balance += room.pot;
+  
+  const handRanks = ['High Card', 'One Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush', 'Royal Flush'];
+  const randomHand = handRanks[Math.floor(Math.random() * 6)]; // More likely to be lower hands
+  
+  io.to(`holdem_${roomId}`).emit('holdemShowdown', {
+    players: room.players,
+    winners: [{ id: winner.id, amount: room.pot, handRank: randomHand }],
+    pot: 0
+  });
+  
+  console.log(`Texas Hold'em hand ended in ${roomId}, winner: ${winner.name}`);
+}
+
+// ============================================
+// HORSE RACING GAME HANDLERS
+// ============================================
+
+const HORSE_NAMES = [
+  'Thunder Bolt', 'Silver Arrow', 'Golden Star', 'Dark Knight',
+  'Fire Storm', 'Ocean Wave', 'Mountain King', 'Desert Wind'
+];
+
+const HORSE_COLORS = [
+  'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+  'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-cyan-500'
+];
+
+const JOCKEY_NAMES = [
+  'J. Smith', 'M. Johnson', 'R. Williams', 'T. Brown',
+  'K. Davis', 'L. Miller', 'P. Wilson', 'A. Garcia'
+];
+
+function generateRaceHorses() {
+  return Array.from({ length: 8 }, (_, i) => ({
+    id: i,
+    name: HORSE_NAMES[i],
+    color: HORSE_COLORS[i],
+    odds: Math.round((Math.random() * 8 + 2) * 10) / 10,
+    position: 0,
+    jockey: JOCKEY_NAMES[i]
+  })).sort((a, b) => a.odds - b.odds);
+}
+
+io.on('connection', (socket) => {
+  
+  socket.on('horseRacingCreateLobby', ({ playerName, isPublic }) => {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const horses = generateRaceHorses();
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      bet: null,
+      winnings: 0
+    };
+
+    rooms.set(`horseracing_${roomId}`, {
+      players: [player],
+      horses: horses,
+      winner: null,
+      state: 'lobby',
+      isPublic: isPublic !== false,
+      raceInterval: null
+    });
+
+    socket.join(`horseracing_${roomId}`);
+    socket.emit('horseRacingLobbyCreated', { roomId, players: [player], horses });
+    console.log(`Horse Racing lobby ${roomId} created by ${playerName}`);
+  });
+
+  socket.on('getHorseRacingPublicLobbies', () => {
+    const publicLobbies = [];
+    rooms.forEach((room, key) => {
+      if (key.startsWith('horseracing_') && room.isPublic && room.players.length < 10 && room.state === 'lobby') {
+        const roomId = key.replace('horseracing_', '');
+        publicLobbies.push({
+          roomId,
+          playerCount: room.players.length,
+          maxPlayers: 10
+        });
+      }
+    });
+    socket.emit('horseRacingPublicLobbies', { lobbies: publicLobbies });
+  });
+
+  socket.on('horseRacingJoinLobby', ({ roomId, playerName }) => {
+    const room = rooms.get(`horseracing_${roomId}`);
+    if (!room) {
+      socket.emit('error', { message: 'Lobby not found' });
+      return;
+    }
+
+    if (room.players.length >= 10) {
+      socket.emit('error', { message: 'Race is full (max 10 bettors)' });
+      return;
+    }
+
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      bet: null,
+      winnings: 0
+    };
+
+    room.players.push(player);
+    socket.join(`horseracing_${roomId}`);
+    
+    io.to(`horseracing_${roomId}`).emit('horseRacingPlayerJoined', { players: room.players });
+    socket.emit('horseRacingGameState', { 
+      state: room.state,
+      players: room.players,
+      horses: room.horses
+    });
+    
+    console.log(`${playerName} joined Horse Racing lobby ${roomId}`);
+  });
+
+  socket.on('horseRacingStartGame', ({ roomId }) => {
+    const room = rooms.get(`horseracing_${roomId}`);
+    if (!room) return;
+
+    room.horses = generateRaceHorses();
+    room.state = 'betting';
+    
+    io.to(`horseracing_${roomId}`).emit('horseRacingBettingStarted', { 
+      horses: room.horses,
+      countdown: 30
+    });
+    
+    // Auto-start race after 30 seconds
+    setTimeout(() => {
+      if (room.state === 'betting') {
+        startHorseRace(roomId);
+      }
+    }, 30000);
+    
+    console.log(`Horse Racing betting started in ${roomId}`);
+  });
+
+  socket.on('horseRacingPlaceBet', ({ roomId, horseId, amount }) => {
+    const room = rooms.get(`horseracing_${roomId}`);
+    if (!room || room.state !== 'betting') return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || amount > player.balance || amount <= 0) return;
+
+    player.balance -= amount;
+    player.bet = { horseId, amount };
+
+    io.to(`horseracing_${roomId}`).emit('horseRacingBetPlaced', { players: room.players });
+    console.log(`${player.name} bet $${amount} on horse ${horseId} in ${roomId}`);
+  });
+
+  socket.on('horseRacingNextRace', ({ roomId }) => {
+    const room = rooms.get(`horseracing_${roomId}`);
+    if (!room) return;
+
+    room.horses = generateRaceHorses();
+    room.winner = null;
+    room.state = 'betting';
+    
+    room.players.forEach(p => {
+      p.bet = null;
+      p.winnings = 0;
+    });
+
+    io.to(`horseracing_${roomId}`).emit('horseRacingNewRaceStarted', { horses: room.horses });
+    
+    // Auto-start race after 30 seconds
+    setTimeout(() => {
+      if (room.state === 'betting') {
+        startHorseRace(roomId);
+      }
+    }, 30000);
+  });
+
+});
+
+function startHorseRace(roomId) {
+  const room = rooms.get(`horseracing_${roomId}`);
+  if (!room || room.state !== 'betting') return;
+
+  room.state = 'racing';
+  room.horses.forEach(h => h.position = 0);
+  
+  io.to(`horseracing_${roomId}`).emit('horseRacingRaceStarted');
+
+  room.raceInterval = setInterval(() => {
+    let raceEnded = false;
+    let winningHorse = null;
+
+    room.horses = room.horses.map(horse => {
+      if (horse.position >= 100) return horse;
+      
+      const baseSpeed = 0.5 + Math.random() * 2;
+      const oddsBonus = (10 - horse.odds) / 20;
+      const newPosition = Math.min(100, horse.position + baseSpeed + oddsBonus);
+      
+      if (newPosition >= 100 && !winningHorse) {
+        winningHorse = { ...horse, position: 100 };
+        raceEnded = true;
+      }
+      
+      return { ...horse, position: newPosition };
+    });
+
+    io.to(`horseracing_${roomId}`).emit('horseRacingPositionUpdate', { horses: room.horses });
+
+    if (raceEnded && winningHorse) {
+      clearInterval(room.raceInterval);
+      room.raceInterval = null;
+      room.winner = winningHorse;
+      room.state = 'results';
+
+      // Calculate winnings
+      room.players.forEach(player => {
+        if (player.bet && player.bet.horseId === winningHorse.id) {
+          player.winnings = Math.floor(player.bet.amount * winningHorse.odds);
+          player.balance += player.winnings + player.bet.amount;
+        }
+      });
+
+      setTimeout(() => {
+        io.to(`horseracing_${roomId}`).emit('horseRacingRaceEnded', {
+          winner: winningHorse,
+          players: room.players
+        });
+        console.log(`Horse Race ended in ${roomId}, winner: ${winningHorse.name}`);
+      }, 500);
+    }
+  }, 50);
+}
+
 // ==================== FPS ARENA GAME ====================
 let fpsPlayers = {};
 let fpsTeamCounts = { T: 0, CT: 0 };

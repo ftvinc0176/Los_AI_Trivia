@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-type GameType = 'blackjack' | 'andar-bahar' | null;
+type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'horse-racing' | null;
 
 export default function Casino() {
   const router = useRouter();
@@ -87,6 +87,56 @@ export default function Casino() {
                 </button>
               </div>
             </div>
+
+            {/* Texas Hold'em */}
+            <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🃏</div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Texas Hold&apos;em</h2>
+                  <p className="text-white/70">No-limit poker action</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleGameSelect('texas-holdem', 'single')}
+                  className="py-3 bg-green-500/30 hover:bg-green-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  🎮 Single Player
+                </button>
+                <button
+                  onClick={() => handleGameSelect('texas-holdem', 'multiplayer')}
+                  className="py-3 bg-emerald-500/30 hover:bg-emerald-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  👥 Multiplayer
+                </button>
+              </div>
+            </div>
+
+            {/* Horse Racing */}
+            <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🏇</div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Horse Racing</h2>
+                  <p className="text-white/70">Bet on your favorite horse</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleGameSelect('horse-racing', 'single')}
+                  className="py-3 bg-amber-500/30 hover:bg-amber-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  🎮 Single Player
+                </button>
+                <button
+                  onClick={() => handleGameSelect('horse-racing', 'multiplayer')}
+                  className="py-3 bg-yellow-500/30 hover:bg-yellow-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  👥 Multiplayer
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
@@ -98,7 +148,10 @@ export default function Casino() {
             </button>
 
             <h2 className="text-3xl font-bold text-white text-center mb-6">
-              {selectedGame === 'blackjack' ? '🃏 Blackjack' : '🎴 Andar Bahar'} Multiplayer
+              {selectedGame === 'blackjack' ? '🃏 Blackjack' : 
+               selectedGame === 'andar-bahar' ? '🎴 Andar Bahar' : 
+               selectedGame === 'texas-holdem' ? '🃏 Texas Hold\'em' : 
+               '🏇 Horse Racing'} Multiplayer
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
