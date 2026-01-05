@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { io, Socket } from 'socket.io-client';
 import { Capsule } from 'three/examples/jsm/math/Capsule.js';
 import { Octree } from 'three/examples/jsm/math/Octree.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
 export default function FPSArena() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -13,6 +14,120 @@ export default function FPSArena() {
   const [health, setHealth] = useState(100);
   const [kills, setKills] = useState(0);
   const [deaths, setDeaths] = useState(0);
+
+  // Helper function to create soldier model
+  const createSoldierModel = () => {
+    const soldier = new THREE.Group();
+
+    // Body (torso)
+    const bodyGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.3);
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x2a5a2a }); // Military green
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 0.9;
+    body.castShadow = true;
+    soldier.add(body);
+
+    // Head
+    const headGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffdbac }); // Skin tone
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 1.5;
+    head.castShadow = true;
+    soldier.add(head);
+
+    // Helmet
+    const helmetGeometry = new THREE.BoxGeometry(0.32, 0.2, 0.32);
+    const helmetMaterial = new THREE.MeshStandardMaterial({ color: 0x1a3a1a }); // Dark green
+    const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
+    helmet.position.y = 1.65;
+    helmet.castShadow = true;
+    soldier.add(helmet);
+
+    // Arms
+    const armGeometry = new THREE.BoxGeometry(0.15, 0.6, 0.15);
+    const armMaterial = new THREE.MeshStandardMaterial({ color: 0x2a5a2a });
+    
+    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+    leftArm.position.set(-0.35, 0.9, 0);
+    leftArm.castShadow = true;
+    soldier.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+    rightArm.position.set(0.35, 0.9, 0);
+    rightArm.castShadow = true;
+    soldier.add(rightArm);
+
+    // Legs
+    const legGeometry = new THREE.BoxGeometry(0.18, 0.6, 0.18);
+    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x3a4a3a }); // Dark pants
+    
+    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    leftLeg.position.set(-0.12, 0.3, 0);
+    leftLeg.castShadow = true;
+    soldier.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    rightLeg.position.set(0.12, 0.3, 0);
+    rightLeg.castShadow = true;
+    soldier.add(rightLeg);
+
+    // Weapon (rifle)
+    const weaponGeometry = new THREE.BoxGeometry(0.1, 0.5, 0.1);
+    const weaponMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const weapon = new THREE.Mesh(weaponGeometry, weaponMaterial);
+    weapon.position.set(0.25, 0.9, 0.2);
+    weapon.rotation.x = Math.PI / 4;
+    weapon.castShadow = true;
+    soldier.add(weapon);
+
+    return soldier;
+  };
+
+  // Helper function to create nameplate
+  const createNameplate = (name: string, health: number) => {
+    const nameplateDiv = document.createElement('div');
+    nameplateDiv.className = 'nameplate';
+    nameplateDiv.style.cssText = `
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      pointer-events: none;
+      white-space: nowrap;
+    `;
+    
+    const nameSpan = document.createElement('div');
+    nameSpan.textContent = name;
+    nameSpan.style.marginBottom = '2px';
+    nameplateDiv.appendChild(nameSpan);
+    
+    const healthBar = document.createElement('div');
+    healthBar.style.cssText = `
+      width: 60px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+      overflow: hidden;
+    `;
+    
+    const healthFill = document.createElement('div');
+    healthFill.className = 'health-fill';
+    healthFill.style.cssText = `
+      width: ${health}%;
+      height: 100%;
+      background: ${health > 50 ? '#4ade80' : health > 25 ? '#fbbf24' : '#ef4444'};
+      transition: width 0.3s, background 0.3s;
+    `;
+    
+    healthBar.appendChild(healthFill);
+    nameplateDiv.appendChild(healthBar);
+    
+    return { div: nameplateDiv, healthFill };
+  };
 
   useEffect(() => {
     if (!gameStarted || !containerRef.current) return;
@@ -36,6 +151,14 @@ export default function FPSArena() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     containerRef.current.appendChild(renderer.domElement);
+
+    // CSS2D renderer for nameplates
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    containerRef.current.appendChild(labelRenderer.domElement);
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -206,16 +329,23 @@ export default function FPSArena() {
       socket.on('fpsPlayers', (players: any) => {
         Object.entries(players).forEach(([id, playerData]: [string, any]) => {
           if (id !== socket.id && !remotePlayers.has(id)) {
-            const geometry = new THREE.BoxGeometry(0.7, 1.8, 0.7);
-            const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.castShadow = true;
-            scene.add(mesh);
+            const soldierModel = createSoldierModel();
+            soldierModel.castShadow = true;
+            scene.add(soldierModel);
+
+            // Create nameplate
+            const { div: nameplateDiv, healthFill } = createNameplate(playerData.name || 'Player', 100);
+            const nameplate = new CSS2DObject(nameplateDiv);
+            nameplate.position.y = 2.2;
+            soldierModel.add(nameplate);
 
             remotePlayers.set(id, {
-              mesh: mesh,
+              mesh: soldierModel,
+              nameplate: nameplate,
+              healthFill: healthFill,
               position: new THREE.Vector3(...playerData.position),
               rotation: playerData.rotation || 0,
+              health: 100,
             });
           }
         });
@@ -223,16 +353,23 @@ export default function FPSArena() {
 
       socket.on('fpsPlayerJoined', ({ id, player }: any) => {
         if (id !== socket.id && !remotePlayers.has(id)) {
-          const geometry = new THREE.BoxGeometry(0.7, 1.8, 0.7);
-          const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-          const mesh = new THREE.Mesh(geometry, material);
-          mesh.castShadow = true;
-          scene.add(mesh);
+          const soldierModel = createSoldierModel();
+          soldierModel.castShadow = true;
+          scene.add(soldierModel);
+
+          // Create nameplate
+          const { div: nameplateDiv, healthFill } = createNameplate(player.name || 'Player', 100);
+          const nameplate = new CSS2DObject(nameplateDiv);
+          nameplate.position.y = 2.2;
+          soldierModel.add(nameplate);
 
           remotePlayers.set(id, {
-            mesh: mesh,
+            mesh: soldierModel,
+            nameplate: nameplate,
+            healthFill: healthFill,
             position: new THREE.Vector3(...player.position),
             rotation: player.rotation || 0,
+            health: 100,
           });
         }
       });
@@ -245,16 +382,23 @@ export default function FPSArena() {
             
             // Create player if doesn't exist
             if (!player) {
-              const geometry = new THREE.BoxGeometry(0.7, 1.8, 0.7);
-              const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-              const mesh = new THREE.Mesh(geometry, material);
-              mesh.castShadow = true;
-              scene.add(mesh);
+              const soldierModel = createSoldierModel();
+              soldierModel.castShadow = true;
+              scene.add(soldierModel);
+
+              // Create nameplate
+              const { div: nameplateDiv, healthFill } = createNameplate(playerData.name || 'Player', 100);
+              const nameplate = new CSS2DObject(nameplateDiv);
+              nameplate.position.y = 2.2;
+              soldierModel.add(nameplate);
 
               player = {
-                mesh: mesh,
+                mesh: soldierModel,
+                nameplate: nameplate,
+                healthFill: healthFill,
                 position: new THREE.Vector3(...playerData.position),
                 rotation: 0,
+                health: 100,
               };
               remotePlayers.set(id, player);
             } else {
@@ -289,8 +433,18 @@ export default function FPSArena() {
         }
       });
 
-      socket.on('fpsHit', ({ damage }: any) => {
+      socket.on('fpsHit', ({ damage, victim }: any) => {
         setHealth((prev) => Math.max(0, prev - damage));
+        
+        // Update remote player health bar if we hit someone
+        if (victim) {
+          const player = remotePlayers.get(victim);
+          if (player) {
+            player.health = Math.max(0, player.health - damage);
+            player.healthFill.style.width = `${player.health}%`;
+            player.healthFill.style.background = player.health > 50 ? '#4ade80' : player.health > 25 ? '#fbbf24' : '#ef4444';
+          }
+        }
       });
 
       socket.on('fpsKill', ({ killer, victim }: any) => {
@@ -311,6 +465,14 @@ export default function FPSArena() {
         }
         if (killer === socket.id) {
           setKills((prev) => prev + 1);
+        }
+        
+        // Reset killed player's health bar
+        const killedPlayer = remotePlayers.get(victim);
+        if (killedPlayer) {
+          killedPlayer.health = 100;
+          killedPlayer.healthFill.style.width = '100%';
+          killedPlayer.healthFill.style.background = '#4ade80';
         }
       });
     };
@@ -501,6 +663,7 @@ export default function FPSArena() {
       teleportPlayerIfOob();
 
       renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
       requestAnimationFrame(animate);
     };
 
@@ -510,14 +673,20 @@ export default function FPSArena() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement);
+      if (containerRef.current) {
+        if (renderer.domElement) {
+          containerRef.current.removeChild(renderer.domElement);
+        }
+        if (labelRenderer.domElement) {
+          containerRef.current.removeChild(labelRenderer.domElement);
+        }
       }
       renderer.dispose();
       if (socketRef.current) {

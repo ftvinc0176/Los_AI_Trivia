@@ -1936,7 +1936,12 @@ io.on('connection', (socket) => {
   socket.on('fpsHit', ({ victim, damage }) => {
     if (fpsPlayers[victim]) {
       fpsPlayers[victim].health -= damage || 20;
+      
+      // Notify victim
       io.to(victim).emit('fpsHit', { damage: damage || 20 });
+      
+      // Notify shooter so they can update the health bar
+      socket.emit('fpsHit', { damage: damage || 20, victim: victim });
       
       if (fpsPlayers[victim].health <= 0) {
         fpsPlayers[victim].health = 100;
