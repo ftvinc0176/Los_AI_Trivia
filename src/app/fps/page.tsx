@@ -20,6 +20,8 @@ export default function FPSArena() {
   const [deaths, setDeaths] = useState(0);
   const [currentAmmo, setCurrentAmmo] = useState(1); // AWP starts with 1
   const [isReloading, setIsReloading] = useState(false);
+  const ammoRef = useRef(1); // Track ammo immediately to prevent race conditions
+  const isReloadingRef = useRef(false);
 
   // Weapon configs
   const weaponConfig = {
@@ -27,6 +29,17 @@ export default function FPSArena() {
     m4: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
     ak47: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
   };
+
+  // Sync ammo when weapon changes
+  useEffect(() => {
+    if (gameStarted) {
+      const maxAmmo = weaponConfig[selectedWeapon].maxAmmo;
+      ammoRef.current = maxAmmo;
+      setCurrentAmmo(maxAmmo);
+      isReloadingRef.current = false;
+      setIsReloading(false);
+    }
+  }, [selectedWeapon, gameStarted]);
 
   // Helper function to create weapon model
   const createWeaponModel = (weaponType: WeaponType) => {
@@ -1227,25 +1240,32 @@ export default function FPSArena() {
 
     // Reload function
     const reloadWeapon = () => {
-      if (isReloading) return;
+      if (isReloadingRef.current) return;
       
       const config = weaponConfig[selectedWeapon];
-      if (currentAmmo >= config.maxAmmo) return; // Already full
+      if (ammoRef.current >= config.maxAmmo) return; // Already full
       
+      isReloadingRef.current = true;
       setIsReloading(true);
       
       setTimeout(() => {
+        ammoRef.current = config.maxAmmo;
         setCurrentAmmo(config.maxAmmo);
+        isReloadingRef.current = false;
         setIsReloading(false);
       }, config.reloadTime);
     };
 
     // Shoot function
     const shootRocket = () => {
-      // Check if can shoot
-      if (isReloading || currentAmmo <= 0) {
+      // Check if can shoot using refs for immediate values
+      if (isReloadingRef.current || ammoRef.current <= 0) {
         return;
       }
+      
+      // Consume ammo immediately using ref
+      ammoRef.current -= 1;
+      setCurrentAmmo(ammoRef.current);
       
       const rocket = rockets[currentRocketIndex];
       
@@ -1270,15 +1290,10 @@ export default function FPSArena() {
       if (sound.isPlaying) sound.stop();
       sound.play();
 
-      // Consume ammo
-      setCurrentAmmo(prev => {
-        const newAmmo = prev - 1;
-        // Auto-reload when out of ammo
-        if (newAmmo === 0) {
-          setTimeout(() => reloadWeapon(), 100);
-        }
-        return newAmmo;
-      });
+      // Auto-reload when out of ammo
+      if (ammoRef.current === 0) {
+        setTimeout(() => reloadWeapon(), 100);
+      }
 
       if (socketRef.current) {
         socketRef.current.emit('fpsShoot', {
@@ -1485,7 +1500,9 @@ export default function FPSArena() {
       m4: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
       ak47: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
     };
+    ammoRef.current = weaponConfig[weapon].maxAmmo;
     setCurrentAmmo(weaponConfig[weapon].maxAmmo);
+    isReloadingRef.current = false;
     setIsReloading(false);
     // Re-lock pointer after selection
     setTimeout(() => {
