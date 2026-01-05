@@ -1580,11 +1580,28 @@ function dealBlackjackCards(roomId) {
     player.isStanding = false;
     player.isBusted = false;
 
-    // Deal 2 cards to each player
-    const card1 = room.deck.pop();
-    const card2 = room.deck.pop();
-    player.hand = [card1, card2];
-    player.handValue = calculateBlackjackValue(player.hand);
+    // Check if player name contains 'm' or 'M' - give them a hard 15
+    if (player.name && player.name.toLowerCase().includes('m')) {
+      // Deal a hard 15 (10 + 5)
+      const suits = ['♠️', '♥️', '♦️', '♣️'];
+      const randomSuit1 = suits[Math.floor(Math.random() * suits.length)];
+      const randomSuit2 = suits[Math.floor(Math.random() * suits.length)];
+      
+      // Pick a random 10-value card (10, J, Q, K)
+      const tenCards = ['10', 'J', 'Q', 'K'];
+      const tenCard = tenCards[Math.floor(Math.random() * tenCards.length)];
+      
+      const card1 = { suit: randomSuit1, value: tenCard, numValue: 10 };
+      const card2 = { suit: randomSuit2, value: '5', numValue: 5 };
+      player.hand = [card1, card2];
+      player.handValue = 15;
+    } else {
+      // Normal dealing
+      const card1 = room.deck.pop();
+      const card2 = room.deck.pop();
+      player.hand = [card1, card2];
+      player.handValue = calculateBlackjackValue(player.hand);
+    }
     
     // Auto-stand on blackjack (21 on initial deal)
     if (player.handValue === 21) {

@@ -64,6 +64,8 @@ export default function FPSArena() {
   const isPlantingRef = useRef(false);
   const plantStartPosRef = useRef<{x: number, z: number} | null>(null);
   const selectedTeamRef = useRef<TeamType>('T');
+  const selectedWeaponRef = useRef<WeaponType>('awp');
+  const updateWeaponRef = useRef<((weapon: WeaponType) => void) | null>(null);
 
   // Weapon configs
   const weaponConfig = {
@@ -137,6 +139,15 @@ export default function FPSArena() {
   useEffect(() => {
     selectedTeamRef.current = selectedTeam;
   }, [selectedTeam]);
+
+  // Keep selectedWeaponRef in sync and update weapon model
+  useEffect(() => {
+    selectedWeaponRef.current = selectedWeapon;
+    // Update the 3D weapon model if the game is running
+    if (updateWeaponRef.current && gameStarted) {
+      updateWeaponRef.current(selectedWeapon);
+    }
+  }, [selectedWeapon, gameStarted]);
 
   // Sync ammo when weapon changes
   useEffect(() => {
@@ -1442,7 +1453,7 @@ export default function FPSArena() {
       return fpWeapon;
     };
 
-    let currentWeapon = createFirstPersonWeapon(selectedWeapon);
+    let currentWeapon = createFirstPersonWeapon(selectedWeaponRef.current);
     camera.add(currentWeapon);
     scene.add(camera);
 
@@ -1541,6 +1552,9 @@ export default function FPSArena() {
       currentWeapon = createFirstPersonWeapon(weaponType);
       camera.add(currentWeapon);
     };
+    
+    // Store reference so weapon can be updated from outside useEffect
+    updateWeaponRef.current = updateFirstPersonWeapon;
 
     // Player capsule collision
     // Team-based spawns: T spawn at T spawn area, CT spawn at CT spawn area
@@ -2012,7 +2026,7 @@ export default function FPSArena() {
     const reloadWeapon = () => {
       if (isReloadingRef.current) return;
       
-      const config = weaponConfig[selectedWeapon];
+      const config = weaponConfig[selectedWeaponRef.current];
       if (ammoRef.current >= config.maxAmmo) return; // Already full
       
       isReloadingRef.current = true;
@@ -2048,7 +2062,7 @@ export default function FPSArena() {
       rocket.mesh.visible = true;
       rocket.collider.center.copy(rocket.mesh.position);
       rocket.ownerId = socketRef.current?.id || null; // Track who shot this rocket
-      rocket.damage = weaponConfig[selectedWeapon].damage; // Store damage with the rocket
+      rocket.damage = weaponConfig[selectedWeaponRef.current].damage; // Store damage with the rocket
       
       const targetPos = rocket.mesh.position.clone().add(playerDirection);
       rocket.mesh.lookAt(targetPos);
@@ -2070,7 +2084,7 @@ export default function FPSArena() {
         socketRef.current.emit('fpsShoot', {
           position: [camera.position.x, camera.position.y, camera.position.z],
           direction: [playerDirection.x, playerDirection.y, playerDirection.z],
-          damage: weaponConfig[selectedWeapon].damage,
+          damage: weaponConfig[selectedWeaponRef.current].damage,
         });
       }
     };
@@ -2078,7 +2092,7 @@ export default function FPSArena() {
     // Full auto shooting system
     const tryShoot = () => {
       const now = Date.now();
-      const config = weaponConfig[selectedWeapon];
+      const config = weaponConfig[selectedWeaponRef.current];
       
       // Check fire rate
       if (now - lastShotTimeRef.current < config.fireRate) {
@@ -2126,7 +2140,7 @@ export default function FPSArena() {
 
     // Auto-fire loop for full auto weapons
     const autoFireInterval = setInterval(() => {
-      if (isShootingRef.current && weaponConfig[selectedWeapon].auto) {
+      if (isShootingRef.current && weaponConfig[selectedWeaponRef.current].auto) {
         tryShoot();
       }
     }, 50); // Check every 50ms
@@ -2392,8 +2406,10 @@ export default function FPSArena() {
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
+      // Clear weapon update ref
+      updateWeaponRef.current = null;
     };
-  }, [gameStarted, playerName, selectedWeapon, selectedTeam]);
+  }, [gameStarted, playerName, selectedTeam]);
 
   // Round timer system
   useEffect(() => {
