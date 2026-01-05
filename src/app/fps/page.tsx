@@ -44,6 +44,8 @@ export default function FPSArena() {
   const lastShotTimeRef = useRef(0); // Rate of fire control
   const countdownRef = useRef(10);
   const roundPhaseRef = useRef<'buy' | 'active' | 'end'>('buy');
+  const hasBombRef = useRef(false);
+  const atBombSiteRef = useRef<'A' | 'B' | null>(null);
 
   // Weapon configs
   const weaponConfig = {
@@ -1168,8 +1170,8 @@ export default function FPSArena() {
       
       // E key to plant/defuse bomb
       if (event.code === 'KeyE' && document.pointerLockElement === document.body) {
-        console.log('E key pressed', { selectedTeam, hasBomb, bombPlanted, roundPhase, atBombSite });
-        if (selectedTeam === 'T' && hasBomb && !bombPlanted && roundPhase === 'active' && atBombSite) {
+        console.log('E key pressed', { selectedTeam, hasBomb: hasBombRef.current, bombPlanted, roundPhase: roundPhaseRef.current, atBombSite: atBombSiteRef.current });
+        if (selectedTeam === 'T' && hasBombRef.current && !bombPlanted && roundPhaseRef.current === 'active' && atBombSiteRef.current) {
           // Must be at bomb site to plant
           console.log('Starting bomb plant...');
           setIsPlanting(true);
@@ -1791,10 +1793,13 @@ export default function FPSArena() {
       
       if (distToA < 8) {
         setAtBombSite('A');
+        atBombSiteRef.current = 'A';
       } else if (distToB < 8) {
         setAtBombSite('B');
+        atBombSiteRef.current = 'B';
       } else {
         setAtBombSite(null);
+        atBombSiteRef.current = null;
       }
 
       renderer.render(scene, camera);
@@ -1951,6 +1956,7 @@ export default function FPSArena() {
       // Assign bomb to random T player (for now, just give it to everyone on T team)
       if (selectedTeam === 'T') {
         setHasBomb(true);
+        hasBombRef.current = true;
       }
     }
   }, [gameStarted, roundPhase, selectedTeam, countdown, waitingForPlayers]);
@@ -2099,8 +2105,11 @@ export default function FPSArena() {
         {!waitingForPlayers && roundPhase === 'buy' && countdown > 0 && (
           <div className="text-center text-sm text-green-400 mt-1">ROUND STARTS IN: {countdown}s</div>
         )}
+        {roundPhase === 'buy' && countdown === 0 && (
+          <div className="text-center text-sm text-yellow-400 mt-1">BUY PHASE</div>
+        )}
         {roundPhase === 'active' && (
-          <div className="text-center text-sm text-green-400 mt-1">ROUND ACTIVE</div>
+          <div className="text-center text-sm text-green-400 mt-1 font-bold">● ROUND ACTIVE ●</div>
         )}
         {bombPlanted && (
           <div className="text-center text-sm text-red-400 mt-1 animate-pulse">BOMB PLANTED - {bombTimer}s</div>
@@ -2140,11 +2149,15 @@ export default function FPSArena() {
             </span>
           )}
         </div>
-        {hasBomb && selectedTeam === 'T' && !bombPlanted && (
-          <div className="text-sm text-red-400 font-bold mt-2 animate-pulse">YOU HAVE THE BOMB</div>
+        {hasBomb && selectedTeam === 'T' && !bombPlanted && roundPhase === 'active' && (
+          <div className="text-sm text-red-400 font-bold mt-2 px-3 py-1 bg-red-900/50 rounded border border-red-400 animate-pulse">
+            💣 YOU HAVE THE BOMB
+          </div>
         )}
-        {atBombSite && selectedTeam === 'T' && hasBomb && !bombPlanted && (
-          <div className="text-sm text-green-400 font-bold">AT BOMB SITE {atBombSite} - Press E to Plant</div>
+        {atBombSite && selectedTeam === 'T' && hasBomb && !bombPlanted && roundPhase === 'active' && (
+          <div className="text-sm text-green-400 font-bold mt-2 px-3 py-1 bg-green-900/50 rounded border border-green-400">
+            ✓ AT BOMB SITE {atBombSite} - PRESS E TO PLANT
+          </div>
         )}
         {isPlanting && (
           <div className="text-sm text-yellow-400 font-bold mt-2">PLANTING...</div>
