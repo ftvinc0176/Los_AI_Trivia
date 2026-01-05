@@ -31,6 +31,9 @@ export default function FPSArena() {
   const [isDefusing, setIsDefusing] = useState(false);
   const [tScore, setTScore] = useState(0);
   const [ctScore, setCtScore] = useState(0);
+  const [waitingForPlayers, setWaitingForPlayers] = useState(true);
+  const [countdown, setCountdown] = useState(10);
+  const [atBombSite, setAtBombSite] = useState<'A' | 'B' | null>(null);
   
   const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
@@ -831,6 +834,26 @@ export default function FPSArena() {
       addMesh(wall);
     });
 
+    // === BOMB SITES MARKERS ===
+    // Bomb Site A marker
+    const bombSiteAGeometry = new THREE.CircleGeometry(8, 32);
+    const bombSiteAMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xff0000, 
+      transparent: true, 
+      opacity: 0.3,
+      side: THREE.DoubleSide 
+    });
+    const bombSiteA = new THREE.Mesh(bombSiteAGeometry, bombSiteAMaterial);
+    bombSiteA.rotation.x = -Math.PI / 2;
+    bombSiteA.position.set(50, 0.1, -20); // A Site center
+    scene.add(bombSiteA);
+    
+    // Bomb Site B marker
+    const bombSiteB = new THREE.Mesh(bombSiteAGeometry, bombSiteAMaterial);
+    bombSiteB.rotation.x = -Math.PI / 2;
+    bombSiteB.position.set(-35, 0.1, -10); // B Site center
+    scene.add(bombSiteB);
+
     // === FIRST PERSON WEAPON (dynamic based on selected weapon) ===
     const createFirstPersonWeapon = (weaponType: WeaponType) => {
       const fpWeapon = new THREE.Group();
@@ -1001,10 +1024,10 @@ export default function FPSArena() {
     };
 
     // Player capsule collision
-    // Team-based spawns: T spawn at bottom, CT spawn at top
+    // Team-based spawns: T spawn at T spawn area, CT spawn at CT spawn area
     const spawnPos = selectedTeam === 'T' 
-      ? { x: -15, y: 0.35, z: -75 } // T Spawn area
-      : { x: 25, y: 0.35, z: 20 };  // CT Spawn area
+      ? { x: 0, y: 0.35, z: -70 } // T Spawn - center of T spawn room
+      : { x: 25, y: 0.35, z: 20 };  // CT Spawn - center of CT spawn room
       
     const playerCapsule = new Capsule(
       new THREE.Vector3(spawnPos.x, spawnPos.y, spawnPos.z),
@@ -1039,14 +1062,17 @@ export default function FPSArena() {
       
       // E key to plant/defuse bomb
       if (event.code === 'KeyE' && document.pointerLockElement === document.body) {
-        if (selectedTeam === 'T' && hasBomb && !bombPlanted && roundPhase === 'active') {
-          // Check if at bomb site (simplified - anywhere on map for now)
+        if (selectedTeam === 'T' && hasBomb && !bombPlanted && roundPhase === 'active' && atBombSite) {
+          // Must be at bomb site to plant
           setIsPlanting(true);
           setTimeout(() => {
             setBombPlanted(true);
             setIsPlanting(false);
             if (socketRef.current) {
-              socketRef.current.emit('fpsPlantBomb', { position: [camera.position.x, camera.position.y, camera.position.z] });
+              socketRef.current.emit('fpsPlantBomb', { 
+                position: [camera.position.x, camera.position.y, camera.position.z],
+                site: atBombSite
+              });
             }
           }, 3000); // 3 second plant time
         } else if (selectedTeam === 'CT' && bombPlanted && !isDefusing) {
@@ -1256,8 +1282,8 @@ export default function FPSArena() {
           setDeaths((prev) => prev + 1);
           setHealth(100);
           const spawn = selectedTeam === 'T'
-            ? { x: -15 + Math.random() * 10, z: -75 + Math.random() * 10 }
-            : { x: 25 + Math.random() * 10, z: 20 + Math.random() * 10 };
+            ? { x: Math.random() * 20 - 10, z: -70 + Math.random() * 10 }
+            : { x: 25 + Math.random() * 20 - 10, z: 20 + Math.random() * 10 };
           playerCapsule.start.set(
             spawn.x,
             0.35,
@@ -1406,7 +1432,7 @@ export default function FPSArena() {
     };
 
     const controls = (deltaTime: number) => {
-      const speedDelta = deltaTime * 50;
+      const speedDelta = deltaTime * 25; // Reduced from 50 to make players slower
 
       if (keyStates['KeyW']) {
         playerVelocity.add(getForwardVector().multiplyScalar(speedDelta));
@@ -1421,7 +1447,7 @@ export default function FPSArena() {
         playerVelocity.add(getSideVector().multiplyScalar(speedDelta));
       }
       if (keyStates['Space'] && playerOnFloor) {
-        playerVelocity.y = 15;
+        playerVelocity.y = 8; // Reduced from 15 for lower jumps
       }
     };
 
@@ -1469,7 +1495,7 @@ export default function FPSArena() {
     const teleportPlayerIfOob = () => {
       if (camera.position.y <= -25) {
         const spawn = selectedTeam === 'T'
-          ? { x: -15, z: -75 }
+          ? { x: 0, z: -70 }
           : { x: 25, z: 20 };
         playerCapsule.start.set(spawn.x, 0.35, spawn.z);
         playerCapsule.end.set(spawn.x, 1.8, spawn.z);
@@ -1538,6 +1564,24 @@ export default function FPSArena() {
       updateRockets(deltaTime);
       updateRemotePlayers();
       teleportPlayerIfOob();
+      
+      // Check if player is at bomb site
+      const distToA = Math.sqrt(
+        Math.pow(camera.position.x - 50, 2) + 
+        Math.pow(camera.position.z - (-20), 2)
+      );
+      const distToB = Math.sqrt(
+        Math.pow(camera.position.x - (-35), 2) + 
+        Math.pow(camera.position.z - (-10), 2)
+      );
+      
+      if (distToA < 8) {
+        setAtBombSite('A');
+      } else if (distToB < 8) {
+        setAtBombSite('B');
+      } else {
+        setAtBombSite(null);
+      }
 
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
@@ -1625,18 +1669,37 @@ export default function FPSArena() {
 
   // Buy phase timer
   useEffect(() => {
-    if (!gameStarted || roundPhase !== 'buy') return;
+    if (!gameStarted || roundPhase !== 'buy' || waitingForPlayers) return;
     
-    const timer = setTimeout(() => {
+    // Countdown before round starts
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      // Start active round
       setRoundPhase('active');
+      setCountdown(10); // Reset for next round
       // Assign bomb to random T player (for now, just give it to everyone on T team)
       if (selectedTeam === 'T') {
         setHasBomb(true);
       }
-    }, 15000); // 15 second buy time
+    }
+  }, [gameStarted, roundPhase, selectedTeam, countdown, waitingForPlayers]);
+
+  // Team balance check - need at least 1 player per team
+  useEffect(() => {
+    if (!gameStarted) return;
+    
+    // This would normally check server-side for team counts
+    // For now, assume teams are balanced after 3 seconds (simplified)
+    const timer = setTimeout(() => {
+      setWaitingForPlayers(false);
+    }, 3000);
     
     return () => clearTimeout(timer);
-  }, [gameStarted, roundPhase, selectedTeam]);
+  }, [gameStarted]);
 
   // Handle weapon change from menu
   const handleWeaponSelect = (weapon: WeaponType) => {
@@ -1776,8 +1839,14 @@ export default function FPSArena() {
           <div className="text-2xl">{Math.floor(roundTime / 60)}:{(roundTime % 60).toString().padStart(2, '0')}</div>
           <div className="text-blue-400">CT: {ctScore}</div>
         </div>
-        {roundPhase === 'buy' && (
-          <div className="text-center text-sm text-green-400 mt-1">BUY PHASE</div>
+        {waitingForPlayers && (
+          <div className="text-center text-sm text-orange-400 mt-1 animate-pulse">WAITING FOR PLAYERS...</div>
+        )}
+        {!waitingForPlayers && roundPhase === 'buy' && countdown > 0 && (
+          <div className="text-center text-sm text-green-400 mt-1">ROUND STARTS IN: {countdown}s</div>
+        )}
+        {roundPhase === 'active' && (
+          <div className="text-center text-sm text-green-400 mt-1">ROUND ACTIVE</div>
         )}
         {bombPlanted && (
           <div className="text-center text-sm text-red-400 mt-1 animate-pulse">BOMB PLANTED - {bombTimer}s</div>
@@ -1805,6 +1874,9 @@ export default function FPSArena() {
         </div>
         {hasBomb && selectedTeam === 'T' && !bombPlanted && (
           <div className="text-sm text-red-400 font-bold mt-2 animate-pulse">YOU HAVE THE BOMB</div>
+        )}
+        {atBombSite && selectedTeam === 'T' && hasBomb && !bombPlanted && (
+          <div className="text-sm text-green-400 font-bold">AT BOMB SITE {atBombSite} - Press E to Plant</div>
         )}
         {isPlanting && (
           <div className="text-sm text-yellow-400 font-bold mt-2">PLANTING...</div>
