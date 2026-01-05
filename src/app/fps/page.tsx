@@ -1556,7 +1556,9 @@ export default function FPSArena() {
     window.addEventListener('resize', handleResize);
 
     return () => {
-      clearInterval(autoFireInterval);\n      window.removeEventListener('resize', handleResize);\n      if (containerRef.current) {
+      clearInterval(autoFireInterval);
+      window.removeEventListener('resize', handleResize);
+      if (containerRef.current) {
         if (renderer.domElement) {
           containerRef.current.removeChild(renderer.domElement);
         }
