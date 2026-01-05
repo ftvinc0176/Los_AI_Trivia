@@ -411,9 +411,9 @@ export default function Multiplayer() {
                       type="text"
                       value={customCategory}
                       onChange={(e) => setCustomCategory(e.target.value)}
-                      placeholder="Enter custom category (e.g., Movies, Animals)"
+                      placeholder="Enter custom category (e.g., Movies, Animals, 90s Pop Culture)"
                       className="w-full p-4 rounded-xl bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white/50 text-lg placeholder-white/50"
-                      maxLength={50}
+                      maxLength={250}
                     />
                   </div>
                 )}
