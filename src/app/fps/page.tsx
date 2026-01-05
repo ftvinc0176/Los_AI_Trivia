@@ -310,6 +310,7 @@ export default function FPSArena() {
         collider: collider,
         velocity: new THREE.Vector3(),
         alive: false,
+        ownerId: null,
       });
     }
 
@@ -425,6 +426,7 @@ export default function FPSArena() {
           rocket.alive = true;
           rocket.mesh.visible = true;
           rocket.collider.center.copy(rocket.mesh.position);
+          rocket.ownerId = id; // Track who shot this rocket
 
           const dir = new THREE.Vector3(...direction);
           const targetPos = rocket.mesh.position.clone().add(dir);
@@ -491,6 +493,7 @@ export default function FPSArena() {
       rocket.alive = true;
       rocket.mesh.visible = true;
       rocket.collider.center.copy(rocket.mesh.position);
+      rocket.ownerId = socketRef.current?.id || null; // Track who shot this rocket
       
       const targetPos = rocket.mesh.position.clone().add(playerDirection);
       rocket.mesh.lookAt(targetPos);
@@ -508,12 +511,6 @@ export default function FPSArena() {
 
     document.addEventListener('mousedown', () => {
       if (document.pointerLockElement === document.body) {
-        shootRocket();
-      }
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (event.code === 'Space' && document.pointerLockElement === document.body) {
         shootRocket();
       }
     });
@@ -621,6 +618,9 @@ export default function FPSArena() {
 
         remotePlayers.forEach((player: any, playerId: string) => {
           if (!rocket.alive) return;
+          
+          // Don't check collision with the player who shot this rocket
+          if (rocket.ownerId === playerId) return;
           
           const distance = rocket.mesh.position.distanceTo(player.position);
           if (distance < 1.5) {
