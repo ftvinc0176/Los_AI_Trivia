@@ -1278,6 +1278,7 @@ export default function FPSArena() {
       rocket.mesh.visible = true;
       rocket.collider.center.copy(rocket.mesh.position);
       rocket.ownerId = socketRef.current?.id || null; // Track who shot this rocket
+      rocket.damage = weaponConfig[selectedWeapon].damage; // Store damage with the rocket
       
       const targetPos = rocket.mesh.position.clone().add(playerDirection);
       rocket.mesh.lookAt(targetPos);
