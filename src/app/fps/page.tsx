@@ -1165,10 +1165,13 @@ export default function FPSArena() {
       
       // E key to plant/defuse bomb
       if (event.code === 'KeyE' && document.pointerLockElement === document.body) {
+        console.log('E key pressed', { selectedTeam, hasBomb, bombPlanted, roundPhase, atBombSite });
         if (selectedTeam === 'T' && hasBomb && !bombPlanted && roundPhase === 'active' && atBombSite) {
           // Must be at bomb site to plant
+          console.log('Starting bomb plant...');
           setIsPlanting(true);
           setTimeout(() => {
+            console.log('Bomb planted!');
             setBombPlanted(true);
             setIsPlanting(false);
             const bombPos = { x: camera.position.x, y: 0.2, z: camera.position.z };
@@ -1553,7 +1556,7 @@ export default function FPSArena() {
     };
 
     document.addEventListener('mousedown', () => {
-      if (document.pointerLockElement === document.body) {
+      if (document.pointerLockElement === document.body && !(countdown > 0 && roundPhase === 'buy')) {
         isShootingRef.current = true;
         tryShoot(); // Shoot immediately
       }
@@ -1587,6 +1590,11 @@ export default function FPSArena() {
     };
 
     const controls = (deltaTime: number) => {
+      // Freeze players during countdown
+      if (countdown > 0 && roundPhase === 'buy') {
+        return;
+      }
+      
       const speedDelta = deltaTime * 25; // Reduced from 50 to make players slower
 
       if (keyStates['KeyW']) {
@@ -1812,6 +1820,23 @@ export default function FPSArena() {
     
     const timer = setInterval(() => {
       setRoundTime(prev => {
+        // Play beep sound for last 10 seconds
+        if (prev <= 10 && prev > 1 && !bombPlanted) {
+          const audioContext = new AudioContext();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 600;
+          gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.15);
+        }
+        
         if (prev <= 1) {
           // Time's up - CTs win
           setCtScore(s => s + 1);
@@ -1828,7 +1853,7 @@ export default function FPSArena() {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [gameStarted, roundPhase]);
+  }, [gameStarted, roundPhase, bombPlanted]);
 
   // Bomb timer
   useEffect(() => {
@@ -1862,6 +1887,21 @@ export default function FPSArena() {
     
     // Countdown before round starts
     if (countdown > 0) {
+      // Play countdown beep sound
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = countdown === 1 ? 1200 : 800;
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+      
       const timer = setTimeout(() => {
         setCountdown(prev => prev - 1);
       }, 1000);
