@@ -721,25 +721,17 @@ export default function CSBetting() {
 
     // Check line of sight between two positions
     const checkLineOfSight = (from: THREE.Vector3, to: THREE.Vector3): boolean => {
-      const direction = to.clone().sub(from).normalize();
       const distance = from.distanceTo(to);
       
-      raycaster.set(from, direction);
-      raycaster.far = distance;
-      
-      // Cast ray against world geometry
-      const fromPos = from.clone();
-      const toPos = to.clone();
-      
-      // Simple step-based collision check
-      const steps = Math.ceil(distance / 2);
+      // Simple step-based collision check - check at chest height to avoid floor issues
+      const steps = Math.ceil(distance / 3);
       for (let i = 1; i < steps; i++) {
         const t = i / steps;
-        const checkPos = new THREE.Vector3().lerpVectors(fromPos, toPos, t);
-        checkPos.y = 1; // Check at body height
+        const checkPos = new THREE.Vector3().lerpVectors(from, to, t);
         
+        // Only check walls at chest/head height (y=1.0 to 1.5), not floors
         const testCapsule = new Capsule(
-          checkPos.clone().setY(0.5),
+          checkPos.clone().setY(1.0),
           checkPos.clone().setY(1.5),
           0.1
         );
@@ -924,45 +916,32 @@ export default function CSBetting() {
           if (bombPlantedRef.current && plantedPositionRef.current) {
             // Rush to defuse - go directly
             bot.targetPosition = plantedPositionRef.current.clone();
-          } else if (nearestT && botPos.distanceTo(nearestT.capsule.start) < 35) {
-            // Enemy nearby - engage
+          } else if (nearestT) {
+            // Always move toward nearest T
             bot.targetPosition = nearestT.capsule.start.clone();
           } else {
-            // Follow patrol route
-            if (routeIdx < route.length) {
-              const currentWaypoint = route[routeIdx];
-              const distToWaypoint = botPos.distanceTo(currentWaypoint);
-              
-              if (distToWaypoint < 4) {
-                botRouteIndex.set(bot.id, routeIdx + 1);
-              }
-              bot.targetPosition = currentWaypoint.clone();
-            } else {
-              // Reached end of route, reverse or pick new route
-              const newRoute = Math.random() > 0.5 ? 
-                [...ctRoutesToA[Math.floor(Math.random() * ctRoutesToA.length)]] :
-                [...ctRoutesToB[Math.floor(Math.random() * ctRoutesToB.length)]];
-              botRoutes.set(bot.id, newRoute);
-              botRouteIndex.set(bot.id, 0);
+            // No Ts visible, patrol toward a bomb site
+            if (!bot.targetPosition || botPos.distanceTo(bot.targetPosition) < 5) {
+              bot.targetPosition = Math.random() > 0.5 ? bombSiteA.clone() : bombSiteB.clone();
             }
           }
         }
 
-        // Movement with wall collision
+        // Movement - simplified without floor collision issues
         if (bot.targetPosition && !bot.isPlanting) {
           const direction = bot.targetPosition.clone().sub(botPos).normalize();
           bot.facingDirection.copy(direction);
-          const speed = 6;
+          const speed = 8;
           
           // Calculate new position
           const newX = bot.capsule.start.x + direction.x * speed * deltaTime;
           const newZ = bot.capsule.start.z + direction.z * speed * deltaTime;
           
-          // Create test capsule at new position
+          // Create test capsule at new position - raised to avoid floor collision
           const testCapsule = new Capsule(
-            new THREE.Vector3(newX, 0.35, newZ),
+            new THREE.Vector3(newX, 0.6, newZ),
             new THREE.Vector3(newX, 1.7, newZ),
-            0.35
+            0.3
           );
           
           // Check collision with world
@@ -976,13 +955,11 @@ export default function CSBetting() {
             bot.capsule.end.z = newZ;
           } else {
             // Collision detected - try to slide along wall
-            const normal = result.normal;
-            
             // Try moving only in X
             const testX = new Capsule(
-              new THREE.Vector3(newX, 0.35, bot.capsule.start.z),
+              new THREE.Vector3(newX, 0.6, bot.capsule.start.z),
               new THREE.Vector3(newX, 1.7, bot.capsule.start.z),
-              0.35
+              0.3
             );
             if (!worldOctree.capsuleIntersect(testX)) {
               bot.capsule.start.x = newX;
@@ -991,9 +968,9 @@ export default function CSBetting() {
             
             // Try moving only in Z
             const testZ = new Capsule(
-              new THREE.Vector3(bot.capsule.start.x, 0.35, newZ),
+              new THREE.Vector3(bot.capsule.start.x, 0.6, newZ),
               new THREE.Vector3(bot.capsule.start.x, 1.7, newZ),
-              0.35
+              0.3
             );
             if (!worldOctree.capsuleIntersect(testZ)) {
               bot.capsule.start.z = newZ;
