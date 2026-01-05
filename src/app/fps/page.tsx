@@ -32,7 +32,7 @@ export default function FPSArena() {
   const [tScore, setTScore] = useState(0);
   const [ctScore, setCtScore] = useState(0);
   const [waitingForPlayers, setWaitingForPlayers] = useState(true);
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(5);
   const [atBombSite, setAtBombSite] = useState<'A' | 'B' | null>(null);
   const [bombPosition, setBombPosition] = useState<{x: number, y: number, z: number} | null>(null);
   const [teamCounts, setTeamCounts] = useState({T: 0, CT: 0});
@@ -43,7 +43,7 @@ export default function FPSArena() {
   const isReloadingRef = useRef(false);
   const isShootingRef = useRef(false); // For full auto
   const lastShotTimeRef = useRef(0); // Rate of fire control
-  const countdownRef = useRef(10);
+  const countdownRef = useRef(5);
   const roundPhaseRef = useRef<'buy' | 'active' | 'end'>('buy');
   const hasBombRef = useRef(false);
   const atBombSiteRef = useRef<'A' | 'B' | null>(null);
@@ -907,34 +907,34 @@ export default function FPSArena() {
     // === C4 BOMB MODEL (hidden until planted) ===
     const bombGroup = new THREE.Group();
     
-    // Main bomb body
+    // Main bomb body - 5x larger
     const bombBody = new THREE.Mesh(
-      new THREE.BoxGeometry(0.3, 0.15, 0.2),
+      new THREE.BoxGeometry(1.5, 0.75, 1.0),
       new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8, roughness: 0.3 })
     );
     bombGroup.add(bombBody);
     
-    // Red LED display
+    // Red LED display - 5x larger
     const ledDisplay = new THREE.Mesh(
-      new THREE.BoxGeometry(0.25, 0.08, 0.05),
+      new THREE.BoxGeometry(1.0, 0.4, 0.1),
       new THREE.MeshStandardMaterial({ 
         color: 0xff0000, 
         emissive: 0xff0000,
         emissiveIntensity: 0.8
       })
     );
-    ledDisplay.position.set(0, 0.05, 0.1);
+    ledDisplay.position.set(0, 0.2, 0.55);
     bombGroup.add(ledDisplay);
     
-    // Wires
+    // Wires - 5x larger
     for (let i = 0; i < 3; i++) {
       const wire = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.01, 0.01, 0.15, 8),
+        new THREE.CylinderGeometry(0.05, 0.05, 0.75, 8),
         new THREE.MeshStandardMaterial({ 
           color: i === 0 ? 0xff0000 : i === 1 ? 0x0000ff : 0x00ff00 
         })
       );
-      wire.position.set(-0.1 + i * 0.1, -0.05, -0.05);
+      wire.position.set(-0.5 + i * 0.5, -0.25, -0.25);
       wire.rotation.x = Math.PI / 2;
       bombGroup.add(wire);
     }
@@ -1229,8 +1229,8 @@ export default function FPSArena() {
                 roundPhaseRef.current = 'buy';
                 setRoundTime(115);
                 setRoundWinner(null);
-                setCountdown(10);
-                countdownRef.current = 10;
+                setCountdown(5);
+                countdownRef.current = 5;
                 setWaitingForPlayers(false);
               }, 5000);
               if (socketRef.current) {
@@ -1309,7 +1309,8 @@ export default function FPSArena() {
           setWaitingForPlayers(false);
         } else {
           setWaitingForPlayers(true);
-          setCountdown(10); // Reset countdown when teams become unbalanced
+          setCountdown(5); // Reset countdown when teams become unbalanced
+          countdownRef.current = 5;
         }
       });
 
@@ -1870,8 +1871,8 @@ export default function FPSArena() {
             setRoundTime(115);
             setHealth(100);
             setRoundWinner(null);
-            setCountdown(10);
-            countdownRef.current = 10;
+            setCountdown(5);
+            countdownRef.current = 5;
             setWaitingForPlayers(false);
             // Reset to spawn will happen in teleport function
           }, 5000);
@@ -1904,8 +1905,8 @@ export default function FPSArena() {
             setBombTimer(40);
             setHealth(100);
             setRoundWinner(null);
-            setCountdown(10);
-            countdownRef.current = 10;
+            setCountdown(5);
+            countdownRef.current = 5;
             setWaitingForPlayers(false);
           }, 5000);
           return 40;
@@ -1950,8 +1951,8 @@ export default function FPSArena() {
       // Start active round
       setRoundPhase('active');
       roundPhaseRef.current = 'active';
-      setCountdown(10); // Reset for next round
-      countdownRef.current = 10;
+      setCountdown(5); // Reset for next round
+      countdownRef.current = 5;
       // Assign bomb to random T player (for now, just give it to everyone on T team)
       if (selectedTeam === 'T') {
         setHasBomb(true);
