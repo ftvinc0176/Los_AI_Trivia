@@ -1105,6 +1105,14 @@ function BlackjackGame() {
                     const result = roundResults[player.id];
                     const isWaiting = !player.currentBet || player.currentBet === 0;
                     
+                    console.log(`Rendering player ${player.name}:`, {
+                      playerId: player.id,
+                      result: result,
+                      hasSideBetResults: !!player.sideBetResults,
+                      sideBetResults: player.sideBetResults,
+                      roundResults: roundResults
+                    });
+                    
                     return (
                       <div key={player.id} className="flex flex-col items-center min-w-[100px] max-w-[180px]">
                         {/* Waiting Message for Late Joiners */}
@@ -1131,7 +1139,7 @@ function BlackjackGame() {
                         )}
                         
                         {/* Show Side Bet Results when round ends */}
-                        {result && player.sideBetResults && (
+                        {player.sideBetResults && (player.sideBetResults.perfectPairs || player.sideBetResults.twentyOnePlus3) && (
                           <div className="mb-2 space-y-1">
                             {player.sideBetResults.perfectPairs && (
                               <div className={`px-2 py-1 rounded text-[10px] sm:text-xs font-semibold text-center ${
