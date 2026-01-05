@@ -59,6 +59,7 @@ function BlackjackGame() {
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; playerCount: number; maxPlayers: number }>>([]);
   const [roundResults, setRoundResults] = useState<Record<string, string>>({});
+  const [lastBet, setLastBet] = useState<{ main: number; perfectPairs: number; twentyOnePlus3: number } | null>(null);
 
   useEffect(() => {
     if (mode !== 'single') {
@@ -266,6 +267,9 @@ function BlackjackGame() {
     console.log('Total bet:', totalBet);
     
     if (bet > 0 && totalBet <= balance) {
+      // Save this bet for rebet functionality
+      setLastBet({ main: bet, perfectPairs: sideBets.perfectPairs, twentyOnePlus3: sideBets.twentyOnePlus3 });
+      
       setBetAmount(bet);
       setBalance(balance - totalBet);
       
@@ -277,6 +281,21 @@ function BlackjackGame() {
         dealInitialCards(bet);
       }
     }
+  };
+
+  const rebetLastBet = () => {
+    if (!lastBet) return;
+    const totalBet = lastBet.main + lastBet.perfectPairs + lastBet.twentyOnePlus3;
+    if (totalBet > balance) return;
+    
+    setBetInput(String(lastBet.main));
+    setSideBets({ perfectPairs: lastBet.perfectPairs, twentyOnePlus3: lastBet.twentyOnePlus3 });
+  };
+
+  const allIn = () => {
+    if (balance <= 0) return;
+    setBetInput(String(balance));
+    setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
   };
 
   const addChipToBet = (area: 'main' | 'perfectPairs' | 'twentyOnePlus3') => {
@@ -960,37 +979,54 @@ function BlackjackGame() {
             </div>
 
             {/* Chip Selection */}
-            <div className="relative flex justify-center gap-1 sm:gap-3 mb-3 sm:mb-6">
-              {[25, 50, 100, 250, 500].map((value) => (
+            <div className="relative flex justify-center gap-1 sm:gap-2 mb-3 sm:mb-6 flex-wrap">
+              {[25, 50, 100, 250, 500, 1000, 5000, 10000].map((value) => (
                 <button
                   key={value}
                   onClick={() => setSelectedChip(value)}
                   disabled={value > balance}
                   className={`relative transition-all ${selectedChip === value ? 'scale-110' : 'scale-100'} ${value > balance ? 'opacity-30' : 'hover:scale-105'}`}
                 >
-                  <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 sm:border-4 border-white shadow-lg flex items-center justify-center font-bold text-white text-xs sm:text-base ${
+                  <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 sm:border-3 border-white shadow-lg flex items-center justify-center font-bold text-white text-xs sm:text-sm ${
                     value === 25 ? 'bg-red-600' :
                     value === 50 ? 'bg-blue-600' :
                     value === 100 ? 'bg-green-600' :
                     value === 250 ? 'bg-purple-600' :
-                    'bg-yellow-600'
+                    value === 500 ? 'bg-yellow-600' :
+                    value === 1000 ? 'bg-pink-600' :
+                    value === 5000 ? 'bg-orange-600' :
+                    'bg-cyan-600'
                   }`}>
-                    {value}
+                    {value >= 1000 ? `${value/1000}K` : value}
                   </div>
                   {selectedChip === value && (
-                    <div className="absolute -bottom-1 sm:-bottom-2 left-1/2 transform -translate-x-1/2 w-10 sm:w-16 h-1 bg-yellow-400 rounded"></div>
+                    <div className="absolute -bottom-1 sm:-bottom-2 left-1/2 transform -translate-x-1/2 w-8 sm:w-12 h-1 bg-yellow-400 rounded"></div>
                   )}
                 </button>
               ))}
             </div>
 
             {/* Action Buttons */}
-            <div className="relative flex justify-center gap-2 sm:gap-4">
+            <div className="relative flex justify-center gap-2 sm:gap-3 flex-wrap">
               <button
                 onClick={clearBets}
-                className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm sm:text-base transition-all"
+                className="px-3 sm:px-5 py-2 sm:py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm sm:text-base transition-all"
               >
-                Clear Bets
+                Clear
+              </button>
+              <button
+                onClick={rebetLastBet}
+                disabled={!lastBet || (lastBet.main + lastBet.perfectPairs + lastBet.twentyOnePlus3) > balance}
+                className="px-3 sm:px-5 py-2 sm:py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-xl font-bold text-sm sm:text-base disabled:cursor-not-allowed transition-all"
+              >
+                Rebet
+              </button>
+              <button
+                onClick={allIn}
+                disabled={balance <= 0}
+                className="px-3 sm:px-5 py-2 sm:py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 text-white rounded-xl font-bold text-sm sm:text-base disabled:cursor-not-allowed transition-all"
+              >
+                All In
               </button>
               <button
                 onClick={placeBet}

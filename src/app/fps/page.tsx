@@ -41,6 +41,7 @@ export default function FPSArena() {
   const [plantedSite, setPlantedSite] = useState<'A' | 'B' | null>(null);
   const [isDead, setIsDead] = useState(false);
   const [isScoped, setIsScoped] = useState(false);
+  const [killFeed, setKillFeed] = useState<{killer: string, victim: string, killerTeam: string, victimTeam: string, id: number}[]>([]);
   
   const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
@@ -1951,14 +1952,14 @@ export default function FPSArena() {
       });
 
       socket.on('fpsHit', ({ damage, victim }: any) => {
-        // Play hurt sound when we get hit
-        if (hurtSound.isPlaying) hurtSound.stop();
-        hurtSound.play();
-        
-        setHealth((prev) => Math.max(0, prev - damage));
-        
-        // Play hit sound when we hit someone
-        if (victim) {
+        if (!victim) {
+          // We are the victim - take damage
+          if (hurtSound.isPlaying) hurtSound.stop();
+          hurtSound.play();
+          
+          setHealth((prev) => Math.max(0, prev - damage));
+        } else {
+          // We are the shooter - play hit sound and update remote player's health display
           if (hitSound.isPlaying) hitSound.stop();
           hitSound.play();
           
@@ -1969,7 +1970,7 @@ export default function FPSArena() {
         }
       });
 
-      socket.on('fpsKill', ({ killer, victim }: any) => {
+      socket.on('fpsKill', ({ killer, victim, killerName, victimName, killerTeam, victimTeam }: any) => {
         if (victim === socket.id) {
           setDeaths((prev) => prev + 1);
           // Don't respawn during round - wait for round end
@@ -1977,6 +1978,25 @@ export default function FPSArena() {
         if (killer === socket.id) {
           setKills((prev) => prev + 1);
         }
+        
+        // Add to kill feed
+        const killId = Date.now();
+        setKillFeed(prev => {
+          const newFeed = [...prev, { 
+            killer: killerName || 'Unknown', 
+            victim: victimName || 'Unknown',
+            killerTeam: killerTeam || 'T',
+            victimTeam: victimTeam || 'CT',
+            id: killId 
+          }];
+          // Keep only last 5 kills
+          return newFeed.slice(-5);
+        });
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+          setKillFeed(prev => prev.filter(k => k.id !== killId));
+        }, 5000);
         
         // Reset killed player's health
         const killedPlayer = remotePlayers.get(victim);
@@ -2656,6 +2676,24 @@ export default function FPSArena() {
         {bombPlanted && (
           <div className="text-center text-sm text-red-400 mt-1 animate-pulse">BOMB PLANTED - {bombTimer}s</div>
         )}
+      </div>
+
+      {/* Kill Feed - Top Right */}
+      <div className="absolute top-6 right-6 flex flex-col gap-1">
+        {killFeed.map((kill) => (
+          <div 
+            key={kill.id} 
+            className="bg-black/70 backdrop-blur-sm rounded px-3 py-1 text-sm flex items-center gap-2 animate-fade-in"
+          >
+            <span style={{ color: kill.killerTeam === 'T' ? '#fbbf24' : '#60a5fa' }}>
+              {kill.killer}
+            </span>
+            <span className="text-gray-400">☠</span>
+            <span style={{ color: kill.victimTeam === 'T' ? '#fbbf24' : '#60a5fa' }}>
+              {kill.victim}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Round Winner Popup */}

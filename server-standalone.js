@@ -1962,7 +1962,16 @@ io.on('connection', (socket) => {
       
       if (fpsPlayers[victim].health <= 0) {
         fpsPlayers[victim].health = 0; // Mark as dead
-        io.emit('fpsKill', { killer: socket.id, victim });
+        const killerPlayer = fpsPlayers[socket.id];
+        const victimPlayer = fpsPlayers[victim];
+        io.emit('fpsKill', { 
+          killer: socket.id, 
+          victim,
+          killerName: killerPlayer ? killerPlayer.name : 'Unknown',
+          victimName: victimPlayer ? victimPlayer.name : 'Unknown',
+          killerTeam: killerPlayer ? killerPlayer.team : 'T',
+          victimTeam: victimPlayer ? victimPlayer.team : 'CT'
+        });
         
         // Check for team elimination
         let aliveTCount = 0;
