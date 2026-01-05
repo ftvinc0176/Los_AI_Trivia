@@ -18,6 +18,15 @@ export default function FPSArena() {
   const [health, setHealth] = useState(100);
   const [kills, setKills] = useState(0);
   const [deaths, setDeaths] = useState(0);
+  const [currentAmmo, setCurrentAmmo] = useState(1); // AWP starts with 1
+  const [isReloading, setIsReloading] = useState(false);
+
+  // Weapon configs
+  const weaponConfig = {
+    awp: { maxAmmo: 1, damage: 100, reloadTime: 2000 },
+    m4: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
+    ak47: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
+  };
 
   // Helper function to create weapon model
   const createWeaponModel = (weaponType: WeaponType) => {
@@ -990,6 +999,11 @@ export default function FPSArena() {
         document.exitPointerLock();
         setShowWeaponMenu(true);
       }
+      
+      // R key to reload
+      if (event.code === 'KeyR' && document.pointerLockElement === document.body) {
+        reloadWeapon();
+      }
     });
 
     document.addEventListener('keyup', (event) => {
@@ -1140,7 +1154,7 @@ export default function FPSArena() {
         }
       });
 
-      socket.on('fpsShot', ({ id, position, direction }: any) => {
+      socket.on('fpsShot', ({ id, position, direction, damage }: any) => {
         const rocket = rockets.find((r: any) => !r.alive);
         if (rocket) {
           rocket.mesh.position.set(...position);
@@ -1149,6 +1163,7 @@ export default function FPSArena() {
           rocket.mesh.visible = true;
           rocket.collider.center.copy(rocket.mesh.position);
           rocket.ownerId = id; // Track who shot this rocket
+          rocket.damage = damage || 20; // Store damage with the rocket
 
           const dir = new THREE.Vector3(...direction);
           const targetPos = rocket.mesh.position.clone().add(dir);
@@ -1210,8 +1225,28 @@ export default function FPSArena() {
 
     initSocket();
 
+    // Reload function
+    const reloadWeapon = () => {
+      if (isReloading) return;
+      
+      const config = weaponConfig[selectedWeapon];
+      if (currentAmmo >= config.maxAmmo) return; // Already full
+      
+      setIsReloading(true);
+      
+      setTimeout(() => {
+        setCurrentAmmo(config.maxAmmo);
+        setIsReloading(false);
+      }, config.reloadTime);
+    };
+
     // Shoot function
     const shootRocket = () => {
+      // Check if can shoot
+      if (isReloading || currentAmmo <= 0) {
+        return;
+      }
+      
       const rocket = rockets[currentRocketIndex];
       
       camera.getWorldDirection(playerDirection);
@@ -1235,10 +1270,21 @@ export default function FPSArena() {
       if (sound.isPlaying) sound.stop();
       sound.play();
 
+      // Consume ammo
+      setCurrentAmmo(prev => {
+        const newAmmo = prev - 1;
+        // Auto-reload when out of ammo
+        if (newAmmo === 0) {
+          setTimeout(() => reloadWeapon(), 100);
+        }
+        return newAmmo;
+      });
+
       if (socketRef.current) {
         socketRef.current.emit('fpsShoot', {
           position: [camera.position.x, camera.position.y, camera.position.z],
           direction: [playerDirection.x, playerDirection.y, playerDirection.z],
+          damage: weaponConfig[selectedWeapon].damage,
         });
       }
     };
@@ -1364,7 +1410,7 @@ export default function FPSArena() {
             if (socketRef.current) {
               socketRef.current.emit('fpsHit', {
                 victim: playerId,
-                damage: 20,
+                damage: rocket.damage || 20,
               });
             }
           }
@@ -1433,6 +1479,14 @@ export default function FPSArena() {
   const handleWeaponSelect = (weapon: WeaponType) => {
     setSelectedWeapon(weapon);
     setShowWeaponMenu(false);
+    // Reset ammo to max for new weapon
+    const weaponConfig = {
+      awp: { maxAmmo: 1, damage: 100, reloadTime: 2000 },
+      m4: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
+      ak47: { maxAmmo: 30, damage: 20, reloadTime: 1000 },
+    };
+    setCurrentAmmo(weaponConfig[weapon].maxAmmo);
+    setIsReloading(false);
     // Re-lock pointer after selection
     setTimeout(() => {
       document.body.requestPointerLock();
@@ -1469,6 +1523,8 @@ export default function FPSArena() {
               >
                 <div className="text-white font-semibold mb-1">AWP</div>
                 <div className="text-gray-400 text-sm">Sniper Rifle</div>
+                <div className="text-xs text-green-400 mt-1">1 Shot Kill</div>
+                <div className="text-xs text-gray-500">1 Round</div>
               </button>
               
               <button
@@ -1481,6 +1537,8 @@ export default function FPSArena() {
               >
                 <div className="text-white font-semibold mb-1">M4A1</div>
                 <div className="text-gray-400 text-sm">Assault Rifle</div>
+                <div className="text-xs text-blue-400 mt-1">5 Shots to Kill</div>
+                <div className="text-xs text-gray-500">30 Rounds</div>
               </button>
               
               <button
@@ -1493,6 +1551,8 @@ export default function FPSArena() {
               >
                 <div className="text-white font-semibold mb-1">AK-47</div>
                 <div className="text-gray-400 text-sm">Assault Rifle</div>
+                <div className="text-xs text-orange-400 mt-1">5 Shots to Kill</div>
+                <div className="text-xs text-gray-500">30 Rounds</div>
               </button>
             </div>
           </div>
@@ -1520,6 +1580,15 @@ export default function FPSArena() {
         <div className="text-sm text-gray-300 mt-2 pt-2 border-t border-white/20">
           Weapon: {selectedWeapon.toUpperCase()}
         </div>
+        <div className="text-lg font-bold mt-1">
+          {isReloading ? (
+            <span className="text-yellow-400">Reloading...</span>
+          ) : (
+            <span className={currentAmmo === 0 ? 'text-red-400' : 'text-white'}>
+              Ammo: {currentAmmo}/{weaponConfig[selectedWeapon].maxAmmo}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* In-game weapon menu */}
@@ -1538,7 +1607,8 @@ export default function FPSArena() {
               >
                 <div className="text-white text-xl font-semibold mb-2">AWP</div>
                 <div className="text-gray-300 text-sm">Sniper Rifle</div>
-                <div className="text-green-400 text-xs mt-2">High Damage</div>
+                <div className="text-green-400 text-xs mt-2">1 Shot Kill</div>
+                <div className="text-gray-400 text-xs">1 Round | 2s Reload</div>
               </button>
               
               <button
@@ -1551,7 +1621,8 @@ export default function FPSArena() {
               >
                 <div className="text-white text-xl font-semibold mb-2">M4A1</div>
                 <div className="text-gray-300 text-sm">Assault Rifle</div>
-                <div className="text-blue-400 text-xs mt-2">Balanced</div>
+                <div className="text-blue-400 text-xs mt-2">5 Shots to Kill</div>
+                <div className="text-gray-400 text-xs">30 Rounds | 1s Reload</div>
               </button>
               
               <button
@@ -1564,7 +1635,8 @@ export default function FPSArena() {
               >
                 <div className="text-white text-xl font-semibold mb-2">AK-47</div>
                 <div className="text-gray-300 text-sm">Assault Rifle</div>
-                <div className="text-orange-400 text-xs mt-2">High Fire Rate</div>
+                <div className="text-orange-400 text-xs mt-2">5 Shots to Kill</div>
+                <div className="text-gray-400 text-xs">30 Rounds | 1s Reload</div>
               </button>
             </div>
             <button
@@ -1591,6 +1663,7 @@ export default function FPSArena() {
         <div>WASD - Move</div>
         <div>Mouse - Look</div>
         <div>Click - Shoot</div>
+        <div>R - Reload</div>
         <div>Space - Jump</div>
         <div>B - Change Weapon</div>
         <div className="text-xs text-gray-400 mt-2">Click screen to lock pointer</div>
