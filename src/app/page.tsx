@@ -20,7 +20,7 @@ export default function Home() {
         </div>
 
         {/* Main Menu Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-12 animate-slide-up">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6 mb-12 animate-slide-up">
           {/* Caseonaire Card */}
           <button
             onClick={() => router.push('/singleplayer')}
@@ -32,6 +32,21 @@ export default function Home() {
               <h2 className="text-3xl font-bold text-white mb-3">Caseonaire</h2>
               <p className="text-purple-100 font-light">
                 Win cases with AI trivia
+              </p>
+            </div>
+          </button>
+
+          {/* AI Trivia Card */}
+          <button
+            onClick={() => router.push('/ai-trivia')}
+            className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-white/20"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative">
+              <div className="text-6xl mb-4">🤖</div>
+              <h2 className="text-3xl font-bold text-white mb-3">AI Trivia</h2>
+              <p className="text-purple-100 font-light">
+                Solo trivia with AI questions
               </p>
             </div>
           </button>
