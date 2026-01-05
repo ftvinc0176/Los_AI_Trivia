@@ -60,6 +60,7 @@ export default function CSBetting() {
   const bombPlantedRef = useRef(false);
   const roundPhaseRef = useRef<'betting' | 'playing' | 'result'>('betting');
   const plantedPositionRef = useRef<THREE.Vector3 | null>(null);
+  const initRoutesRef = useRef<(() => void) | null>(null);
   
   const startGame = () => {
     setGameStarted(true);
@@ -640,6 +641,84 @@ export default function CSBetting() {
     const bombSiteB = new THREE.Vector3(-35, 0, -10);
     let targetSite = Math.random() > 0.5 ? bombSiteA : bombSiteB;
 
+    // Waypoints for navigation around the map
+    const waypoints = {
+      tSpawn: new THREE.Vector3(0, 0, -70),
+      tAptsEntry: new THREE.Vector3(-20, 0, -55),
+      bApps: new THREE.Vector3(-30, 0, -35),
+      bSite: new THREE.Vector3(-35, 0, -10),
+      underpass: new THREE.Vector3(-18, 0, -25),
+      mid: new THREE.Vector3(0, 0, -35),
+      midTop: new THREE.Vector3(0, 0, -15),
+      connector: new THREE.Vector3(0, 0, -5),
+      tRamp: new THREE.Vector3(20, 0, -60),
+      palace: new THREE.Vector3(35, 0, -45),
+      palaceTop: new THREE.Vector3(35, 0, -30),
+      aShort: new THREE.Vector3(20, 0, -20),
+      aSite: new THREE.Vector3(50, 0, -20),
+      ctSpawn: new THREE.Vector3(25, 0, 15),
+      market: new THREE.Vector3(-10, 0, 10),
+    };
+
+    // Routes from T spawn to bomb sites
+    const routesToA = [
+      [waypoints.tSpawn, waypoints.mid, waypoints.aShort, waypoints.aSite],
+      [waypoints.tSpawn, waypoints.tRamp, waypoints.palace, waypoints.palaceTop, waypoints.aSite],
+    ];
+    const routesToB = [
+      [waypoints.tSpawn, waypoints.tAptsEntry, waypoints.bApps, waypoints.bSite],
+      [waypoints.tSpawn, waypoints.mid, waypoints.underpass, waypoints.bSite],
+    ];
+
+    // Routes from CT spawn to bomb sites
+    const ctRoutesToA = [
+      [waypoints.ctSpawn, waypoints.aSite],
+      [waypoints.ctSpawn, waypoints.connector, waypoints.aShort, waypoints.aSite],
+    ];
+    const ctRoutesToB = [
+      [waypoints.ctSpawn, waypoints.market, waypoints.bSite],
+      [waypoints.ctSpawn, waypoints.connector, waypoints.mid, waypoints.underpass, waypoints.bSite],
+    ];
+
+    // Assign routes to bots
+    const botRoutes: Map<string, THREE.Vector3[]> = new Map();
+    const botRouteIndex: Map<string, number> = new Map();
+    const botStuckTime: Map<string, number> = new Map();
+    const botLastPos: Map<string, THREE.Vector3> = new Map();
+
+    // Initialize routes when game starts
+    const initializeBotRoutes = () => {
+      // Pick a new random target site for each round
+      targetSite = Math.random() > 0.5 ? bombSiteA : bombSiteB;
+      
+      botsRef.current.forEach((bot, i) => {
+        if (bot.team === 'T') {
+          // Assign T bots to routes
+          if (targetSite === bombSiteA) {
+            botRoutes.set(bot.id, [...routesToA[i % routesToA.length]]);
+          } else {
+            botRoutes.set(bot.id, [...routesToB[i % routesToB.length]]);
+          }
+        } else {
+          // CT bots patrol between sites
+          if (i % 2 === 0) {
+            botRoutes.set(bot.id, [...ctRoutesToA[i % ctRoutesToA.length]]);
+          } else {
+            botRoutes.set(bot.id, [...ctRoutesToB[i % ctRoutesToB.length]]);
+          }
+        }
+        botRouteIndex.set(bot.id, 0);
+        botStuckTime.set(bot.id, 0);
+        botLastPos.set(bot.id, bot.capsule.start.clone());
+      });
+    };
+
+    // Store the function in ref so nextRound can call it
+    initRoutesRef.current = initializeBotRoutes;
+
+    // Call after bots are initialized
+    setTimeout(initializeBotRoutes, 100);
+
     // Check line of sight between two positions
     const checkLineOfSight = (from: THREE.Vector3, to: THREE.Vector3): boolean => {
       const direction = to.clone().sub(from).normalize();
@@ -733,79 +812,138 @@ export default function CSBetting() {
         const botPos = bot.capsule.start.clone();
         botPos.y = 0;
 
+        // Check if stuck
+        const lastPos = botLastPos.get(bot.id);
+        if (lastPos) {
+          const moved = botPos.distanceTo(lastPos);
+          if (moved < 0.1) {
+            const stuckTime = (botStuckTime.get(bot.id) || 0) + deltaTime;
+            botStuckTime.set(bot.id, stuckTime);
+            
+            // If stuck for more than 1 second, try a random direction
+            if (stuckTime > 1) {
+              const randomAngle = Math.random() * Math.PI * 2;
+              const escapeDir = new THREE.Vector3(Math.cos(randomAngle), 0, Math.sin(randomAngle));
+              bot.targetPosition = botPos.clone().add(escapeDir.multiplyScalar(5));
+              botStuckTime.set(bot.id, 0);
+            }
+          } else {
+            botStuckTime.set(bot.id, 0);
+          }
+        }
+        botLastPos.set(bot.id, botPos.clone());
+
+        // Get current route and waypoint
+        const route = botRoutes.get(bot.id) || [];
+        let routeIdx = botRouteIndex.get(bot.id) || 0;
+
         // T bot behavior
         if (bot.team === 'T') {
           if (bombPlantedRef.current) {
             // Defend planted bomb
             if (plantedPositionRef.current) {
               const distToPlant = botPos.distanceTo(plantedPositionRef.current);
-              if (distToPlant > 10) {
+              if (distToPlant > 8) {
                 bot.targetPosition = plantedPositionRef.current.clone();
               } else {
-                bot.targetPosition = null;
+                // Stay near bomb and watch for CTs
+                const nearestCT = aliveCTBots.reduce((nearest, ctBot) => {
+                  const dist = botPos.distanceTo(ctBot.capsule.start);
+                  return !nearest || dist < botPos.distanceTo(nearest.capsule.start) ? ctBot : nearest;
+                }, null as Bot | null);
+                if (nearestCT) {
+                  bot.targetPosition = nearestCT.capsule.start.clone();
+                } else {
+                  bot.targetPosition = null;
+                }
               }
             }
           } else if (bot.hasBomb) {
-            // Bomb carrier goes to site
-            const distToSite = botPos.distanceTo(targetSite);
-            if (distToSite < 5) {
-              // At bomb site - plant
-              bot.isPlanting = true;
-              bot.plantProgress += deltaTime;
-              if (bot.plantProgress >= 3) {
-                bombPlantedRef.current = true;
-                setBombPlanted(true);
-                plantedPositionRef.current = botPos.clone();
-                bombMesh.position.copy(botPos);
-                bombMesh.position.y = 0.15;
-                bombMesh.visible = true;
-                bot.hasBomb = false;
+            // Bomb carrier follows waypoint route to site
+            if (routeIdx < route.length) {
+              const currentWaypoint = route[routeIdx];
+              const distToWaypoint = botPos.distanceTo(currentWaypoint);
+              
+              if (distToWaypoint < 4) {
+                // Reached waypoint, move to next
+                botRouteIndex.set(bot.id, routeIdx + 1);
+              }
+              bot.targetPosition = currentWaypoint.clone();
+            } else {
+              // At site - plant
+              const distToSite = botPos.distanceTo(targetSite);
+              if (distToSite < 6) {
+                bot.isPlanting = true;
+                bot.plantProgress += deltaTime;
+                if (bot.plantProgress >= 3) {
+                  bombPlantedRef.current = true;
+                  setBombPlanted(true);
+                  plantedPositionRef.current = botPos.clone();
+                  bombMesh.position.copy(botPos);
+                  bombMesh.position.y = 0.15;
+                  bombMesh.visible = true;
+                  bot.hasBomb = false;
+                  bot.isPlanting = false;
+                }
+              } else {
+                bot.targetPosition = targetSite.clone();
                 bot.isPlanting = false;
               }
-            } else {
-              bot.targetPosition = targetSite.clone();
-              bot.isPlanting = false;
-              bot.plantProgress = 0;
             }
           } else {
-            // Follow bomb carrier or go to site
-            const bombCarrier = aliveTBots.find(b => b.hasBomb);
-            if (bombCarrier) {
-              const carrierPos = bombCarrier.capsule.start.clone();
-              carrierPos.y = 0;
-              bot.targetPosition = carrierPos.clone().add(
-                new THREE.Vector3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10)
-              );
+            // Non-bomb carrier follows similar route
+            if (routeIdx < route.length) {
+              const currentWaypoint = route[routeIdx];
+              const distToWaypoint = botPos.distanceTo(currentWaypoint);
+              
+              if (distToWaypoint < 4) {
+                botRouteIndex.set(bot.id, routeIdx + 1);
+              }
+              bot.targetPosition = currentWaypoint.clone();
             } else {
-              bot.targetPosition = targetSite.clone();
+              // At site, engage enemies
+              const nearestCT = aliveCTBots.reduce((nearest, ctBot) => {
+                const dist = botPos.distanceTo(ctBot.capsule.start);
+                return !nearest || dist < botPos.distanceTo(nearest.capsule.start) ? ctBot : nearest;
+              }, null as Bot | null);
+              if (nearestCT) {
+                bot.targetPosition = nearestCT.capsule.start.clone();
+              }
             }
           }
         }
 
         // CT bot behavior
         if (bot.team === 'CT') {
-          if (bombPlantedRef.current && plantedPositionRef.current) {
-            // Rush to defuse
-            bot.targetPosition = plantedPositionRef.current.clone();
-          } else {
-            // Patrol between sites or engage enemies
-            const nearestT = aliveTBots.reduce((nearest, tBot) => {
-              const dist = botPos.distanceTo(tBot.capsule.start);
-              return !nearest || dist < botPos.distanceTo(nearest.capsule.start) ? tBot : nearest;
-            }, null as Bot | null);
+          // Always try to find and engage Ts
+          const nearestT = aliveTBots.reduce((nearest, tBot) => {
+            const dist = botPos.distanceTo(tBot.capsule.start);
+            return !nearest || dist < botPos.distanceTo(nearest.capsule.start) ? tBot : nearest;
+          }, null as Bot | null);
 
-            if (nearestT) {
-              const distToT = botPos.distanceTo(nearestT.capsule.start);
-              if (distToT < 40) {
-                // Engage enemy
-                bot.targetPosition = nearestT.capsule.start.clone();
-              } else {
-                // Patrol between bomb sites
-                if (!bot.targetPosition || botPos.distanceTo(bot.targetPosition) < 3) {
-                  // Alternate between A and B site
-                  bot.targetPosition = Math.random() > 0.5 ? bombSiteA.clone() : bombSiteB.clone();
-                }
+          if (bombPlantedRef.current && plantedPositionRef.current) {
+            // Rush to defuse - go directly
+            bot.targetPosition = plantedPositionRef.current.clone();
+          } else if (nearestT && botPos.distanceTo(nearestT.capsule.start) < 35) {
+            // Enemy nearby - engage
+            bot.targetPosition = nearestT.capsule.start.clone();
+          } else {
+            // Follow patrol route
+            if (routeIdx < route.length) {
+              const currentWaypoint = route[routeIdx];
+              const distToWaypoint = botPos.distanceTo(currentWaypoint);
+              
+              if (distToWaypoint < 4) {
+                botRouteIndex.set(bot.id, routeIdx + 1);
               }
+              bot.targetPosition = currentWaypoint.clone();
+            } else {
+              // Reached end of route, reverse or pick new route
+              const newRoute = Math.random() > 0.5 ? 
+                [...ctRoutesToA[Math.floor(Math.random() * ctRoutesToA.length)]] :
+                [...ctRoutesToB[Math.floor(Math.random() * ctRoutesToB.length)]];
+              botRoutes.set(bot.id, newRoute);
+              botRouteIndex.set(bot.id, 0);
             }
           }
         }
@@ -1105,6 +1243,7 @@ export default function CSBetting() {
       bot.isPlanting = false;
       bot.plantProgress = 0;
       bot.hasBomb = bot.team === 'T' && i === 0;
+      bot.targetPosition = null;
       
       if (bot.team === 'T') {
         const xOffset = (i % 5 - 2) * 3;
@@ -1118,6 +1257,11 @@ export default function CSBetting() {
         bot.mesh.position.set(xOffset, 0, 15);
       }
     });
+
+    // Reinitialize routes for new round
+    if (initRoutesRef.current) {
+      setTimeout(() => initRoutesRef.current?.(), 100);
+    }
   };
 
   // Pre-game lobby
