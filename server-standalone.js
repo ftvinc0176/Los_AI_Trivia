@@ -56,17 +56,14 @@ correctAnswer is the index (0-3) of the correct option.`;
 
 async function generateQuestions(category, difficulty, count) {
   try {
-    const OpenAI = require('openai').default;
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'AIzaSyCYugGiZqVvV3hJwi5BXIbJX40WOGSEzng');
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    const prompt = `${count} ${difficulty} ${category} trivia. JSON array:\n[{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`;
+    const prompt = `Generate ${count} ${difficulty} trivia questions about ${category}. Return ONLY a JSON array:\n[{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]\ncorrectAnswer is the index (0-3).`;
 
-    const response = await client.responses.create({
-      model: 'gpt-5-nano',
-      input: prompt
-    });
-
-    const text = response.output_text;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     
     if (!jsonMatch) throw new Error('No JSON found');
