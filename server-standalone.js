@@ -1885,39 +1885,47 @@ function checkBlackjackRoundEnd(roomId) {
 }
 
 // ==================== FPS ARENA GAME ====================
-const fpsPlayers = new Map();
+let fpsPlayers = {};
+
+// High-frequency position broadcast (like three-arena's 120Hz)
+setInterval(function () {
+  if (Object.keys(fpsPlayers).length > 0) {
+    io.sockets.emit('fpsPlayerPositions', fpsPlayers);
+  }
+}, 8); // ~120Hz
 
 io.on('connection', (socket) => {
   
   // FPS Arena handlers
   socket.on('fpsJoin', ({ name }) => {
-    const player = {
-      id: socket.id,
-      name: name,
-      position: [0, 1.6, 0],
-      rotation: 0,
+    fpsPlayers[socket.id] = {
+      position: [0, 1.8, 0],
+      direction: [0, 0, 0],
+      name: name || 'Player',
       health: 100
     };
-    fpsPlayers.set(socket.id, player);
     
-    // Send existing players to new player
-    fpsPlayers.forEach((p, id) => {
-      if (id !== socket.id) {
-        socket.emit('fpsPlayerJoined', p);
-      }
-    });
+    // Send current players to new player
+    socket.emit('fpsPlayers', fpsPlayers);
     
     // Broadcast new player to others
-    socket.broadcast.emit('fpsPlayerJoined', player);
-    console.log(`FPS Player ${name} joined (${socket.id})`);
+    socket.broadcast.emit('fpsPlayerJoined', { 
+      id: socket.id, 
+      player: fpsPlayers[socket.id] 
+    });
+    
+    console.log(`FPS Player ${name} joined (${socket.id}), total: ${Object.keys(fpsPlayers).length}`);
   });
   
   socket.on('fpsMove', ({ position, rotation }) => {
-    const player = fpsPlayers.get(socket.id);
-    if (player) {
-      player.position = position;
-      player.rotation = rotation;
-      socket.broadcast.emit('fpsPlayerMoved', { id: socket.id, position, rotation });
+    if (fpsPlayers[socket.id]) {
+      fpsPlayers[socket.id].position = position;
+      fpsPlayers[socket.id].direction = [
+        Math.sin(rotation),
+        0,
+        Math.cos(rotation)
+      ];
+      // Position updates are handled by interval broadcast
     }
   });
   
@@ -1926,28 +1934,28 @@ io.on('connection', (socket) => {
   });
   
   socket.on('fpsHit', ({ victim, damage }) => {
-    const victimPlayer = fpsPlayers.get(victim);
-    if (victimPlayer) {
-      victimPlayer.health -= damage;
-      io.to(victim).emit('fpsHit', { damage });
+    if (fpsPlayers[victim]) {
+      fpsPlayers[victim].health -= damage || 20;
+      io.to(victim).emit('fpsHit', { damage: damage || 20 });
       
-      if (victimPlayer.health <= 0) {
-        victimPlayer.health = 100;
-        victimPlayer.position = [0, 1.6, 0];
+      if (fpsPlayers[victim].health <= 0) {
+        fpsPlayers[victim].health = 100;
+        // Random respawn position
+        fpsPlayers[victim].position = [
+          Math.random() * 40 - 20,
+          1.8,
+          Math.random() * 40 - 20
+        ];
         io.emit('fpsKill', { killer: socket.id, victim });
       }
     }
   });
   
-  socket.on('fpsLeave', () => {
-    fpsPlayers.delete(socket.id);
-    socket.broadcast.emit('fpsPlayerLeft', { id: socket.id });
-  });
-  
   socket.on('disconnect', () => {
-    if (fpsPlayers.has(socket.id)) {
-      fpsPlayers.delete(socket.id);
+    if (fpsPlayers[socket.id]) {
+      delete fpsPlayers[socket.id];
       socket.broadcast.emit('fpsPlayerLeft', { id: socket.id });
+      console.log(`FPS Player disconnected (${socket.id}), remaining: ${Object.keys(fpsPlayers).length}`);
       console.log(`FPS Player left (${socket.id})`);
     }
   });
