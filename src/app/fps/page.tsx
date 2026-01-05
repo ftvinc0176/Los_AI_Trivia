@@ -29,6 +29,7 @@ export default function FPSArena() {
   const [hasBomb, setHasBomb] = useState(false);
   const [isPlanting, setIsPlanting] = useState(false);
   const [isDefusing, setIsDefusing] = useState(false);
+  const [defuseTimer, setDefuseTimer] = useState(5);
   const [tScore, setTScore] = useState(0);
   const [ctScore, setCtScore] = useState(0);
   const [waitingForPlayers, setWaitingForPlayers] = useState(true);
@@ -53,6 +54,8 @@ export default function FPSArena() {
   const socketRef = useRef<Socket | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const playerCapsuleRef = useRef<Capsule | null>(null);
+  const defuseIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isDefusingRef = useRef(false);
 
   // Weapon configs
   const weaponConfig = {
@@ -94,6 +97,12 @@ export default function FPSArena() {
     setBombTimer(40);
     setIsPlanting(false);
     setIsDefusing(false);
+    isDefusingRef.current = false;
+    setDefuseTimer(5);
+    if (defuseIntervalRef.current) {
+      clearInterval(defuseIntervalRef.current);
+      defuseIntervalRef.current = null;
+    }
     
     // Reset bomb for Terrorists
     if (selectedTeam === 'T') {
@@ -122,89 +131,260 @@ export default function FPSArena() {
   const createWeaponModel = (weaponType: WeaponType) => {
     const weaponGroup = new THREE.Group();
     
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8, roughness: 0.3 });
+    const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.2 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.8 });
+    const greenMat = new THREE.MeshStandardMaterial({ color: 0x2d4a3e, metalness: 0.6, roughness: 0.4 });
+    
     if (weaponType === 'awp') {
-      // AWP Sniper - long barrel with scope
+      // AWP Sniper Rifle - Long barrel with scope
+      // Main barrel (long and thin)
       const barrel = new THREE.Mesh(
-        new THREE.BoxGeometry(0.08, 1.2, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x2d4a3e })
+        new THREE.CylinderGeometry(0.02, 0.025, 0.9, 8),
+        darkMetalMat
       );
-      barrel.position.y = 0;
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.z = 0.45;
       weaponGroup.add(barrel);
       
-      const scope = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 0.25, 8),
-        new THREE.MeshStandardMaterial({ color: 0x111111 })
-      );
-      scope.rotation.z = Math.PI / 2;
-      scope.position.set(0, 0.3, 0.08);
-      weaponGroup.add(scope);
-      
-      const stock = new THREE.Mesh(
-        new THREE.BoxGeometry(0.1, 0.3, 0.12),
-        new THREE.MeshStandardMaterial({ color: 0x2d4a3e })
-      );
-      stock.position.y = -0.5;
-      weaponGroup.add(stock);
-      
-    } else if (weaponType === 'm4') {
-      // M4 Rifle - medium barrel, tactical look
-      const barrel = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.7, 0.06),
-        new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
-      );
-      barrel.position.y = 0;
-      weaponGroup.add(barrel);
-      
+      // Receiver body
       const receiver = new THREE.Mesh(
-        new THREE.BoxGeometry(0.08, 0.3, 0.12),
-        new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+        new THREE.BoxGeometry(0.08, 0.12, 0.4),
+        greenMat
       );
-      receiver.position.y = -0.15;
+      receiver.position.z = -0.1;
       weaponGroup.add(receiver);
       
-      const stock = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.25, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+      // Scope mount
+      const scopeMount = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.04, 0.15),
+        metalMat
       );
-      stock.position.y = -0.4;
+      scopeMount.position.set(0, 0.08, 0);
+      weaponGroup.add(scopeMount);
+      
+      // Scope body
+      const scope = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.035, 0.25, 12),
+        darkMetalMat
+      );
+      scope.rotation.x = Math.PI / 2;
+      scope.position.set(0, 0.12, 0);
+      weaponGroup.add(scope);
+      
+      // Scope lens front
+      const lensFront = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.035, 0.02, 12),
+        new THREE.MeshStandardMaterial({ color: 0x4444ff, metalness: 0.9, roughness: 0.1 })
+      );
+      lensFront.rotation.x = Math.PI / 2;
+      lensFront.position.set(0, 0.12, 0.13);
+      weaponGroup.add(lensFront);
+      
+      // Stock
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.14, 0.25),
+        greenMat
+      );
+      stock.position.z = -0.35;
       weaponGroup.add(stock);
       
-      const mag = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 0.15, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x0a0a0a })
+      // Trigger guard
+      const triggerGuard = new THREE.Mesh(
+        new THREE.TorusGeometry(0.03, 0.008, 8, 12, Math.PI),
+        metalMat
       );
-      mag.position.set(0, -0.25, 0);
+      triggerGuard.rotation.x = Math.PI / 2;
+      triggerGuard.position.set(0, -0.07, -0.15);
+      weaponGroup.add(triggerGuard);
+      
+      // Magazine
+      const mag = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.12, 0.08),
+        darkMetalMat
+      );
+      mag.position.set(0, -0.1, -0.08);
+      weaponGroup.add(mag);
+      
+    } else if (weaponType === 'm4') {
+      // M4A4 Rifle - Modern tactical look
+      // Barrel with flash hider
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.018, 0.018, 0.5, 8),
+        darkMetalMat
+      );
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.z = 0.35;
+      weaponGroup.add(barrel);
+      
+      // Flash hider
+      const flashHider = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.02, 0.06, 8),
+        metalMat
+      );
+      flashHider.rotation.x = Math.PI / 2;
+      flashHider.position.z = 0.62;
+      weaponGroup.add(flashHider);
+      
+      // Handguard (quad rail)
+      const handguard = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.06, 0.22),
+        metalMat
+      );
+      handguard.position.z = 0.18;
+      weaponGroup.add(handguard);
+      
+      // Upper receiver
+      const upperReceiver = new THREE.Mesh(
+        new THREE.BoxGeometry(0.055, 0.07, 0.18),
+        darkMetalMat
+      );
+      upperReceiver.position.z = -0.02;
+      weaponGroup.add(upperReceiver);
+      
+      // Carry handle / sight rail
+      const sightRail = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.025, 0.12),
+        metalMat
+      );
+      sightRail.position.set(0, 0.048, 0);
+      weaponGroup.add(sightRail);
+      
+      // Lower receiver
+      const lowerReceiver = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.08, 0.12),
+        darkMetalMat
+      );
+      lowerReceiver.position.set(0, -0.04, -0.08);
+      weaponGroup.add(lowerReceiver);
+      
+      // Pistol grip
+      const grip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, 0.1, 0.045),
+        darkMetalMat
+      );
+      grip.position.set(0, -0.1, -0.12);
+      grip.rotation.x = 0.3;
+      weaponGroup.add(grip);
+      
+      // Stock (collapsible)
+      const stockTube = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.015, 0.18, 8),
+        metalMat
+      );
+      stockTube.rotation.x = Math.PI / 2;
+      stockTube.position.z = -0.22;
+      weaponGroup.add(stockTube);
+      
+      const stockPad = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.08, 0.03),
+        darkMetalMat
+      );
+      stockPad.position.z = -0.32;
+      weaponGroup.add(stockPad);
+      
+      // Magazine (curved)
+      const mag = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, 0.14, 0.05),
+        darkMetalMat
+      );
+      mag.position.set(0, -0.12, -0.05);
+      mag.rotation.x = 0.1;
       weaponGroup.add(mag);
       
     } else if (weaponType === 'ak47') {
-      // AK-47 - distinctive curved mag, wood furniture
+      // AK-47 - Iconic curved magazine, wood furniture
+      // Barrel
       const barrel = new THREE.Mesh(
-        new THREE.BoxGeometry(0.07, 0.75, 0.07),
-        new THREE.MeshStandardMaterial({ color: 0x0a0a0a })
+        new THREE.CylinderGeometry(0.02, 0.02, 0.45, 8),
+        darkMetalMat
       );
-      barrel.position.y = 0;
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.z = 0.35;
       weaponGroup.add(barrel);
       
-      const receiver = new THREE.Mesh(
-        new THREE.BoxGeometry(0.09, 0.35, 0.14),
-        new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+      // Front sight block
+      const frontSight = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.06, 0.04),
+        darkMetalMat
       );
-      receiver.position.y = -0.2;
+      frontSight.position.set(0, 0.02, 0.5);
+      weaponGroup.add(frontSight);
+      
+      // Gas tube
+      const gasTube = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.015, 0.25, 8),
+        darkMetalMat
+      );
+      gasTube.rotation.x = Math.PI / 2;
+      gasTube.position.set(0, 0.03, 0.2);
+      weaponGroup.add(gasTube);
+      
+      // Wooden handguard (lower)
+      const handguardLower = new THREE.Mesh(
+        new THREE.BoxGeometry(0.045, 0.04, 0.2),
+        woodMat
+      );
+      handguardLower.position.set(0, -0.02, 0.15);
+      weaponGroup.add(handguardLower);
+      
+      // Receiver (stamped steel look)
+      const receiver = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.08, 0.22),
+        darkMetalMat
+      );
+      receiver.position.z = -0.02;
       weaponGroup.add(receiver);
       
-      const stock = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.3, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0x6b4423 }) // Wood color
+      // Rear sight
+      const rearSight = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.03, 0.02),
+        darkMetalMat
       );
-      stock.position.y = -0.45;
+      rearSight.position.set(0, 0.055, 0.02);
+      weaponGroup.add(rearSight);
+      
+      // Dust cover
+      const dustCover = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.02, 0.12),
+        metalMat
+      );
+      dustCover.position.set(0, 0.04, -0.04);
+      weaponGroup.add(dustCover);
+      
+      // Pistol grip
+      const grip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.1, 0.05),
+        woodMat
+      );
+      grip.position.set(0, -0.1, -0.1);
+      grip.rotation.x = 0.25;
+      weaponGroup.add(grip);
+      
+      // Wooden stock
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.045, 0.07, 0.28),
+        woodMat
+      );
+      stock.position.z = -0.28;
+      stock.position.y = -0.01;
       weaponGroup.add(stock);
       
-      const mag = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.18, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0x3a2a1a }) // Darker wood
+      // Stock buttpad
+      const buttpad = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.08, 0.02),
+        darkMetalMat
       );
-      mag.position.set(0, -0.3, 0.02);
-      mag.rotation.x = 0.15; // Slight curve
+      buttpad.position.z = -0.43;
+      weaponGroup.add(buttpad);
+      
+      // Curved magazine (iconic AK look)
+      const mag = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.16, 0.06),
+        new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.7 })
+      );
+      mag.position.set(0, -0.14, -0.03);
+      mag.rotation.x = 0.2;
       weaponGroup.add(mag);
     }
     
@@ -1257,31 +1437,59 @@ export default function FPSArena() {
               });
             }
           }, 3000); // 3 second plant time
-        } else if (selectedTeam === 'CT' && bombPlantedRef.current && !isDefusing && bombPositionRef.current) {
+        } else if (selectedTeam === 'CT' && bombPlantedRef.current && !isDefusingRef.current && bombPositionRef.current) {
           // Check if near bomb
           const distToBomb = Math.sqrt(
             Math.pow(camera.position.x - bombPositionRef.current.x, 2) + 
             Math.pow(camera.position.z - bombPositionRef.current.z, 2)
           );
           
-          console.log('CT near bomb?', { distToBomb, bombPos: bombPositionRef.current, playerPos: { x: camera.position.x, z: camera.position.z } });
-          
           if (distToBomb < 2) {
+            // Start defusing with countdown
             setIsDefusing(true);
-            setTimeout(() => {
-              bombGroup.visible = false;
-              setCtScore(prev => prev + 1);
-              setRoundPhase('end');
-              roundPhaseRef.current = 'end';
-              setRoundWinner('CT');
-              setIsDefusing(false);
-              if (socketRef.current) {
-                socketRef.current.emit('fpsDefuseBomb');
+            isDefusingRef.current = true;
+            setDefuseTimer(5);
+            let timeLeft = 5;
+            
+            defuseIntervalRef.current = setInterval(() => {
+              // Check if still near bomb
+              const currentDist = Math.sqrt(
+                Math.pow(camera.position.x - bombPositionRef.current!.x, 2) + 
+                Math.pow(camera.position.z - bombPositionRef.current!.z, 2)
+              );
+              
+              if (currentDist > 2) {
+                // Walked away - cancel defuse
+                clearInterval(defuseIntervalRef.current!);
+                defuseIntervalRef.current = null;
+                setIsDefusing(false);
+                isDefusingRef.current = false;
+                setDefuseTimer(5);
+                return;
               }
-              setTimeout(() => {
-                respawnPlayer();
-              }, 5000);
-            }, 10000); // 10 second defuse time
+              
+              timeLeft--;
+              setDefuseTimer(timeLeft);
+              
+              if (timeLeft <= 0) {
+                // Defuse complete!
+                clearInterval(defuseIntervalRef.current!);
+                defuseIntervalRef.current = null;
+                bombGroup.visible = false;
+                setCtScore(prev => prev + 1);
+                setRoundPhase('end');
+                roundPhaseRef.current = 'end';
+                setRoundWinner('CT');
+                setIsDefusing(false);
+                isDefusingRef.current = false;
+                if (socketRef.current) {
+                  socketRef.current.emit('fpsDefuseBomb');
+                }
+                setTimeout(() => {
+                  respawnPlayer();
+                }, 5000);
+              }
+            }, 1000);
           }
         }
       }
@@ -1402,16 +1610,10 @@ export default function FPSArena() {
               soldierModel.castShadow = true;
               scene.add(soldierModel);
 
-              // Create nameplate
-              const { div: nameplateDiv, healthFill } = createNameplate(playerData.name || 'Player', 100);
-              const nameplate = new CSS2DObject(nameplateDiv);
-              nameplate.position.y = 2.2;
-              soldierModel.add(nameplate);
+              // No nameplates - removed for cleaner gameplay
 
               player = {
                 mesh: soldierModel,
-                nameplate: nameplate,
-                healthFill: healthFill,
                 position: new THREE.Vector3(...playerData.position),
                 rotation: 0,
                 health: 100,
@@ -1514,8 +1716,6 @@ export default function FPSArena() {
           const player = remotePlayers.get(victim);
           if (player) {
             player.health = Math.max(0, player.health - damage);
-            player.healthFill.style.width = `${player.health}%`;
-            player.healthFill.style.background = player.health > 50 ? '#4ade80' : player.health > 25 ? '#fbbf24' : '#ef4444';
           }
         }
       });
@@ -1529,12 +1729,10 @@ export default function FPSArena() {
           setKills((prev) => prev + 1);
         }
         
-        // Reset killed player's health bar
+        // Reset killed player's health
         const killedPlayer = remotePlayers.get(victim);
         if (killedPlayer) {
           killedPlayer.health = 100;
-          killedPlayer.healthFill.style.width = '100%';
-          killedPlayer.healthFill.style.background = '#4ade80';
         }
       });
     };
@@ -1786,7 +1984,13 @@ export default function FPSArena() {
     
     const updateRemotePlayers = () => {
       remotePlayers.forEach((player: any) => {
-        player.mesh.position.copy(player.position);
+        // Offset Y position - camera is at eye level (1.8), but model base is at feet
+        // Subtract ~1.5 to put feet on ground (model is about 1.8 tall, eyes at top)
+        player.mesh.position.set(
+          player.position.x,
+          player.position.y - 1.5,
+          player.position.z
+        );
         player.mesh.rotation.y = player.rotation;
         
         // Check if nameplate is occluded by walls
@@ -2217,13 +2421,21 @@ export default function FPSArena() {
             💣 BOMB PLANTED AT SITE {plantedSite} - FIND AND DEFUSE
           </div>
         )}
-        {bombPlanted && selectedTeam === 'CT' && bombPosition && (
+        {bombPlanted && selectedTeam === 'CT' && bombPosition && !isDefusing && (
           <div className="text-sm text-blue-400 font-bold mt-1">
             Get close and press E to defuse
           </div>
         )}
         {isDefusing && (
-          <div className="text-sm text-blue-400 font-bold mt-2">DEFUSING...</div>
+          <div className="text-center mt-2">
+            <div className="text-2xl text-blue-400 font-bold animate-pulse">DEFUSING... {defuseTimer}s</div>
+            <div className="w-48 h-3 bg-gray-700 rounded-full mx-auto mt-2 overflow-hidden">
+              <div 
+                className="h-full bg-blue-500 transition-all duration-1000"
+                style={{ width: `${(defuseTimer / 5) * 100}%` }}
+              />
+            </div>
+          </div>
         )}
       </div>
 
