@@ -47,6 +47,8 @@ export default function FPSArena() {
   const roundPhaseRef = useRef<'buy' | 'active' | 'end'>('buy');
   const hasBombRef = useRef(false);
   const atBombSiteRef = useRef<'A' | 'B' | null>(null);
+  const bombPositionRef = useRef<{x: number, y: number, z: number} | null>(null);
+  const bombPlantedRef = useRef(false);
 
   // Weapon configs
   const weaponConfig = {
@@ -1179,10 +1181,12 @@ export default function FPSArena() {
           setTimeout(() => {
             console.log('Bomb planted!');
             setBombPlanted(true);
+            bombPlantedRef.current = true;
             setIsPlanting(false);
             setPlantedSite(atBombSiteRef.current);
             const bombPos = { x: camera.position.x, y: 0.2, z: camera.position.z };
             setBombPosition(bombPos);
+            bombPositionRef.current = bombPos;
             
             // Show and position bomb model
             bombGroup.position.set(bombPos.x, bombPos.y, bombPos.z);
@@ -1195,16 +1199,18 @@ export default function FPSArena() {
             if (socketRef.current) {
               socketRef.current.emit('fpsPlantBomb', { 
                 position: [bombPos.x, bombPos.y, bombPos.z],
-                site: atBombSite
+                site: atBombSiteRef.current
               });
             }
           }, 3000); // 3 second plant time
-        } else if (selectedTeam === 'CT' && bombPlanted && !isDefusing && bombPosition) {
+        } else if (selectedTeam === 'CT' && bombPlantedRef.current && !isDefusing && bombPositionRef.current) {
           // Check if near bomb
           const distToBomb = Math.sqrt(
-            Math.pow(camera.position.x - bombPosition.x, 2) + 
-            Math.pow(camera.position.z - bombPosition.z, 2)
+            Math.pow(camera.position.x - bombPositionRef.current.x, 2) + 
+            Math.pow(camera.position.z - bombPositionRef.current.z, 2)
           );
+          
+          console.log('CT near bomb?', { distToBomb, bombPos: bombPositionRef.current, playerPos: { x: camera.position.x, z: camera.position.z } });
           
           if (distToBomb < 2) {
             setIsDefusing(true);
@@ -1383,12 +1389,16 @@ export default function FPSArena() {
       });
 
       socket.on('fpsBombPlanted', ({ position, site }: any) => {
+        console.log('Received fpsBombPlanted:', { position, site });
         setBombPlanted(true);
+        bombPlantedRef.current = true;
         setPlantedSite(site);
         const bombPos = { x: position[0], y: position[1], z: position[2] };
         setBombPosition(bombPos);
+        bombPositionRef.current = bombPos;
         bombGroup.position.set(bombPos.x, bombPos.y, bombPos.z);
         bombGroup.visible = true;
+        console.log('Bomb model visible:', bombGroup.visible, 'position:', bombGroup.position);
         
         // Play bomb plant sound
         if (bombPlantSound.isPlaying) bombPlantSound.stop();
