@@ -1884,6 +1884,75 @@ function checkBlackjackRoundEnd(roomId) {
   }
 }
 
+// ==================== FPS ARENA GAME ====================
+const fpsPlayers = new Map();
+
+io.on('connection', (socket) => {
+  
+  // FPS Arena handlers
+  socket.on('fpsJoin', ({ name }) => {
+    const player = {
+      id: socket.id,
+      name: name,
+      position: [0, 1.6, 0],
+      rotation: 0,
+      health: 100
+    };
+    fpsPlayers.set(socket.id, player);
+    
+    // Send existing players to new player
+    fpsPlayers.forEach((p, id) => {
+      if (id !== socket.id) {
+        socket.emit('fpsPlayerJoined', p);
+      }
+    });
+    
+    // Broadcast new player to others
+    socket.broadcast.emit('fpsPlayerJoined', player);
+    console.log(`FPS Player ${name} joined (${socket.id})`);
+  });
+  
+  socket.on('fpsMove', ({ position, rotation }) => {
+    const player = fpsPlayers.get(socket.id);
+    if (player) {
+      player.position = position;
+      player.rotation = rotation;
+      socket.broadcast.emit('fpsPlayerMoved', { id: socket.id, position, rotation });
+    }
+  });
+  
+  socket.on('fpsShoot', ({ position, direction }) => {
+    socket.broadcast.emit('fpsShot', { id: socket.id, position, direction });
+  });
+  
+  socket.on('fpsHit', ({ victim, damage }) => {
+    const victimPlayer = fpsPlayers.get(victim);
+    if (victimPlayer) {
+      victimPlayer.health -= damage;
+      io.to(victim).emit('fpsHit', { damage });
+      
+      if (victimPlayer.health <= 0) {
+        victimPlayer.health = 100;
+        victimPlayer.position = [0, 1.6, 0];
+        io.emit('fpsKill', { killer: socket.id, victim });
+      }
+    }
+  });
+  
+  socket.on('fpsLeave', () => {
+    fpsPlayers.delete(socket.id);
+    socket.broadcast.emit('fpsPlayerLeft', { id: socket.id });
+  });
+  
+  socket.on('disconnect', () => {
+    if (fpsPlayers.has(socket.id)) {
+      fpsPlayers.delete(socket.id);
+      socket.broadcast.emit('fpsPlayerLeft', { id: socket.id });
+      console.log(`FPS Player left (${socket.id})`);
+    }
+  });
+});
+
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Socket.io server running on port ${PORT}`);
