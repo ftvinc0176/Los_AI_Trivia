@@ -78,8 +78,15 @@ export default function Multiplayer() {
     newSocket.on('gameState', (state: GameState) => {
       console.log('Received gameState:', state);
       setGameState(state);
-      if (state.started && isGeneratingQuestions) {
+      
+      // Reset generating questions flag when game starts OR when returning to lobby
+      if (state.started) {
         setIsGeneratingQuestions(false);
+      } else if (!state.started) {
+        // Game is not started (in lobby)
+        setIsGeneratingQuestions(false);
+        setShowResults(false);
+        setSelectedAnswer(null);
       }
     });
 
@@ -172,6 +179,8 @@ export default function Multiplayer() {
     if (socket && roomId) {
       socket.emit('returnToLobby', { roomId });
       setShowResults(false);
+      setIsGeneratingQuestions(false);
+      setSelectedAnswer(null);
     }
   };
 
