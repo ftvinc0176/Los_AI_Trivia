@@ -1886,6 +1886,7 @@ function checkBlackjackRoundEnd(roomId) {
 
 // ==================== FPS ARENA GAME ====================
 let fpsPlayers = {};
+let fpsTeamCounts = { T: 0, CT: 0 };
 
 // High-frequency position broadcast (like three-arena's 120Hz)
 setInterval(function () {
@@ -1897,13 +1898,28 @@ setInterval(function () {
 io.on('connection', (socket) => {
   
   // FPS Arena handlers
-  socket.on('fpsJoin', ({ name }) => {
+  socket.on('fpsJoin', ({ name, team }) => {
+    console.log(`FPS Player joined: ${name} on team ${team}, socket: ${socket.id}`);
+    
     fpsPlayers[socket.id] = {
       position: [0, 1.8, 0],
       direction: [0, 0, 0],
       name: name || 'Player',
+      team: team,
       health: 100
     };
+    
+    // Update team counts
+    if (team === 'T') {
+      fpsTeamCounts.T++;
+    } else if (team === 'CT') {
+      fpsTeamCounts.CT++;
+    }
+    
+    console.log('Updated team counts:', fpsTeamCounts);
+    
+    // Broadcast updated team counts to all players
+    io.emit('fpsTeamCounts', fpsTeamCounts);
     
     // Send current players to new player
     socket.emit('fpsPlayers', fpsPlayers);
@@ -1958,10 +1974,23 @@ io.on('connection', (socket) => {
   
   socket.on('disconnect', () => {
     if (fpsPlayers[socket.id]) {
+      const player = fpsPlayers[socket.id];
+      
+      // Update team counts
+      if (player.team === 'T') {
+        fpsTeamCounts.T = Math.max(0, fpsTeamCounts.T - 1);
+      } else if (player.team === 'CT') {
+        fpsTeamCounts.CT = Math.max(0, fpsTeamCounts.CT - 1);
+      }
+      
       delete fpsPlayers[socket.id];
+      
+      // Broadcast updated team counts
+      io.emit('fpsTeamCounts', fpsTeamCounts);
+      
       socket.broadcast.emit('fpsPlayerLeft', { id: socket.id });
       console.log(`FPS Player disconnected (${socket.id}), remaining: ${Object.keys(fpsPlayers).length}`);
-      console.log(`FPS Player left (${socket.id})`);
+      console.log('Updated team counts:', fpsTeamCounts);
     }
   });
 });
