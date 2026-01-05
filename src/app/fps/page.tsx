@@ -7,16 +7,113 @@ import { Capsule } from 'three/examples/jsm/math/Capsule.js';
 import { Octree } from 'three/examples/jsm/math/Octree.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
+type WeaponType = 'awp' | 'm4' | 'ak47';
+
 export default function FPSArena() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [playerName, setPlayerName] = useState('');
+  const [selectedWeapon, setSelectedWeapon] = useState<WeaponType>('awp');
   const [gameStarted, setGameStarted] = useState(false);
+  const [showWeaponMenu, setShowWeaponMenu] = useState(false);
   const [health, setHealth] = useState(100);
   const [kills, setKills] = useState(0);
   const [deaths, setDeaths] = useState(0);
 
-  // Helper function to create soldier model
-  const createSoldierModel = () => {
+  // Helper function to create weapon model
+  const createWeaponModel = (weaponType: WeaponType) => {
+    const weaponGroup = new THREE.Group();
+    
+    if (weaponType === 'awp') {
+      // AWP Sniper - long barrel with scope
+      const barrel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 1.2, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x2d4a3e })
+      );
+      barrel.position.y = 0;
+      weaponGroup.add(barrel);
+      
+      const scope = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 0.25, 8),
+        new THREE.MeshStandardMaterial({ color: 0x111111 })
+      );
+      scope.rotation.z = Math.PI / 2;
+      scope.position.set(0, 0.3, 0.08);
+      weaponGroup.add(scope);
+      
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.1, 0.3, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0x2d4a3e })
+      );
+      stock.position.y = -0.5;
+      weaponGroup.add(stock);
+      
+    } else if (weaponType === 'm4') {
+      // M4 Rifle - medium barrel, tactical look
+      const barrel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.7, 0.06),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+      );
+      barrel.position.y = 0;
+      weaponGroup.add(barrel);
+      
+      const receiver = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.3, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+      );
+      receiver.position.y = -0.15;
+      weaponGroup.add(receiver);
+      
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.25, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+      );
+      stock.position.y = -0.4;
+      weaponGroup.add(stock);
+      
+      const mag = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.15, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x0a0a0a })
+      );
+      mag.position.set(0, -0.25, 0);
+      weaponGroup.add(mag);
+      
+    } else if (weaponType === 'ak47') {
+      // AK-47 - distinctive curved mag, wood furniture
+      const barrel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.07, 0.75, 0.07),
+        new THREE.MeshStandardMaterial({ color: 0x0a0a0a })
+      );
+      barrel.position.y = 0;
+      weaponGroup.add(barrel);
+      
+      const receiver = new THREE.Mesh(
+        new THREE.BoxGeometry(0.09, 0.35, 0.14),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+      );
+      receiver.position.y = -0.2;
+      weaponGroup.add(receiver);
+      
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.3, 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x6b4423 }) // Wood color
+      );
+      stock.position.y = -0.45;
+      weaponGroup.add(stock);
+      
+      const mag = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.18, 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x3a2a1a }) // Darker wood
+      );
+      mag.position.set(0, -0.3, 0.02);
+      mag.rotation.x = 0.15; // Slight curve
+      weaponGroup.add(mag);
+    }
+    
+    return weaponGroup;
+  };
+
+  // Helper function to create soldier model with weapon
+  const createSoldierModel = (weaponType: WeaponType = 'awp') => {
     const soldier = new THREE.Group();
 
     // Body (torso)
@@ -71,33 +168,12 @@ export default function FPSArena() {
     rightLeg.castShadow = true;
     soldier.add(rightLeg);
 
-    // AWP Sniper Rifle
-    const awpGroup = new THREE.Group();
-    
-    // Main body (long barrel)
-    const barrelGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.08);
-    const awpMaterial = new THREE.MeshStandardMaterial({ color: 0x2d4a3e }); // AWP green
-    const barrel = new THREE.Mesh(barrelGeometry, awpMaterial);
-    barrel.position.y = 0;
-    awpGroup.add(barrel);
-    
-    // Scope
-    const scopeGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.25, 8);
-    const scopeMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 });
-    const scope = new THREE.Mesh(scopeGeometry, scopeMaterial);
-    scope.rotation.z = Math.PI / 2;
-    scope.position.set(0, 0.3, 0.08);
-    awpGroup.add(scope);
-    
-    // Stock
-    const stockGeometry = new THREE.BoxGeometry(0.1, 0.3, 0.12);
-    const stock = new THREE.Mesh(stockGeometry, awpMaterial);
-    stock.position.y = -0.5;
-    awpGroup.add(stock);
-    
-    awpGroup.position.set(0.3, 0.85, 0.25);
-    awpGroup.rotation.x = Math.PI / 6;
-    soldier.add(awpGroup);
+    // Add weapon based on type
+    const weaponGroup = createWeaponModel(weaponType);
+    weaponGroup.position.set(0.3, 0.85, 0.25);
+    weaponGroup.rotation.x = Math.PI / 6;
+    weaponGroup.castShadow = true;
+    soldier.add(weaponGroup);
 
     return soldier;
   };
@@ -343,9 +419,9 @@ export default function FPSArena() {
     });
     const tileMat = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.7 });
     const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.8 });
-    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
-    const metalMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.6, roughness: 0.4 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 });
+    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.9 });
+    const archMat = new THREE.MeshStandardMaterial({ color: 0xa08060, roughness: 0.7 });
 
     // Helper to add mesh with collision
     const addMesh = (mesh: THREE.Mesh) => {
@@ -355,352 +431,538 @@ export default function FPSArena() {
       worldOctree.fromGraphNode(mesh);
     };
 
-    // Helper to add wall segment
-    const addWall = (x: number, z: number, w: number, d: number, h = 5) => {
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
-      wall.position.set(x, h/2, z);
-      addMesh(wall);
-    };
+    // Wall height for indoor areas
+    const wallH = 6;
+    const wallThick = 1;
 
-    // Helper to add floor section
-    const addFloor = (x: number, z: number, w: number, d: number, y = 0) => {
-      const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), tileMat);
-      floor.position.set(x, y + 0.15, z);
+    // ===== CORRIDOR BUILDER =====
+    // Creates a proper enclosed corridor with floor, walls, and ceiling
+    const buildCorridor = (
+      x1: number, z1: number, // Start point
+      x2: number, z2: number, // End point  
+      width: number,         // Corridor width
+      hasRoof: boolean = true,
+      mat: THREE.Material = wallMat
+    ) => {
+      const dx = x2 - x1;
+      const dz = z2 - z1;
+      const length = Math.sqrt(dx * dx + dz * dz);
+      const angle = Math.atan2(dx, dz);
+      const cx = (x1 + x2) / 2;
+      const cz = (z1 + z2) / 2;
+
+      // Floor
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(width, 0.3, length), tileMat);
+      floor.position.set(cx, 0.15, cz);
+      floor.rotation.y = angle;
       addMesh(floor);
+
+      // Left wall
+      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, length), mat);
+      leftWall.position.set(
+        cx + Math.cos(angle) * (width / 2 + wallThick / 2),
+        wallH / 2,
+        cz - Math.sin(angle) * (width / 2 + wallThick / 2)
+      );
+      leftWall.rotation.y = angle;
+      addMesh(leftWall);
+
+      // Right wall
+      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, length), mat);
+      rightWall.position.set(
+        cx - Math.cos(angle) * (width / 2 + wallThick / 2),
+        wallH / 2,
+        cz + Math.sin(angle) * (width / 2 + wallThick / 2)
+      );
+      rightWall.rotation.y = angle;
+      addMesh(rightWall);
+
+      // Ceiling
+      if (hasRoof) {
+        const ceiling = new THREE.Mesh(new THREE.BoxGeometry(width + wallThick * 2, 0.3, length), roofMat);
+        ceiling.position.set(cx, wallH, cz);
+        ceiling.rotation.y = angle;
+        addMesh(ceiling);
+      }
     };
 
-    // Helper to add roof/ceiling
-    const addRoof = (x: number, z: number, w: number, d: number, y: number) => {
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), roofMat);
-      roof.position.set(x, y, z);
-      addMesh(roof);
+    // ===== ROOM BUILDER =====
+    // Creates an enclosed room with optional door openings
+    const buildRoom = (
+      x: number, z: number,  // Center position
+      w: number, d: number,  // Width and depth
+      doors: { side: 'n' | 's' | 'e' | 'w', pos: number, width: number }[] = [],
+      hasRoof: boolean = true,
+      mat: THREE.Material = wallMat
+    ) => {
+      // Floor
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), tileMat);
+      floor.position.set(x, 0.15, z);
+      addMesh(floor);
+
+      // Build walls with door openings
+      const buildWallWithDoor = (
+        wx: number, wz: number, 
+        wWidth: number, wDepth: number,
+        doorPos: number, doorWidth: number
+      ) => {
+        if (doorWidth <= 0) {
+          // No door, full wall
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(wWidth, wallH, wDepth), mat);
+          wall.position.set(wx, wallH / 2, wz);
+          addMesh(wall);
+        } else {
+          // Wall with door opening - create two segments
+          const isHorizontal = wWidth > wDepth;
+          const wallLen = isHorizontal ? wWidth : wDepth;
+          const leftLen = doorPos - doorWidth / 2;
+          const rightLen = wallLen - doorPos - doorWidth / 2;
+
+          if (leftLen > 0.5) {
+            const leftWall = new THREE.Mesh(
+              new THREE.BoxGeometry(
+                isHorizontal ? leftLen : wWidth,
+                wallH,
+                isHorizontal ? wDepth : leftLen
+              ),
+              mat
+            );
+            leftWall.position.set(
+              isHorizontal ? wx - wallLen / 2 + leftLen / 2 : wx,
+              wallH / 2,
+              isHorizontal ? wz : wz - wallLen / 2 + leftLen / 2
+            );
+            addMesh(leftWall);
+          }
+
+          if (rightLen > 0.5) {
+            const rightWall = new THREE.Mesh(
+              new THREE.BoxGeometry(
+                isHorizontal ? rightLen : wWidth,
+                wallH,
+                isHorizontal ? wDepth : rightLen
+              ),
+              mat
+            );
+            rightWall.position.set(
+              isHorizontal ? wx + wallLen / 2 - rightLen / 2 : wx,
+              wallH / 2,
+              isHorizontal ? wz : wz + wallLen / 2 - rightLen / 2
+            );
+            addMesh(rightWall);
+          }
+
+          // Door frame top (lintel)
+          const lintel = new THREE.Mesh(
+            new THREE.BoxGeometry(
+              isHorizontal ? doorWidth + 0.5 : wWidth,
+              1.5,
+              isHorizontal ? wDepth : doorWidth + 0.5
+            ),
+            archMat
+          );
+          lintel.position.set(
+            isHorizontal ? wx - wallLen / 2 + doorPos : wx,
+            wallH - 0.75,
+            isHorizontal ? wz : wz - wallLen / 2 + doorPos
+          );
+          addMesh(lintel);
+        }
+      };
+
+      // Process each wall
+      doors.forEach(door => {
+        const halfW = w / 2;
+        const halfD = d / 2;
+        
+        switch (door.side) {
+          case 'n': // North wall (positive Z)
+            buildWallWithDoor(x, z + halfD + wallThick / 2, w + wallThick * 2, wallThick, halfW + door.pos, door.width);
+            break;
+          case 's': // South wall (negative Z)
+            buildWallWithDoor(x, z - halfD - wallThick / 2, w + wallThick * 2, wallThick, halfW + door.pos, door.width);
+            break;
+          case 'e': // East wall (positive X)
+            buildWallWithDoor(x + halfW + wallThick / 2, z, wallThick, d + wallThick * 2, halfD + door.pos, door.width);
+            break;
+          case 'w': // West wall (negative X)
+            buildWallWithDoor(x - halfW - wallThick / 2, z, wallThick, d + wallThick * 2, halfD + door.pos, door.width);
+            break;
+        }
+      });
+
+      // Add solid walls for sides without doors
+      const sides = ['n', 's', 'e', 'w'] as const;
+      sides.forEach(side => {
+        if (!doors.find(d => d.side === side)) {
+          const halfW = w / 2;
+          const halfD = d / 2;
+          switch (side) {
+            case 'n':
+              const nWall = new THREE.Mesh(new THREE.BoxGeometry(w + wallThick * 2, wallH, wallThick), mat);
+              nWall.position.set(x, wallH / 2, z + halfD + wallThick / 2);
+              addMesh(nWall);
+              break;
+            case 's':
+              const sWall = new THREE.Mesh(new THREE.BoxGeometry(w + wallThick * 2, wallH, wallThick), mat);
+              sWall.position.set(x, wallH / 2, z - halfD - wallThick / 2);
+              addMesh(sWall);
+              break;
+            case 'e':
+              const eWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, d), mat);
+              eWall.position.set(x + halfW + wallThick / 2, wallH / 2, z);
+              addMesh(eWall);
+              break;
+            case 'w':
+              const wWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, d), mat);
+              wWall.position.set(x - halfW - wallThick / 2, wallH / 2, z);
+              addMesh(wWall);
+              break;
+          }
+        }
+      });
+
+      // Ceiling
+      if (hasRoof) {
+        const ceiling = new THREE.Mesh(new THREE.BoxGeometry(w + wallThick * 2, 0.3, d + wallThick * 2), roofMat);
+        ceiling.position.set(x, wallH, z);
+        addMesh(ceiling);
+      }
     };
 
-    // === BASE GROUND (only outside areas) ===
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), sandMat);
+    // === GROUND (visible in open areas) ===
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), sandMat);
     ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.1;
     ground.receiveShadow = true;
     scene.add(ground);
     worldOctree.fromGraphNode(ground);
 
     // ============================================
-    // MIRAGE MAP LAYOUT (Based on actual CS2 map)
-    // Coordinate system: +X = right (A), -X = left (B), +Z = CT, -Z = T
+    // MIRAGE MAP - PROPER ENCLOSED CORRIDORS
     // ============================================
 
-    // === T SPAWN AREA (bottom of map, -Z) ===
-    // T Spawn open area with surrounding walls
-    addWall(-40, -85, 1, 30, 6); // Left boundary
-    addWall(40, -85, 1, 30, 6);  // Right boundary
-    addWall(0, -100, 82, 1, 6); // Back wall
-    addFloor(0, -85, 80, 30);
+    // === T SPAWN (bottom center) ===
+    buildRoom(0, -70, 30, 20, [
+      { side: 'n', pos: -8, width: 5 },  // Exit to T apartments (left)
+      { side: 'n', pos: 8, width: 5 },   // Exit to mid
+    ], false); // Open roof
 
-    // === T APARTMENTS / T RAMP (path to B) ===
-    // Left corridor from T spawn to B apartments
-    addWall(-35, -60, 1, 20, 5);
-    addWall(-50, -60, 1, 20, 5);
-    addFloor(-42.5, -60, 14, 20);
-    addRoof(-42.5, -60, 14, 20, 5);
+    // === T APARTMENTS (T spawn to B) ===
+    buildRoom(-20, -55, 10, 15, [
+      { side: 's', pos: 0, width: 5 },   // From T spawn
+      { side: 'n', pos: 0, width: 4 },   // To B apps corridor
+    ]);
 
-    // T Apartments interior hallway
-    addWall(-55, -45, 10, 1, 5);
-    addWall(-55, -30, 10, 1, 5);
-    addWall(-60, -37.5, 1, 16, 5);
-    addFloor(-55, -37.5, 10, 15);
-    addRoof(-55, -37.5, 10, 15, 5);
-
-    // === B APARTMENTS (walkable building leading to B) ===
-    // Long corridor
-    addWall(-65, -15, 1, 30, 5);
-    addWall(-50, -15, 1, 30, 5);
-    addFloor(-57.5, -15, 14, 30);
-    addRoof(-57.5, -15, 14, 30, 5);
-    
-    // B Apps drop down area
-    addWall(-70, 5, 10, 1, 5);
-    addWall(-65, 10, 1, 10, 5);
-    addFloor(-67.5, 10, 6, 10);
-    addRoof(-67.5, 10, 6, 10, 5);
+    // === B APARTMENTS CORRIDOR ===
+    buildRoom(-30, -35, 12, 25, [
+      { side: 's', pos: 0, width: 4 },   // From T apartments
+      { side: 'n', pos: 0, width: 5 },   // To B site
+      { side: 'e', pos: 5, width: 4 },   // To underpass
+    ]);
 
     // === B SITE ===
-    // B site is an enclosed courtyard
-    addFloor(-55, 25, 30, 30);
-    
-    // B site walls forming the area
-    addWall(-70, 10, 1, 30, 6);  // Far left
-    addWall(-70, 35, 30, 1, 6);  // Back wall
-    addWall(-40, 25, 1, 20, 6);  // Right side (partial)
-    
-    // B Bench (box)
-    const bBench = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 3), woodMat);
-    bBench.position.set(-55, 1, 30);
-    addMesh(bBench);
-    
-    // B Van
-    const van = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 8), concreteMat);
-    van.position.set(-60, 1.5, 20);
-    addMesh(van);
+    buildRoom(-40, -5, 25, 25, [
+      { side: 's', pos: 5, width: 5 },   // From B apartments
+      { side: 'e', pos: 0, width: 6 },   // From short/market
+      { side: 'e', pos: -8, width: 4 },  // From underpass
+    ], false); // Open roof
 
-    // === B SHORT (Apartments exit to B) ===
-    addWall(-45, 0, 10, 1, 5);
-    addWall(-45, -8, 10, 1, 5);
-    addWall(-40, -4, 1, 9, 5);
-    addFloor(-45, -4, 10, 8);
-    addRoof(-45, -4, 10, 8, 5);
+    // B site cover
+    const bBox = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
+    bBox.position.set(-45, 1.25, 0);
+    addMesh(bBox);
+    const bBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    bBox2.position.set(-35, 1, -8);
+    addMesh(bBox2);
 
-    // === MARKET / KITCHEN (B side of mid) ===
-    // Enclosed building you walk through
-    addWall(-35, -25, 1, 20, 5);
-    addWall(-20, -25, 1, 20, 5);
-    addWall(-27.5, -35, 16, 1, 5);
-    addFloor(-27.5, -25, 14, 20);
-    addRoof(-27.5, -25, 14, 20, 5);
-    
-    // Market interior boxes
-    const marketBox1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-    marketBox1.position.set(-30, 1, -28);
-    addMesh(marketBox1);
-    const marketBox2 = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 2), woodMat);
-    marketBox2.position.set(-24, 0.75, -22);
-    addMesh(marketBox2);
+    // === UNDERPASS (connects B apps to mid and B) ===
+    buildRoom(-18, -25, 10, 20, [
+      { side: 'w', pos: 5, width: 4 },   // From B apartments
+      { side: 'n', pos: 0, width: 4 },   // To B site
+      { side: 'e', pos: -5, width: 4 },  // To mid
+    ]);
 
-    // === MID (Central corridor) ===
-    // Mid is a long corridor connecting T to CT
-    addWall(-18, -30, 1, 40, 5);  // Left side of mid
-    addWall(18, -30, 1, 40, 5);   // Right side of mid
-    addFloor(0, -30, 35, 40);
-    
-    // Mid boxes for cover
-    const midBox1 = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
-    midBox1.position.set(0, 1.25, -25);
-    addMesh(midBox1);
+    // === MID ===
+    buildRoom(0, -35, 15, 40, [
+      { side: 's', pos: 0, width: 5 },   // From T spawn
+      { side: 'n', pos: 0, width: 6 },   // To connector
+      { side: 'w', pos: 5, width: 4 },   // To underpass
+      { side: 'e', pos: -10, width: 4 }, // To window room
+      { side: 'e', pos: 10, width: 4 },  // To A short
+    ], false); // Open roof (for sniping)
+
+    // Mid boxes
+    const midBox = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
+    midBox.position.set(-3, 1.25, -35);
+    addMesh(midBox);
     const midBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-    midBox2.position.set(-8, 1, -35);
+    midBox2.position.set(4, 1, -45);
     addMesh(midBox2);
 
-    // === WINDOW ROOM (overlooks mid) ===
-    // Elevated room with window to mid
-    addWall(25, -25, 14, 1, 5);
-    addWall(25, -15, 14, 1, 5);
-    addWall(32, -20, 1, 11, 5);
-    addFloor(25, -20, 14, 10, 2);  // Elevated
-    addRoof(25, -20, 14, 10, 7);
-    
-    // Stairs up to window
-    for (let i = 0; i < 4; i++) {
-      const stair = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 1.5), tileMat);
-      stair.position.set(19, 0.5 + i * 0.5, -18 + i * 1.2);
-      addMesh(stair);
-    }
+    // === WINDOW ROOM ===
+    buildRoom(20, -45, 12, 12, [
+      { side: 'w', pos: 0, width: 4 },   // From mid
+      { side: 'e', pos: 0, width: 4 },   // To top mid/cat
+    ]);
 
-    // === UNDERPASS (below window) ===
-    // Tunnel under window room
-    addWall(25, -5, 1, 10, 2);
-    addWall(32, -5, 1, 10, 2);
-    addFloor(28.5, -5, 6, 10);
-    addRoof(28.5, -5, 6, 10, 2);
+    // === A SHORT (mid to A) ===
+    buildRoom(20, -20, 12, 15, [
+      { side: 'w', pos: 0, width: 4 },   // From mid
+      { side: 'e', pos: 0, width: 5 },   // To A site
+    ]);
 
-    // === CONNECTOR / JUNGLE (Mid to A) ===
-    // Corridor from mid to A site
-    addWall(18, 0, 1, 20, 5);
-    addWall(35, 0, 1, 20, 5);
-    addFloor(26.5, 0, 16, 20);
-    addRoof(26.5, 0, 16, 20, 5);
-    
-    // Connector boxes
-    const connectorBox = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-    connectorBox.position.set(25, 1, 5);
-    addMesh(connectorBox);
+    // === CONNECTOR (mid to CT) ===
+    buildRoom(0, -5, 15, 20, [
+      { side: 's', pos: 0, width: 6 },   // From mid
+      { side: 'n', pos: 0, width: 6 },   // To CT spawn
+    ]);
 
-    // === A RAMP (T to A site) ===
-    // Corridor with ramp leading up to A
-    addWall(40, -40, 1, 30, 5);
-    addWall(55, -40, 1, 30, 5);
-    addFloor(47.5, -40, 14, 30);
-    addRoof(47.5, -40, 14, 30, 5);
-    
-    // Actual ramp incline
-    const aRamp = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, 15), tileMat);
-    aRamp.position.set(47.5, 0.7, -30);
-    aRamp.rotation.x = -0.12;
-    addMesh(aRamp);
+    // === T RAMP (T spawn to A) ===
+    buildRoom(20, -60, 10, 20, [
+      { side: 's', pos: 0, width: 4 },   // From T spawn area
+      { side: 'n', pos: 0, width: 4 },   // To palace
+    ]);
 
-    // === PALACE (Top right, leads to A) ===
-    // Palace interior rooms
-    addWall(60, -55, 1, 20, 5);
-    addWall(75, -55, 1, 20, 5);
-    addWall(67.5, -65, 16, 1, 5);
-    addFloor(67.5, -55, 14, 20);
-    addRoof(67.5, -55, 14, 20, 5);
-    
-    // Palace second room
-    addWall(60, -40, 1, 10, 5);
-    addWall(75, -40, 1, 10, 5);
-    addFloor(67.5, -40, 14, 10);
-    addRoof(67.5, -40, 14, 10, 5);
+    // === PALACE ===
+    buildRoom(35, -45, 15, 15, [
+      { side: 's', pos: 0, width: 4 },   // From T ramp
+      { side: 'e', pos: 0, width: 5 },   // To A site
+      { side: 'n', pos: 3, width: 4 },   // To palace top
+    ]);
+
+    // Palace inner room
+    buildRoom(35, -30, 12, 12, [
+      { side: 's', pos: 3, width: 4 },   // From palace
+      { side: 'e', pos: 0, width: 4 },   // To A site
+    ]);
 
     // === A SITE ===
-    // Open bombsite with surrounding structures
-    addFloor(55, -10, 40, 40);
-    
-    // A site surrounding walls (with gaps for entries)
-    addWall(75, -10, 1, 40, 6);   // Far right wall
-    addWall(55, 10, 40, 1, 6);    // Back wall (CT side)
-    addWall(35, -5, 1, 30, 6);    // Left wall (partial, connector side)
-    
-    // Default boxes (triple stack)
-    const aDefault1 = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 5), woodMat);
-    aDefault1.position.set(55, 1.5, -5);
-    addMesh(aDefault1);
-    const aDefault2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 3), woodMat);
-    aDefault2.position.set(52, 1.25, -8);
-    addMesh(aDefault2);
-    
-    // Ninja corner
-    const ninja = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), woodMat);
-    ninja.position.set(72, 1, 5);
-    addMesh(ninja);
-    
-    // Tetris boxes
-    const tetris1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-    tetris1.position.set(45, 1, 0);
-    addMesh(tetris1);
-    const tetris2 = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), woodMat);
-    tetris2.position.set(43, 1.5, -3);
-    addMesh(tetris2);
+    buildRoom(50, -20, 30, 35, [
+      { side: 'w', pos: 5, width: 5 },   // From A short
+      { side: 'w', pos: -8, width: 5 },  // From palace
+      { side: 's', pos: 0, width: 4 },   // From palace inner
+      { side: 'n', pos: 5, width: 6 },   // To CT spawn (stairs)
+    ], false); // Open roof
 
-    // === STAIRS (A site to CT) ===
-    // Stairs connecting A to CT spawn
-    for (let i = 0; i < 6; i++) {
-      const stair = new THREE.Mesh(new THREE.BoxGeometry(6, 0.4, 1.5), tileMat);
-      stair.position.set(60, 0.2 + i * 0.4, 12 + i * 1.5);
-      addMesh(stair);
-    }
+    // A site boxes
+    const aDefault = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), woodMat);
+    aDefault.position.set(50, 1.5, -15);
+    addMesh(aDefault);
+    const aTriple = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 3), woodMat);
+    aTriple.position.set(55, 1.25, -20);
+    addMesh(aTriple);
+    const aNinja = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), woodMat);
+    aNinja.position.set(62, 1, -10);
+    addMesh(aNinja);
+    const aTetris = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    aTetris.position.set(40, 1, -25);
+    addMesh(aTetris);
 
     // === CT SPAWN ===
-    // Open area behind A site
-    addFloor(50, 35, 50, 30);
-    
-    // CT Spawn walls
-    addWall(75, 35, 1, 30, 6);
-    addWall(50, 50, 50, 1, 6);
-    addWall(25, 35, 1, 30, 6);
-    
+    buildRoom(25, 15, 40, 20, [
+      { side: 's', pos: -12, width: 6 },  // From connector
+      { side: 's', pos: 12, width: 6 },   // From A site
+      { side: 'w', pos: 0, width: 5 },    // To B through market
+    ], false); // Open roof
+
     // CT boxes
-    const ctBox1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-    ctBox1.position.set(60, 1, 40);
-    addMesh(ctBox1);
-    const ctBox2 = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 2.5), woodMat);
-    ctBox2.position.set(40, 0.75, 35);
-    addMesh(ctBox2);
+    const ctBox = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    ctBox.position.set(30, 1, 18);
+    addMesh(ctBox);
 
-    // === TICKET BOOTH / SANDWICH ===
-    // Small room between CT and A
-    addWall(40, 15, 10, 1, 5);
-    addWall(40, 25, 10, 1, 5);
-    addWall(35, 20, 1, 11, 5);
-    addFloor(40, 20, 10, 10);
-    addRoof(40, 20, 10, 10, 5);
+    // === MARKET (CT to B) ===
+    buildRoom(-10, 10, 15, 15, [
+      { side: 'e', pos: 0, width: 5 },    // From CT spawn
+      { side: 'w', pos: 0, width: 5 },    // To B site
+    ]);
 
-    // === JUNGLE (covered area near A) ===
-    addWall(35, 5, 1, 10, 4);
-    addRoof(38, 5, 7, 10, 4);
+    // Market interior
+    const marketBox = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 4), woodMat);
+    marketBox.position.set(-12, 1, 12);
+    addMesh(marketBox);
 
-    // === BOUNDARY WALLS (outer map limits) ===
-    addWall(-80, 0, 1, 200, 10);  // Far left
-    addWall(85, 0, 1, 200, 10);   // Far right
-    addWall(0, -110, 170, 1, 10); // Far back (T)
-    addWall(0, 60, 170, 1, 10);   // Far front (CT)
-
-    // === BARRELS scattered around ===
-    const barrels = [
-      [-50, 1, -5], [-25, 1, -40], [10, 1, -45], [35, 1, -50],
-      [65, 1, 25], [30, 1, 30], [-55, 1, 25], [50, 1, -25],
+    // === OUTER BOUNDARY WALLS ===
+    const boundaryWalls = [
+      { x: 0, z: -95, w: 150, d: 2 },    // South
+      { x: 0, z: 40, w: 150, d: 2 },     // North
+      { x: -70, z: -25, w: 2, d: 140 },  // West
+      { x: 80, z: -25, w: 2, d: 140 },   // East
     ];
-    barrels.forEach(pos => {
-      const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.7, 0.7, 1.6, 10),
-        new THREE.MeshStandardMaterial({ color: 0x3a5a4a, roughness: 0.7 })
-      );
-      barrel.position.set(pos[0], pos[1], pos[2]);
-      addMesh(barrel);
+    boundaryWalls.forEach(b => {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(b.w, 12, b.d), darkWallMat);
+      wall.position.set(b.x, 6, b.z);
+      addMesh(wall);
     });
 
-    // === FIRST PERSON AWP WEAPON ===
-    const fpWeapon = new THREE.Group();
-    
-    // AWP body
-    const fpBarrel = new THREE.Mesh(
-      new THREE.BoxGeometry(0.04, 0.8, 0.04),
-      new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.3 })
-    );
-    fpBarrel.position.set(0, 0, -0.4);
-    fpWeapon.add(fpBarrel);
-    
-    // AWP receiver
-    const fpReceiver = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 0.15, 0.25),
-      new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.4 })
-    );
-    fpReceiver.position.set(0, -0.05, 0);
-    fpWeapon.add(fpReceiver);
-    
-    // Scope
-    const fpScope = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.025, 0.03, 0.2, 8),
-      new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 })
-    );
-    fpScope.rotation.x = Math.PI / 2;
-    fpScope.position.set(0, 0.08, -0.1);
-    fpWeapon.add(fpScope);
-    
-    // Scope rings
-    const scopeRing1 = new THREE.Mesh(
-      new THREE.TorusGeometry(0.035, 0.008, 8, 16),
-      new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 })
-    );
-    scopeRing1.rotation.y = Math.PI / 2;
-    scopeRing1.position.set(0, 0.08, -0.05);
-    fpWeapon.add(scopeRing1);
-    
-    const scopeRing2 = new THREE.Mesh(
-      new THREE.TorusGeometry(0.035, 0.008, 8, 16),
-      new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 })
-    );
-    scopeRing2.rotation.y = Math.PI / 2;
-    scopeRing2.position.set(0, 0.08, -0.15);
-    fpWeapon.add(scopeRing2);
-    
-    // Stock
-    const fpStock = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05, 0.12, 0.2),
-      new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.5 })
-    );
-    fpStock.position.set(0, -0.02, 0.2);
-    fpWeapon.add(fpStock);
-    
-    // Magazine
-    const fpMag = new THREE.Mesh(
-      new THREE.BoxGeometry(0.03, 0.12, 0.06),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 })
-    );
-    fpMag.position.set(0, -0.12, 0.05);
-    fpWeapon.add(fpMag);
-    
-    // Bolt
-    const fpBolt = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.012, 0.08, 8),
-      new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.1 })
-    );
-    fpBolt.rotation.z = Math.PI / 2;
-    fpBolt.position.set(0.04, 0.02, -0.05);
-    fpWeapon.add(fpBolt);
-    
-    // Position weapon in view
-    fpWeapon.position.set(0.25, -0.2, -0.5);
-    fpWeapon.rotation.set(0, 0, 0);
-    camera.add(fpWeapon);
+    // === FIRST PERSON WEAPON (dynamic based on selected weapon) ===
+    const createFirstPersonWeapon = (weaponType: WeaponType) => {
+      const fpWeapon = new THREE.Group();
+      
+      if (weaponType === 'awp') {
+        const fpBarrel = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.8, 0.04),
+          new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.3 })
+        );
+        fpBarrel.position.set(0, 0, -0.4);
+        fpWeapon.add(fpBarrel);
+        
+        const fpScope = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.03, 0.2, 8),
+          new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 })
+        );
+        fpScope.rotation.x = Math.PI / 2;
+        fpScope.position.set(0, 0.08, -0.1);
+        fpWeapon.add(fpScope);
+        
+        const fpStock = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.12, 0.2),
+          new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.5 })
+        );
+        fpStock.position.set(0, -0.02, 0.2);
+        fpWeapon.add(fpStock);
+        
+      } else if (weaponType === 'm4') {
+        const fpBarrel = new THREE.Mesh(
+          new THREE.BoxGeometry(0.03, 0.5, 0.03),
+          new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 })
+        );
+        fpBarrel.position.set(0, 0, -0.25);
+        fpWeapon.add(fpBarrel);
+        
+        const fpReceiver = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.12, 0.18),
+          new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 })
+        );
+        fpReceiver.position.set(0, -0.03, 0);
+        fpWeapon.add(fpReceiver);
+        
+        const fpMag = new THREE.Mesh(
+          new THREE.BoxGeometry(0.03, 0.12, 0.06),
+          new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.4 })
+        );
+        fpMag.position.set(0, -0.10, 0.05);
+        fpWeapon.add(fpMag);
+        
+        const fpStock = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.08, 0.15),
+          new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.5 })
+        );
+        fpStock.position.set(0, -0.02, 0.18);
+        fpWeapon.add(fpStock);
+        
+      } else if (weaponType === 'ak47') {
+        const fpBarrel = new THREE.Mesh(
+          new THREE.BoxGeometry(0.035, 0.55, 0.035),
+          new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3 })
+        );
+        fpBarrel.position.set(0, 0, -0.28);
+        fpWeapon.add(fpBarrel);
+        
+        const fpReceiver = new THREE.Mesh(
+          new THREE.BoxGeometry(0.055, 0.14, 0.20),
+          new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 })
+        );
+        fpReceiver.position.set(0, -0.04, 0);
+        fpWeapon.add(fpReceiver);
+        
+        const fpMag = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.15, 0.08),
+          new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.5 })
+        );
+        fpMag.position.set(0, -0.12, 0.04);
+        fpMag.rotation.x = 0.15;
+        fpWeapon.add(fpMag);
+        
+        const fpStock = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.10, 0.16),
+          new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.6 })
+        );
+        fpStock.position.set(0, -0.03, 0.19);
+        fpWeapon.add(fpStock);
+      }
+      
+      fpWeapon.position.set(0.25, -0.2, -0.5);
+      fpWeapon.rotation.set(0, 0, 0);
+      return fpWeapon;
+    };
+
+    let currentWeapon = createFirstPersonWeapon(selectedWeapon);
+    camera.add(currentWeapon);
     scene.add(camera);
+
+    // === AUDIO SYSTEM ===
+    const audioListener = new THREE.AudioListener();
+    camera.add(audioListener);
+    
+    // Create shoot sounds for each weapon
+    const createShootSound = (weaponType: WeaponType) => {
+      const sound = new THREE.Audio(audioListener);
+      const audioLoader = new THREE.AudioLoader();
+      
+      // Create synthetic gun shot using oscillator (since we don't have audio files)
+      const audioContext = audioListener.context;
+      const duration = weaponType === 'awp' ? 0.3 : 0.15;
+      const sampleRate = audioContext.sampleRate;
+      const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
+      const data = buffer.getChannelData(0);
+      
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        let sample = 0;
+        if (weaponType === 'awp') {
+          // Deep, loud sniper sound
+          sample = Math.random() * 2 - 1;
+          sample *= Math.exp(-t * 8);
+          sample *= 0.8;
+        } else {
+          // Sharper rifle sound
+          sample = Math.random() * 2 - 1;
+          sample *= Math.exp(-t * 12);
+          sample *= 0.6;
+        }
+        data[i] = sample;
+      }
+      
+      sound.setBuffer(buffer);
+      sound.setVolume(0.5);
+      return sound;
+    };
+
+    const shootSounds = {
+      awp: createShootSound('awp'),
+      m4: createShootSound('m4'),
+      ak47: createShootSound('ak47'),
+    };
+
+    // Hit sound
+    const createHitSound = () => {
+      const sound = new THREE.Audio(audioListener);
+      const audioContext = audioListener.context;
+      const duration = 0.1;
+      const sampleRate = audioContext.sampleRate;
+      const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
+      const data = buffer.getChannelData(0);
+      
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 30) * 0.3;
+      }
+      
+      sound.setBuffer(buffer);
+      sound.setVolume(0.4);
+      return sound;
+    };
+
+    const hitSound = createHitSound();
+    const hurtSound = createHitSound();
+
+    // Function to update first-person weapon
+    const updateFirstPersonWeapon = (weaponType: WeaponType) => {
+      camera.remove(currentWeapon);
+      currentWeapon = createFirstPersonWeapon(weaponType);
+      camera.add(currentWeapon);
+    };
 
     // Player capsule collision
     const playerCapsule = new Capsule(
@@ -722,6 +984,12 @@ export default function FPSArena() {
 
     document.addEventListener('keydown', (event) => {
       keyStates[event.code] = true;
+      
+      // B key to toggle weapon menu
+      if (event.code === 'KeyB' && document.pointerLockElement === document.body) {
+        document.exitPointerLock();
+        setShowWeaponMenu(true);
+      }
     });
 
     document.addEventListener('keyup', (event) => {
@@ -890,10 +1158,17 @@ export default function FPSArena() {
       });
 
       socket.on('fpsHit', ({ damage, victim }: any) => {
+        // Play hurt sound when we get hit
+        if (hurtSound.isPlaying) hurtSound.stop();
+        hurtSound.play();
+        
         setHealth((prev) => Math.max(0, prev - damage));
         
-        // Update remote player health bar if we hit someone
+        // Play hit sound when we hit someone
         if (victim) {
+          if (hitSound.isPlaying) hitSound.stop();
+          hitSound.play();
+          
           const player = remotePlayers.get(victim);
           if (player) {
             player.health = Math.max(0, player.health - damage);
@@ -954,6 +1229,11 @@ export default function FPSArena() {
       rocket.mesh.rotateX(Math.PI / 2);
       
       currentRocketIndex = (currentRocketIndex + 1) % maxRockets;
+
+      // Play weapon sound
+      const sound = shootSounds[selectedWeapon];
+      if (sound.isPlaying) sound.stop();
+      sound.play();
 
       if (socketRef.current) {
         socketRef.current.emit('fpsShoot', {
@@ -1147,15 +1427,26 @@ export default function FPSArena() {
         socketRef.current.disconnect();
       }
     };
-  }, [gameStarted, playerName]);
+  }, [gameStarted, playerName, selectedWeapon]);
+
+  // Handle weapon change from menu
+  const handleWeaponSelect = (weapon: WeaponType) => {
+    setSelectedWeapon(weapon);
+    setShowWeaponMenu(false);
+    // Re-lock pointer after selection
+    setTimeout(() => {
+      document.body.requestPointerLock();
+    }, 100);
+  };
 
   if (!gameStarted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <div className="bg-black/50 backdrop-blur-xl rounded-3xl p-12 border border-white/10 max-w-md w-full mx-4">
+        <div className="bg-black/50 backdrop-blur-xl rounded-3xl p-12 border border-white/10 max-w-2xl w-full mx-4">
           <h1 className="text-5xl font-bold text-center mb-8 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
             FPS Arena
           </h1>
+          
           <input
             type="text"
             value={playerName}
@@ -1164,6 +1455,48 @@ export default function FPSArena() {
             className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 mb-6 focus:outline-none focus:border-purple-500"
             onKeyDown={(e) => e.key === 'Enter' && playerName && setGameStarted(true)}
           />
+
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Select Your Weapon</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <button
+                onClick={() => setSelectedWeapon('awp')}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  selectedWeapon === 'awp'
+                    ? 'border-green-500 bg-green-500/20'
+                    : 'border-white/20 bg-white/5 hover:border-white/40'
+                }`}
+              >
+                <div className="text-white font-semibold mb-1">AWP</div>
+                <div className="text-gray-400 text-sm">Sniper Rifle</div>
+              </button>
+              
+              <button
+                onClick={() => setSelectedWeapon('m4')}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  selectedWeapon === 'm4'
+                    ? 'border-blue-500 bg-blue-500/20'
+                    : 'border-white/20 bg-white/5 hover:border-white/40'
+                }`}
+              >
+                <div className="text-white font-semibold mb-1">M4A1</div>
+                <div className="text-gray-400 text-sm">Assault Rifle</div>
+              </button>
+              
+              <button
+                onClick={() => setSelectedWeapon('ak47')}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  selectedWeapon === 'ak47'
+                    ? 'border-orange-500 bg-orange-500/20'
+                    : 'border-white/20 bg-white/5 hover:border-white/40'
+                }`}
+              >
+                <div className="text-white font-semibold mb-1">AK-47</div>
+                <div className="text-gray-400 text-sm">Assault Rifle</div>
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={() => setGameStarted(true)}
             disabled={!playerName}
@@ -1184,7 +1517,68 @@ export default function FPSArena() {
         <div>Health: {health}</div>
         <div>Kills: {kills}</div>
         <div>Deaths: {deaths}</div>
+        <div className="text-sm text-gray-300 mt-2 pt-2 border-t border-white/20">
+          Weapon: {selectedWeapon.toUpperCase()}
+        </div>
       </div>
+
+      {/* In-game weapon menu */}
+      {showWeaponMenu && (
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-black/80 backdrop-blur-xl rounded-2xl p-8 border border-white/20 max-w-2xl w-full mx-4">
+            <h2 className="text-3xl font-bold text-center mb-6 text-white">Select Weapon</h2>
+            <div className="grid grid-cols-3 gap-6 mb-6">
+              <button
+                onClick={() => handleWeaponSelect('awp')}
+                className={`p-6 rounded-xl border-2 transition-all ${
+                  selectedWeapon === 'awp'
+                    ? 'border-green-500 bg-green-500/30'
+                    : 'border-white/30 bg-white/10 hover:border-white/50'
+                }`}
+              >
+                <div className="text-white text-xl font-semibold mb-2">AWP</div>
+                <div className="text-gray-300 text-sm">Sniper Rifle</div>
+                <div className="text-green-400 text-xs mt-2">High Damage</div>
+              </button>
+              
+              <button
+                onClick={() => handleWeaponSelect('m4')}
+                className={`p-6 rounded-xl border-2 transition-all ${
+                  selectedWeapon === 'm4'
+                    ? 'border-blue-500 bg-blue-500/30'
+                    : 'border-white/30 bg-white/10 hover:border-white/50'
+                }`}
+              >
+                <div className="text-white text-xl font-semibold mb-2">M4A1</div>
+                <div className="text-gray-300 text-sm">Assault Rifle</div>
+                <div className="text-blue-400 text-xs mt-2">Balanced</div>
+              </button>
+              
+              <button
+                onClick={() => handleWeaponSelect('ak47')}
+                className={`p-6 rounded-xl border-2 transition-all ${
+                  selectedWeapon === 'ak47'
+                    ? 'border-orange-500 bg-orange-500/30'
+                    : 'border-white/30 bg-white/10 hover:border-white/50'
+                }`}
+              >
+                <div className="text-white text-xl font-semibold mb-2">AK-47</div>
+                <div className="text-gray-300 text-sm">Assault Rifle</div>
+                <div className="text-orange-400 text-xs mt-2">High Fire Rate</div>
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setShowWeaponMenu(false);
+                setTimeout(() => document.body.requestPointerLock(), 100);
+              }}
+              className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all"
+            >
+              Close (or press ESC)
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
         <div className="relative w-6 h-6">
@@ -1196,9 +1590,10 @@ export default function FPSArena() {
       <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
         <div>WASD - Move</div>
         <div>Mouse - Look</div>
-        <div>Click - Shoot AWP</div>
+        <div>Click - Shoot</div>
         <div>Space - Jump</div>
-        <div>Click screen to lock pointer</div>
+        <div>B - Change Weapon</div>
+        <div className="text-xs text-gray-400 mt-2">Click screen to lock pointer</div>
       </div>
     </div>
   );
