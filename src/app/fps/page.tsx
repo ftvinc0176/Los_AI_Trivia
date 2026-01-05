@@ -37,6 +37,7 @@ export default function FPSArena() {
   const [bombPosition, setBombPosition] = useState<{x: number, y: number, z: number} | null>(null);
   const [teamCounts, setTeamCounts] = useState({T: 0, CT: 0});
   const [roundWinner, setRoundWinner] = useState<'T' | 'CT' | null>(null);
+  const [plantedSite, setPlantedSite] = useState<'A' | 'B' | null>(null);
   
   const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
@@ -1179,6 +1180,7 @@ export default function FPSArena() {
             console.log('Bomb planted!');
             setBombPlanted(true);
             setIsPlanting(false);
+            setPlantedSite(atBombSiteRef.current);
             const bombPos = { x: camera.position.x, y: 0.2, z: camera.position.z };
             setBombPosition(bombPos);
             
@@ -1210,6 +1212,7 @@ export default function FPSArena() {
               setBombPlanted(false);
               setIsDefusing(false);
               setBombPosition(null);
+              setPlantedSite(null);
               bombGroup.visible = false;
               setCtScore(prev => prev + 1);
               setRoundPhase('end');
@@ -1311,16 +1314,8 @@ export default function FPSArena() {
             soldierModel.castShadow = true;
             scene.add(soldierModel);
 
-            // Create nameplate
-            const { div: nameplateDiv, healthFill } = createNameplate(playerData.name || 'Player', 100);
-            const nameplate = new CSS2DObject(nameplateDiv);
-            nameplate.position.y = 2.2;
-            soldierModel.add(nameplate);
-
             remotePlayers.set(id, {
               mesh: soldierModel,
-              nameplate: nameplate,
-              healthFill: healthFill,
               position: new THREE.Vector3(...playerData.position),
               rotation: playerData.rotation || 0,
               health: 100,
@@ -1335,16 +1330,8 @@ export default function FPSArena() {
           soldierModel.castShadow = true;
           scene.add(soldierModel);
 
-          // Create nameplate
-          const { div: nameplateDiv, healthFill } = createNameplate(player.name || 'Player', 100);
-          const nameplate = new CSS2DObject(nameplateDiv);
-          nameplate.position.y = 2.2;
-          soldierModel.add(nameplate);
-
           remotePlayers.set(id, {
             mesh: soldierModel,
-            nameplate: nameplate,
-            healthFill: healthFill,
             position: new THREE.Vector3(...player.position),
             rotation: player.rotation || 0,
             health: 100,
@@ -1395,8 +1382,9 @@ export default function FPSArena() {
         }
       });
 
-      socket.on('fpsBombPlanted', ({ position }: any) => {
+      socket.on('fpsBombPlanted', ({ position, site }: any) => {
         setBombPlanted(true);
+        setPlantedSite(site);
         const bombPos = { x: position[0], y: position[1], z: position[2] };
         setBombPosition(bombPos);
         bombGroup.position.set(bombPos.x, bombPos.y, bombPos.z);
@@ -1410,6 +1398,7 @@ export default function FPSArena() {
       socket.on('fpsBombDefused', () => {
         setBombPlanted(false);
         setBombPosition(null);
+        setPlantedSite(null);
         bombGroup.visible = false;
       });
 
@@ -2162,9 +2151,14 @@ export default function FPSArena() {
         {isPlanting && (
           <div className="text-sm text-yellow-400 font-bold mt-2">PLANTING...</div>
         )}
+        {bombPlanted && selectedTeam === 'CT' && plantedSite && (
+          <div className="text-sm text-orange-400 font-bold mt-2 px-3 py-1 bg-orange-900/50 rounded border border-orange-400">
+            💣 BOMB PLANTED AT SITE {plantedSite} - FIND AND DEFUSE
+          </div>
+        )}
         {bombPlanted && selectedTeam === 'CT' && bombPosition && (
-          <div className="text-sm text-orange-400 font-bold mt-2">
-            FIND THE BOMB - Press E to Defuse
+          <div className="text-sm text-blue-400 font-bold mt-1">
+            Get close and press E to defuse
           </div>
         )}
         {isDefusing && (
