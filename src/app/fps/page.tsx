@@ -154,7 +154,7 @@ export default function FPSArena() {
     // Scene setup - Mirage desert theme
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb); // Bright blue sky like Mirage
-    scene.fog = new THREE.Fog(0xc9b896, 100, 400); // Sandy haze
+    scene.fog = new THREE.Fog(0xc9b896, 150, 500); // Sandy haze
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -179,171 +179,501 @@ export default function FPSArena() {
     labelRenderer.domElement.style.pointerEvents = 'none';
     containerRef.current.appendChild(labelRenderer.domElement);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Lighting - warm sun like Mirage
+    const ambientLight = new THREE.AmbientLight(0xffeedd, 0.4);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(-25, 25, -25);
-    dirLight.castShadow = true;
-    dirLight.shadow.camera.near = 0.1;
-    dirLight.shadow.camera.far = 500;
-    dirLight.shadow.camera.right = 150;
-    dirLight.shadow.camera.left = -150;
-    dirLight.shadow.camera.top = 150;
-    dirLight.shadow.camera.bottom = -150;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    dirLight.shadow.radius = 4;
-    dirLight.shadow.bias = -0.00006;
-    scene.add(dirLight);
+    const sunLight = new THREE.DirectionalLight(0xfffaf0, 1.0);
+    sunLight.position.set(50, 80, 30);
+    sunLight.castShadow = true;
+    sunLight.shadow.camera.near = 0.1;
+    sunLight.shadow.camera.far = 500;
+    sunLight.shadow.camera.right = 150;
+    sunLight.shadow.camera.left = -150;
+    sunLight.shadow.camera.top = 150;
+    sunLight.shadow.camera.bottom = -150;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.radius = 2;
+    sunLight.shadow.bias = -0.0001;
+    scene.add(sunLight);
+
+    // Fill light from opposite side
+    const fillLight = new THREE.DirectionalLight(0x8899bb, 0.3);
+    fillLight.position.set(-30, 20, -30);
+    scene.add(fillLight);
 
     // World octree for collision
     const worldOctree = new Octree();
 
+    // === TEXTURE GENERATION ===
+    // Create procedural brick texture
+    const createBrickTexture = (baseColor: number, groutColor: number) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      
+      // Base grout color
+      const grout = new THREE.Color(groutColor);
+      ctx.fillStyle = `rgb(${grout.r*255},${grout.g*255},${grout.b*255})`;
+      ctx.fillRect(0, 0, 256, 256);
+      
+      // Draw bricks
+      const brickW = 60, brickH = 28, groutW = 4;
+      const base = new THREE.Color(baseColor);
+      
+      for (let row = 0; row < 10; row++) {
+        const offset = (row % 2) * (brickW / 2);
+        for (let col = -1; col < 6; col++) {
+          // Vary brick color slightly
+          const variation = 0.9 + Math.random() * 0.2;
+          ctx.fillStyle = `rgb(${base.r*255*variation},${base.g*255*variation},${base.b*255*variation})`;
+          ctx.fillRect(offset + col * (brickW + groutW), row * (brickH + groutW), brickW, brickH);
+        }
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    };
+
+    // Create stone/tile texture
+    const createStoneTexture = (baseColor: number) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      
+      const base = new THREE.Color(baseColor);
+      ctx.fillStyle = `rgb(${base.r*255},${base.g*255},${base.b*255})`;
+      ctx.fillRect(0, 0, 256, 256);
+      
+      // Add stone pattern
+      const tileSize = 64;
+      for (let x = 0; x < 4; x++) {
+        for (let y = 0; y < 4; y++) {
+          const variation = 0.85 + Math.random() * 0.3;
+          ctx.fillStyle = `rgb(${base.r*255*variation},${base.g*255*variation},${base.b*255*variation})`;
+          ctx.fillRect(x * tileSize + 2, y * tileSize + 2, tileSize - 4, tileSize - 4);
+          
+          // Cracks
+          ctx.strokeStyle = `rgba(0,0,0,0.1)`;
+          ctx.beginPath();
+          ctx.moveTo(x * tileSize + Math.random() * tileSize, y * tileSize);
+          ctx.lineTo(x * tileSize + Math.random() * tileSize, y * tileSize + tileSize);
+          ctx.stroke();
+        }
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    };
+
+    // Create sandy ground texture
+    const createSandTexture = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d')!;
+      
+      // Base sand color
+      ctx.fillStyle = '#d4b896';
+      ctx.fillRect(0, 0, 512, 512);
+      
+      // Add noise/grain
+      for (let i = 0; i < 8000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const brightness = 0.7 + Math.random() * 0.6;
+        ctx.fillStyle = `rgba(${180*brightness},${150*brightness},${110*brightness},0.5)`;
+        ctx.fillRect(x, y, 2 + Math.random() * 3, 2 + Math.random() * 3);
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(20, 20);
+      return texture;
+    };
+
+    // Create wood texture
+    const createWoodTexture = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      
+      ctx.fillStyle = '#6b4423';
+      ctx.fillRect(0, 0, 256, 256);
+      
+      // Wood grain lines
+      for (let i = 0; i < 40; i++) {
+        const y = i * 6 + Math.random() * 4;
+        ctx.strokeStyle = `rgba(${40 + Math.random()*30},${20 + Math.random()*20},${10},${0.3 + Math.random()*0.3})`;
+        ctx.lineWidth = 1 + Math.random() * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        for (let x = 0; x < 256; x += 20) {
+          ctx.lineTo(x, y + Math.sin(x * 0.05) * 3);
+        }
+        ctx.stroke();
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    };
+
+    // Generate textures
+    const brickTex = createBrickTexture(0xc9a86c, 0x8b7355);
+    brickTex.repeat.set(4, 2);
+    const stoneTex = createStoneTexture(0x9a8b7a);
+    stoneTex.repeat.set(2, 2);
+    const sandTex = createSandTexture();
+    const woodTex = createWoodTexture();
+    woodTex.repeat.set(1, 2);
+
+    // === MATERIALS WITH TEXTURES ===
+    const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, roughness: 0.9 });
+    const wallMat = new THREE.MeshStandardMaterial({ map: brickTex, roughness: 0.8 });
+    const darkWallMat = new THREE.MeshStandardMaterial({ 
+      map: createBrickTexture(0x8b7355, 0x5a4a3a),
+      roughness: 0.85 
+    });
+    const tileMat = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.7 });
+    const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.8 });
+    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.6, roughness: 0.4 });
+
     // Helper to add mesh with collision
-    const addMesh = (mesh: THREE.Mesh) => {
+    const addMesh = (mesh: THREE.Mesh, noCollision = false) => {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       scene.add(mesh);
-      worldOctree.fromGraphNode(mesh);
+      if (!noCollision) worldOctree.fromGraphNode(mesh);
     };
 
-    // Materials - Mirage theme
-    const sandMat = new THREE.MeshStandardMaterial({ color: 0xd4b896 }); // Sandy ground
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9a86c }); // Adobe/tan walls
-    const darkWallMat = new THREE.MeshStandardMaterial({ color: 0x8b7355 }); // Darker walls
-    const tileMat = new THREE.MeshStandardMaterial({ color: 0x9a8b7a }); // Tile/stone
-    const greenMat = new THREE.MeshStandardMaterial({ color: 0x4a6741 }); // Accent green
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x6b4423 }); // Wood
+    // Helper to create building with windows/doors
+    const createBuilding = (w: number, h: number, d: number, mat: THREE.Material, hasWindows = true) => {
+      const group = new THREE.Group();
+      const main = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      main.castShadow = true;
+      main.receiveShadow = true;
+      group.add(main);
+      
+      if (hasWindows) {
+        // Add window frames
+        const windowMat = new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.2 });
+        const numWindows = Math.floor(w / 5);
+        for (let i = 0; i < numWindows; i++) {
+          const window = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2, 0.2), windowMat);
+          window.position.set(-w/2 + 3 + i * 4, h * 0.2, d/2 + 0.1);
+          group.add(window);
+        }
+      }
+      return group;
+    };
 
-    // Ground - sandy desert floor
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), sandMat);
+    // === GROUND ===
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(250, 250), sandMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
     worldOctree.fromGraphNode(ground);
 
-    // === MIRAGE A SITE AREA (center-right) ===
-    // A Site platform
-    const aSite = new THREE.Mesh(new THREE.BoxGeometry(20, 0.5, 20), tileMat);
-    aSite.position.set(40, 0.25, 0);
-    addMesh(aSite);
+    // === A SITE (Mirage style - right side) ===
+    // A site platform with stone texture
+    const aSitePlatform = new THREE.Mesh(new THREE.BoxGeometry(25, 0.3, 25), tileMat);
+    aSitePlatform.position.set(50, 0.15, 0);
+    addMesh(aSitePlatform);
 
-    // Boxes on A site (like default plant spot)
-    const aBox1 = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), woodMat);
-    aBox1.position.set(42, 1.5, 3);
-    addMesh(aBox1);
-    const aBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-    aBox2.position.set(38, 1, -5);
-    addMesh(aBox2);
+    // Triple box (classic A site default)
+    const tripleBox1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 5), woodMat);
+    tripleBox1.position.set(52, 1.25, 2);
+    addMesh(tripleBox1);
+    const tripleBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 3), woodMat);
+    tripleBox2.position.set(49, 1.25, 0);
+    addMesh(tripleBox2);
+    const tripleBox3 = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 2), woodMat);
+    tripleBox3.position.set(52, 0.75, -3);
+    addMesh(tripleBox3);
 
-    // === MIRAGE B SITE AREA (center-left) ===
-    // B Site platform
-    const bSite = new THREE.Mesh(new THREE.BoxGeometry(18, 0.5, 22), tileMat);
-    bSite.position.set(-40, 0.25, 0);
-    addMesh(bSite);
+    // Ninja box
+    const ninjaBox = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), woodMat);
+    ninjaBox.position.set(45, 1, 8);
+    addMesh(ninjaBox);
+
+    // A site back wall (Ticket booth)
+    const ticketBooth = createBuilding(12, 6, 8, wallMat);
+    ticketBooth.position.set(58, 3, -8);
+    scene.add(ticketBooth);
+    const ticketMesh = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 8), wallMat);
+    ticketMesh.position.set(58, 3, -8);
+    worldOctree.fromGraphNode(ticketMesh);
+
+    // === RAMP (A Ramp) ===
+    const aRamp = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 15), tileMat);
+    aRamp.position.set(40, 0.25, -15);
+    aRamp.rotation.x = -0.08;
+    addMesh(aRamp);
+
+    // Ramp side walls
+    const rampWall1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
+    rampWall1.position.set(44, 2, -15);
+    addMesh(rampWall1);
+    const rampWall2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
+    rampWall2.position.set(36, 2, -15);
+    addMesh(rampWall2);
+
+    // === PALACE ===
+    const palace = createBuilding(20, 10, 15, wallMat);
+    palace.position.set(55, 5, -40);
+    scene.add(palace);
+    const palaceMesh = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 15), wallMat);
+    palaceMesh.position.set(55, 5, -40);
+    worldOctree.fromGraphNode(palaceMesh);
+
+    // Palace arch entrance
+    const palaceArch = new THREE.Mesh(new THREE.BoxGeometry(6, 8, 2), darkWallMat);
+    palaceArch.position.set(45, 4, -35);
+    addMesh(palaceArch);
+
+    // === MID ===
+    // Mid boxes (window peek spot)
+    const midBox1 = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), woodMat);
+    midBox1.position.set(0, 1.5, 0);
+    addMesh(midBox1);
+    const midBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    midBox2.position.set(-4, 1, 3);
+    addMesh(midBox2);
+
+    // Connector building (mid to A)
+    const connector = createBuilding(10, 7, 20, wallMat);
+    connector.position.set(20, 3.5, -10);
+    scene.add(connector);
+    const connectorMesh = new THREE.Mesh(new THREE.BoxGeometry(10, 7, 20), wallMat);
+    connectorMesh.position.set(20, 3.5, -10);
+    worldOctree.fromGraphNode(connectorMesh);
+
+    // === CATWALK (A to Jungle) ===
+    const catwalk = new THREE.Mesh(new THREE.BoxGeometry(20, 0.3, 4), woodMat);
+    catwalk.position.set(35, 2.5, 15);
+    addMesh(catwalk);
+    // Catwalk railing
+    const catwalkRail = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 0.1), metalMat);
+    catwalkRail.position.set(35, 3.2, 17);
+    addMesh(catwalkRail);
+
+    // Stairs up to catwalk
+    for (let i = 0; i < 5; i++) {
+      const stair = new THREE.Mesh(new THREE.BoxGeometry(4, 0.3, 1), tileMat);
+      stair.position.set(25, 0.5 + i * 0.5, 15 + i * 0.8);
+      addMesh(stair);
+    }
+
+    // === B SITE (left side) ===
+    // B site platform
+    const bSitePlatform = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 28), tileMat);
+    bSitePlatform.position.set(-50, 0.15, 0);
+    addMesh(bSitePlatform);
 
     // B site boxes
-    const bBox1 = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 3), woodMat);
-    bBox1.position.set(-42, 1.5, 5);
+    const bBox1 = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 3), woodMat);
+    bBox1.position.set(-52, 1.5, 5);
     addMesh(bBox1);
     const bBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 4), woodMat);
-    bBox2.position.set(-38, 1, -6);
+    bBox2.position.set(-48, 1, -8);
     addMesh(bBox2);
 
-    // === MID AREA ===
-    // Mid boxes (like window/connector)
-    const midBox = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 6), darkWallMat);
-    midBox.position.set(0, 2, 0);
-    addMesh(midBox);
+    // Van (B site iconic)
+    const vanBody = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 3), concreteMat);
+    vanBody.position.set(-55, 2, 0);
+    addMesh(vanBody);
+    const vanCab = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), concreteMat);
+    vanCab.position.set(-55, 1.5, 3);
+    addMesh(vanCab);
 
-    // === PALACE/RAMP (A side) ===
-    const palace = new THREE.Mesh(new THREE.BoxGeometry(15, 8, 25), wallMat);
-    palace.position.set(50, 4, -35);
-    addMesh(palace);
-    // Palace entrance
-    const palaceRamp = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 10), tileMat);
-    palaceRamp.position.set(40, 0.5, -25);
-    palaceRamp.rotation.x = -0.15;
-    addMesh(palaceRamp);
+    // === B APARTMENTS ===
+    const bApps = createBuilding(18, 12, 12, wallMat);
+    bApps.position.set(-55, 6, 40);
+    scene.add(bApps);
+    const bAppsMesh = new THREE.Mesh(new THREE.BoxGeometry(18, 12, 12), wallMat);
+    bAppsMesh.position.set(-55, 6, 40);
+    worldOctree.fromGraphNode(bAppsMesh);
 
-    // === APARTMENTS/B APPS ===
-    const apartments = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 15), wallMat);
-    apartments.position.set(-50, 5, 35);
-    addMesh(apartments);
     // Apartments balcony
-    const balcony = new THREE.Mesh(new THREE.BoxGeometry(10, 0.5, 5), tileMat);
-    balcony.position.set(-40, 4, 30);
-    addMesh(balcony);
+    const appsBalcony = new THREE.Mesh(new THREE.BoxGeometry(12, 0.3, 4), tileMat);
+    appsBalcony.position.set(-46, 4, 36);
+    addMesh(appsBalcony);
+    // Balcony railing
+    const balconyRail = new THREE.Mesh(new THREE.BoxGeometry(12, 1.2, 0.1), metalMat);
+    balconyRail.position.set(-46, 4.75, 34);
+    addMesh(balconyRail);
 
-    // === CONNECTOR (between A and Mid) ===
-    const connector = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 20), darkWallMat);
-    connector.position.set(20, 3, -20);
-    addMesh(connector);
+    // === MARKET/KITCHEN ===
+    const market = createBuilding(15, 6, 10, wallMat);
+    market.position.set(-30, 3, -35);
+    scene.add(market);
+    const marketMesh = new THREE.Mesh(new THREE.BoxGeometry(15, 6, 10), wallMat);
+    marketMesh.position.set(-30, 3, -35);
+    worldOctree.fromGraphNode(marketMesh);
 
-    // === CATWALK ===
-    const catwalk = new THREE.Mesh(new THREE.BoxGeometry(25, 0.5, 4), woodMat);
-    catwalk.position.set(25, 3, 15);
-    addMesh(catwalk);
-    // Catwalk supports
-    const cwSupport1 = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), woodMat);
-    cwSupport1.position.set(15, 1.5, 15);
-    addMesh(cwSupport1);
-    const cwSupport2 = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), woodMat);
-    cwSupport2.position.set(35, 1.5, 15);
-    addMesh(cwSupport2);
+    // === UNDERPASS ===
+    const underpassCeiling = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 15), concreteMat);
+    underpassCeiling.position.set(-15, 4, -15);
+    addMesh(underpassCeiling);
+    const underpassWall1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
+    underpassWall1.position.set(-11, 2, -15);
+    addMesh(underpassWall1);
+    const underpassWall2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
+    underpassWall2.position.set(-19, 2, -15);
+    addMesh(underpassWall2);
 
-    // === MARKET/KITCHEN (B side) ===
-    const market = new THREE.Mesh(new THREE.BoxGeometry(15, 7, 12), wallMat);
-    market.position.set(-25, 3.5, -30);
-    addMesh(market);
-
-    // === SPAWN BUILDINGS ===
-    // T Spawn area
-    const tSpawn = new THREE.Mesh(new THREE.BoxGeometry(30, 10, 20), wallMat);
+    // === T SPAWN ===
+    const tSpawn = createBuilding(25, 10, 15, wallMat);
     tSpawn.position.set(0, 5, -80);
-    addMesh(tSpawn);
+    scene.add(tSpawn);
+    const tSpawnMesh = new THREE.Mesh(new THREE.BoxGeometry(25, 10, 15), wallMat);
+    tSpawnMesh.position.set(0, 5, -80);
+    worldOctree.fromGraphNode(tSpawnMesh);
 
-    // CT Spawn area  
-    const ctSpawn = new THREE.Mesh(new THREE.BoxGeometry(25, 8, 15), wallMat);
+    // T spawn side buildings
+    const tSpawnLeft = createBuilding(12, 8, 10, darkWallMat);
+    tSpawnLeft.position.set(-20, 4, -70);
+    scene.add(tSpawnLeft);
+    const tSpawnLeftMesh = new THREE.Mesh(new THREE.BoxGeometry(12, 8, 10), darkWallMat);
+    tSpawnLeftMesh.position.set(-20, 4, -70);
+    worldOctree.fromGraphNode(tSpawnLeftMesh);
+
+    // === CT SPAWN ===
+    const ctSpawn = createBuilding(20, 8, 12, wallMat);
     ctSpawn.position.set(0, 4, 80);
-    addMesh(ctSpawn);
+    scene.add(ctSpawn);
+    const ctSpawnMesh = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 12), wallMat);
+    ctSpawnMesh.position.set(0, 4, 80);
+    worldOctree.fromGraphNode(ctSpawnMesh);
 
-    // === BOUNDARY WALLS ===
-    const wall1 = new THREE.Mesh(new THREE.BoxGeometry(200, 15, 3), darkWallMat);
-    wall1.position.set(0, 7.5, -98);
-    addMesh(wall1);
-    const wall2 = new THREE.Mesh(new THREE.BoxGeometry(200, 15, 3), darkWallMat);
-    wall2.position.set(0, 7.5, 98);
-    addMesh(wall2);
-    const wall3 = new THREE.Mesh(new THREE.BoxGeometry(3, 15, 200), darkWallMat);
-    wall3.position.set(-98, 7.5, 0);
-    addMesh(wall3);
-    const wall4 = new THREE.Mesh(new THREE.BoxGeometry(3, 15, 200), darkWallMat);
-    wall4.position.set(98, 7.5, 0);
-    addMesh(wall4);
-
-    // === COVER BOXES scattered around ===
-    const coverPositions = [
-      [15, 1, 30], [-15, 1, -25], [25, 1, -45], [-30, 1, 45],
-      [60, 1, 30], [-60, 1, -30], [10, 1, 55], [-10, 1, -55],
+    // === BOUNDARY WALLS (styled) ===
+    const boundaryHeight = 18;
+    const boundaryWalls = [
+      { pos: [0, boundaryHeight/2, -120], size: [250, boundaryHeight, 3] },
+      { pos: [0, boundaryHeight/2, 120], size: [250, boundaryHeight, 3] },
+      { pos: [-120, boundaryHeight/2, 0], size: [3, boundaryHeight, 250] },
+      { pos: [120, boundaryHeight/2, 0], size: [3, boundaryHeight, 250] },
     ];
-    coverPositions.forEach(pos => {
-      const cover = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-      cover.position.set(pos[0], pos[1], pos[2]);
+    boundaryWalls.forEach(w => {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w.size[0], w.size[1], w.size[2]), darkWallMat);
+      wall.position.set(w.pos[0], w.pos[1], w.pos[2]);
+      addMesh(wall);
+    });
+
+    // === SCATTERED COVER ===
+    const coverSpots = [
+      { pos: [15, 1, 35], size: [3, 2, 2] },
+      { pos: [-15, 1, -25], size: [2.5, 1.8, 2.5] },
+      { pos: [30, 1, -50], size: [3, 2.5, 3] },
+      { pos: [-35, 1, 50], size: [2, 1.5, 3] },
+      { pos: [70, 1, 25], size: [2.5, 2, 2.5] },
+      { pos: [-70, 1, -25], size: [3, 2, 2] },
+      { pos: [10, 1, 60], size: [2, 1.8, 2] },
+      { pos: [-10, 1, -60], size: [2.5, 2, 2.5] },
+    ];
+    coverSpots.forEach(c => {
+      const cover = new THREE.Mesh(new THREE.BoxGeometry(c.size[0], c.size[1], c.size[2]), woodMat);
+      cover.position.set(c.pos[0], c.pos[1], c.pos[2]);
       addMesh(cover);
     });
 
-    // === BARRELS ===
-    const barrelPositions = [
-      [35, 1, 10], [-35, 1, -10], [5, 1, 40], [-5, 1, -40],
+    // === BARRELS & PROPS ===
+    const barrelSpots = [
+      [38, 1, 12], [-38, 1, -12], [8, 1, 45], [-8, 1, -45],
+      [60, 1, -15], [-60, 1, 15], [25, 1, 30], [-25, 1, -30],
     ];
-    barrelPositions.forEach(pos => {
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 8), greenMat);
+    barrelSpots.forEach(pos => {
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.8, 0.8, 1.8, 12),
+        new THREE.MeshStandardMaterial({ color: 0x3a5a4a, roughness: 0.7 })
+      );
       barrel.position.set(pos[0], pos[1], pos[2]);
       addMesh(barrel);
     });
+
+    // === FIRST PERSON AWP WEAPON ===
+    const fpWeapon = new THREE.Group();
+    
+    // AWP body
+    const fpBarrel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.8, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.3 })
+    );
+    fpBarrel.position.set(0, 0, -0.4);
+    fpWeapon.add(fpBarrel);
+    
+    // AWP receiver
+    const fpReceiver = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.15, 0.25),
+      new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.4 })
+    );
+    fpReceiver.position.set(0, -0.05, 0);
+    fpWeapon.add(fpReceiver);
+    
+    // Scope
+    const fpScope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.03, 0.2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 })
+    );
+    fpScope.rotation.x = Math.PI / 2;
+    fpScope.position.set(0, 0.08, -0.1);
+    fpWeapon.add(fpScope);
+    
+    // Scope rings
+    const scopeRing1 = new THREE.Mesh(
+      new THREE.TorusGeometry(0.035, 0.008, 8, 16),
+      new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 })
+    );
+    scopeRing1.rotation.y = Math.PI / 2;
+    scopeRing1.position.set(0, 0.08, -0.05);
+    fpWeapon.add(scopeRing1);
+    
+    const scopeRing2 = new THREE.Mesh(
+      new THREE.TorusGeometry(0.035, 0.008, 8, 16),
+      new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 })
+    );
+    scopeRing2.rotation.y = Math.PI / 2;
+    scopeRing2.position.set(0, 0.08, -0.15);
+    fpWeapon.add(scopeRing2);
+    
+    // Stock
+    const fpStock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.12, 0.2),
+      new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.5 })
+    );
+    fpStock.position.set(0, -0.02, 0.2);
+    fpWeapon.add(fpStock);
+    
+    // Magazine
+    const fpMag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.12, 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 })
+    );
+    fpMag.position.set(0, -0.12, 0.05);
+    fpWeapon.add(fpMag);
+    
+    // Bolt
+    const fpBolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.012, 0.08, 8),
+      new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.1 })
+    );
+    fpBolt.rotation.z = Math.PI / 2;
+    fpBolt.position.set(0.04, 0.02, -0.05);
+    fpWeapon.add(fpBolt);
+    
+    // Position weapon in view
+    fpWeapon.position.set(0.25, -0.2, -0.5);
+    fpWeapon.rotation.set(0, 0, 0);
+    camera.add(fpWeapon);
+    scene.add(camera);
 
     // Player capsule collision
     const playerCapsule = new Capsule(
@@ -839,7 +1169,8 @@ export default function FPSArena() {
       <div className="absolute bottom-6 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
         <div>WASD - Move</div>
         <div>Mouse - Look</div>
-        <div>Click/Space - Shoot</div>
+        <div>Click - Shoot AWP</div>
+        <div>Space - Jump</div>
         <div>Click screen to lock pointer</div>
       </div>
     </div>
