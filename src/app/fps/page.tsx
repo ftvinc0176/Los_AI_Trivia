@@ -50,6 +50,7 @@ export default function FPSArena() {
   const atBombSiteRef = useRef<'A' | 'B' | null>(null);
   const bombPositionRef = useRef<{x: number, y: number, z: number} | null>(null);
   const bombPlantedRef = useRef(false);
+  const socketRef = useRef<Socket | null>(null);
 
   // Weapon configs
   const weaponConfig = {
@@ -1290,7 +1291,6 @@ export default function FPSArena() {
     let currentRocketIndex = 0;
 
     // Socket setup
-    const socketRef = { current: null as Socket | null };
     const remotePlayers: Map<string, any> = new Map();
 
     const initSocket = () => {
