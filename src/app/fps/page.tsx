@@ -1605,8 +1605,9 @@ export default function FPSArena() {
     };
 
     const controls = (deltaTime: number) => {
-      // Freeze players during countdown in buy phase
-      if (roundPhaseRef.current === 'buy' && countdownRef.current > 0) {
+      // Freeze players ONLY during countdown in buy phase
+      const shouldFreeze = roundPhaseRef.current === 'buy' && countdownRef.current > 0;
+      if (shouldFreeze) {
         return;
       }
       
@@ -1671,8 +1672,8 @@ export default function FPSArena() {
     };
 
     const teleportPlayerIfOob = () => {
-      // Teleport if out of bounds OR if round just ended
-      if (camera.position.y <= -25 || roundPhase === 'buy') {
+      // Teleport if out of bounds OR if in buy phase countdown (to reset positions)
+      if (camera.position.y <= -25 || (roundPhaseRef.current === 'buy' && countdownRef.current === 10)) {
         const spawn = selectedTeam === 'T'
           ? { x: 0, z: -70 }
           : { x: 25, z: 20 };
