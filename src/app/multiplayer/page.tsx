@@ -601,7 +601,8 @@ export default function Multiplayer() {
                 {option}
               </button>
             ))}
-          </div>          )}        </div>
+          </div>
+        </div>
       </div>
     );
   }
