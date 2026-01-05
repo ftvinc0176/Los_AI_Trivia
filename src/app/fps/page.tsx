@@ -19,61 +19,19 @@ export default function FPSArena() {
   const createSoldierModel = () => {
     const soldier = new THREE.Group();
 
-    // Feet/boots (at ground level)
-    const bootGeometry = new THREE.BoxGeometry(0.2, 0.15, 0.25);
-    const bootMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
-    
-    const leftBoot = new THREE.Mesh(bootGeometry, bootMaterial);
-    leftBoot.position.set(-0.12, 0.075, 0);
-    leftBoot.castShadow = true;
-    soldier.add(leftBoot);
-
-    const rightBoot = new THREE.Mesh(bootGeometry, bootMaterial);
-    rightBoot.position.set(0.12, 0.075, 0);
-    rightBoot.castShadow = true;
-    soldier.add(rightBoot);
-
-    // Legs (from boots to waist)
-    const legGeometry = new THREE.BoxGeometry(0.18, 0.7, 0.18);
-    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x3a4a3a }); // Dark pants
-    
-    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    leftLeg.position.set(-0.12, 0.5, 0);
-    leftLeg.castShadow = true;
-    soldier.add(leftLeg);
-
-    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-    rightLeg.position.set(0.12, 0.5, 0);
-    rightLeg.castShadow = true;
-    soldier.add(rightLeg);
-
     // Body (torso)
     const bodyGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.3);
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x2a5a2a }); // Military green
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 1.25;
+    body.position.y = 0.9;
     body.castShadow = true;
     soldier.add(body);
-
-    // Arms
-    const armGeometry = new THREE.BoxGeometry(0.15, 0.7, 0.15);
-    const armMaterial = new THREE.MeshStandardMaterial({ color: 0x2a5a2a });
-    
-    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-    leftArm.position.set(-0.35, 1.2, 0);
-    leftArm.castShadow = true;
-    soldier.add(leftArm);
-
-    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-    rightArm.position.set(0.35, 1.2, 0);
-    rightArm.castShadow = true;
-    soldier.add(rightArm);
 
     // Head
     const headGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
     const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffdbac }); // Skin tone
     const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.y = 1.8;
+    head.position.y = 1.5;
     head.castShadow = true;
     soldier.add(head);
 
@@ -81,15 +39,43 @@ export default function FPSArena() {
     const helmetGeometry = new THREE.BoxGeometry(0.32, 0.2, 0.32);
     const helmetMaterial = new THREE.MeshStandardMaterial({ color: 0x1a3a1a }); // Dark green
     const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
-    helmet.position.y = 1.95;
+    helmet.position.y = 1.65;
     helmet.castShadow = true;
     soldier.add(helmet);
 
+    // Arms
+    const armGeometry = new THREE.BoxGeometry(0.15, 0.6, 0.15);
+    const armMaterial = new THREE.MeshStandardMaterial({ color: 0x2a5a2a });
+    
+    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+    leftArm.position.set(-0.35, 0.9, 0);
+    leftArm.castShadow = true;
+    soldier.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+    rightArm.position.set(0.35, 0.9, 0);
+    rightArm.castShadow = true;
+    soldier.add(rightArm);
+
+    // Legs
+    const legGeometry = new THREE.BoxGeometry(0.18, 0.6, 0.18);
+    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x3a4a3a }); // Dark pants
+    
+    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    leftLeg.position.set(-0.12, 0.3, 0);
+    leftLeg.castShadow = true;
+    soldier.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    rightLeg.position.set(0.12, 0.3, 0);
+    rightLeg.castShadow = true;
+    soldier.add(rightLeg);
+
     // Weapon (rifle)
-    const weaponGeometry = new THREE.BoxGeometry(0.1, 0.6, 0.1);
+    const weaponGeometry = new THREE.BoxGeometry(0.1, 0.5, 0.1);
     const weaponMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
     const weapon = new THREE.Mesh(weaponGeometry, weaponMaterial);
-    weapon.position.set(0.25, 1.2, 0.2);
+    weapon.position.set(0.25, 0.9, 0.2);
     weapon.rotation.x = Math.PI / 4;
     weapon.castShadow = true;
     soldier.add(weapon);
@@ -146,10 +132,10 @@ export default function FPSArena() {
   useEffect(() => {
     if (!gameStarted || !containerRef.current) return;
 
-    // Scene setup - Rust-style atmosphere
+    // Scene setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xa0a8b0); // Overcast sky
-    scene.fog = new THREE.Fog(0xa0a8b0, 50, 300);
+    scene.background = new THREE.Color(0x88ccff);
+    scene.fog = new THREE.Fog(0x88ccff, 0, 500);
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -174,12 +160,12 @@ export default function FPSArena() {
     labelRenderer.domElement.style.pointerEvents = 'none';
     containerRef.current.appendChild(labelRenderer.domElement);
 
-    // Lighting - Overcast industrial atmosphere
-    const ambientLight = new THREE.AmbientLight(0xb0b8c0, 0.6);
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff8e0, 1.2);
-    dirLight.position.set(-30, 40, -20);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(-25, 25, -25);
     dirLight.castShadow = true;
     dirLight.shadow.camera.near = 0.1;
     dirLight.shadow.camera.far = 500;
@@ -196,25 +182,17 @@ export default function FPSArena() {
     // World octree for collision
     const worldOctree = new Octree();
 
-    // Ground - Concrete/dirt terrain
-    const groundGeometry = new THREE.PlaneGeometry(200, 200, 10, 10);
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x6b6b5a,
-      roughness: 0.9,
-      metalness: 0.1
-    });
+    // Ground
+    const groundGeometry = new THREE.PlaneGeometry(200, 200);
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x3a8a3a });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
     worldOctree.fromGraphNode(ground);
 
-    // Walls - Rusted corrugated metal
-    const wallMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x8b4726,
-      roughness: 0.8,
-      metalness: 0.3
-    });
+    // Walls
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
     
     const wall1 = new THREE.Mesh(new THREE.BoxGeometry(200, 20, 5), wallMaterial);
     wall1.position.set(0, 10, -100);
@@ -244,111 +222,31 @@ export default function FPSArena() {
     scene.add(wall4);
     worldOctree.fromGraphNode(wall4);
 
-    // Rust-style industrial structures
-    
-    // Shipping Containers
-    const containerMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x8b4726, 
-      roughness: 0.85,
-      metalness: 0.4
-    });
-    
-    // Large shipping containers (iconic Rust structures)
-    const container1 = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 3), containerMaterial);
-    container1.position.set(0, 3, 0);
-    container1.castShadow = true;
-    container1.receiveShadow = true;
-    scene.add(container1);
-    worldOctree.fromGraphNode(container1);
-
-    const container2 = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 3), containerMaterial);
-    container2.position.set(0, 9, 0);
-    container2.castShadow = true;
-    container2.receiveShadow = true;
-    scene.add(container2);
-    worldOctree.fromGraphNode(container2);
-
-    const container3 = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 3), containerMaterial);
-    container3.position.set(30, 3, 30);
-    container3.rotation.y = Math.PI / 4;
-    container3.castShadow = true;
-    container3.receiveShadow = true;
-    scene.add(container3);
-    worldOctree.fromGraphNode(container3);
-
-    const container4 = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 3), containerMaterial);
-    container4.position.set(-30, 3, -30);
-    container4.rotation.y = -Math.PI / 4;
-    container4.castShadow = true;
-    container4.receiveShadow = true;
-    scene.add(container4);
-    worldOctree.fromGraphNode(container4);
-
-    // Metal crates and barrels
-    const crateMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x4a4a3a,
-      roughness: 0.7,
-      metalness: 0.2
-    });
-
-    // Metal crates scattered around
-    const cratePositions = [
-      [15, 1, 15], [-15, 1, -15], [25, 1, -25], [-25, 1, 25],
-      [40, 1, 0], [-40, 1, 0], [0, 1, 40], [0, 1, -40],
-      [20, 1, -10], [-20, 1, 10], [10, 1, 20], [-10, 1, -20]
+    // Cover obstacles
+    const obstacles = [
+      { pos: [0, 2.5, 0], size: [10, 5, 10] },
+      { pos: [30, 2.5, 30], size: [8, 5, 8] },
+      { pos: [-30, 2.5, -30], size: [8, 5, 8] },
+      { pos: [30, 2.5, -30], size: [6, 5, 6] },
+      { pos: [-30, 2.5, 30], size: [6, 5, 6] },
+      { pos: [50, 2.5, 0], size: [10, 5, 5] },
+      { pos: [-50, 2.5, 0], size: [10, 5, 5] },
+      { pos: [0, 2.5, 50], size: [5, 5, 10] },
+      { pos: [0, 2.5, -50], size: [5, 5, 10] },
     ];
 
-    cratePositions.forEach(pos => {
-      const crate = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), crateMaterial);
-      crate.position.set(pos[0], pos[1], pos[2]);
-      crate.rotation.y = Math.random() * Math.PI;
-      crate.castShadow = true;
-      crate.receiveShadow = true;
-      scene.add(crate);
-      worldOctree.fromGraphNode(crate);
+    obstacles.forEach((obs) => {
+      const obsMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(obs.size[0], obs.size[1], obs.size[2]),
+        obsMaterial
+      );
+      box.position.set(obs.pos[0], obs.pos[1], obs.pos[2]);
+      box.castShadow = true;
+      box.receiveShadow = true;
+      scene.add(box);
+      worldOctree.fromGraphNode(box);
     });
-
-    // Rusted barrels
-    const barrelMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x8b5a2b,
-      roughness: 0.9,
-      metalness: 0.3
-    });
-
-    const barrelPositions = [
-      [5, 1.5, 5], [-5, 1.5, -5], [35, 1.5, -10], [-35, 1.5, 10],
-      [12, 1.5, -12], [-12, 1.5, 12], [8, 1.5, 25], [-8, 1.5, -25]
-    ];
-
-    barrelPositions.forEach(pos => {
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3, 8), barrelMaterial);
-      barrel.position.set(pos[0], pos[1], pos[2]);
-      barrel.castShadow = true;
-      barrel.receiveShadow = true;
-      scene.add(barrel);
-      worldOctree.fromGraphNode(barrel);
-    });
-
-    // Concrete blocks
-    const concreteMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x707070,
-      roughness: 0.95,
-      metalness: 0.0
-    });
-
-    const concrete1 = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 4), concreteMaterial);
-    concrete1.position.set(45, 1.5, 20);
-    concrete1.castShadow = true;
-    concrete1.receiveShadow = true;
-    scene.add(concrete1);
-    worldOctree.fromGraphNode(concrete1);
-
-    const concrete2 = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 4), concreteMaterial);
-    concrete2.position.set(-45, 1.5, -20);
-    concrete2.castShadow = true;
-    concrete2.receiveShadow = true;
-    scene.add(concrete2);
-    worldOctree.fromGraphNode(concrete2);
 
     // Player capsule collision
     const playerCapsule = new Capsule(
