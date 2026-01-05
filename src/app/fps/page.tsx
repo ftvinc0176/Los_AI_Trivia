@@ -34,6 +34,8 @@ export default function FPSArena() {
   const [waitingForPlayers, setWaitingForPlayers] = useState(true);
   const [countdown, setCountdown] = useState(10);
   const [atBombSite, setAtBombSite] = useState<'A' | 'B' | null>(null);
+  const [bombPosition, setBombPosition] = useState<{x: number, y: number, z: number} | null>(null);
+  const [teamCounts, setTeamCounts] = useState({T: 0, CT: 0});
   
   const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
@@ -681,11 +683,11 @@ export default function FPSArena() {
     // MIRAGE MAP - PROPER ENCLOSED CORRIDORS
     // ============================================
 
-    // === T SPAWN (bottom center) ===
-    buildRoom(0, -70, 30, 20, [
-      { side: 'n', pos: -8, width: 5 },  // Exit to T apartments (left)
-      { side: 'n', pos: 8, width: 5 },   // Exit to mid
-    ], false); // Open roof
+    // === T SPAWN (bottom center) - FULLY OPEN ===
+    // Just add floor, no walls so players can't get stuck
+    const tSpawnFloor = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 20), sandMat);
+    tSpawnFloor.position.set(0, -0.25, -70);
+    addMesh(tSpawnFloor);
 
     // === T APARTMENTS (T spawn to B) ===
     buildRoom(-20, -55, 10, 15, [
@@ -854,6 +856,44 @@ export default function FPSArena() {
     bombSiteB.position.set(-35, 0.1, -10); // B Site center
     scene.add(bombSiteB);
 
+    // === C4 BOMB MODEL (hidden until planted) ===
+    const bombGroup = new THREE.Group();
+    
+    // Main bomb body
+    const bombBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.15, 0.2),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8, roughness: 0.3 })
+    );
+    bombGroup.add(bombBody);
+    
+    // Red LED display
+    const ledDisplay = new THREE.Mesh(
+      new THREE.BoxGeometry(0.25, 0.08, 0.05),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff0000, 
+        emissive: 0xff0000,
+        emissiveIntensity: 0.8
+      })
+    );
+    ledDisplay.position.set(0, 0.05, 0.1);
+    bombGroup.add(ledDisplay);
+    
+    // Wires
+    for (let i = 0; i < 3; i++) {
+      const wire = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.01, 0.15, 8),
+        new THREE.MeshStandardMaterial({ 
+          color: i === 0 ? 0xff0000 : i === 1 ? 0x0000ff : 0x00ff00 
+        })
+      );
+      wire.position.set(-0.1 + i * 0.1, -0.05, -0.05);
+      wire.rotation.x = Math.PI / 2;
+      bombGroup.add(wire);
+    }
+    
+    bombGroup.visible = false;
+    scene.add(bombGroup);
+
     // === FIRST PERSON WEAPON (dynamic based on selected weapon) ===
     const createFirstPersonWeapon = (weaponType: WeaponType) => {
       const fpWeapon = new THREE.Group();
@@ -1016,6 +1056,29 @@ export default function FPSArena() {
     const hitSound = createHitSound();
     const hurtSound = createHitSound();
 
+    // Bomb plant sound
+    const createBombSound = () => {
+      const sound = new THREE.Audio(audioListener);
+      const audioContext = audioListener.context;
+      const duration = 1.5;
+      const sampleRate = audioContext.sampleRate;
+      const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
+      const data = buffer.getChannelData(0);
+      
+      for (let i = 0; i < buffer.length; i++) {
+        const t = i / sampleRate;
+        // Beeping sound
+        const beep = Math.sin(2 * Math.PI * 800 * t) * Math.exp(-t * 2);
+        data[i] = beep * 0.5;
+      }
+      
+      sound.setBuffer(buffer);
+      sound.setVolume(0.7);
+      return sound;
+    };
+
+    const bombPlantSound = createBombSound();
+
     // Function to update first-person weapon
     const updateFirstPersonWeapon = (weaponType: WeaponType) => {
       camera.remove(currentWeapon);
@@ -1068,24 +1131,44 @@ export default function FPSArena() {
           setTimeout(() => {
             setBombPlanted(true);
             setIsPlanting(false);
+            const bombPos = { x: camera.position.x, y: 0.2, z: camera.position.z };
+            setBombPosition(bombPos);
+            
+            // Show and position bomb model
+            bombGroup.position.set(bombPos.x, bombPos.y, bombPos.z);
+            bombGroup.visible = true;
+            
+            // Play bomb plant sound
+            if (bombPlantSound.isPlaying) bombPlantSound.stop();
+            bombPlantSound.play();
+            
             if (socketRef.current) {
               socketRef.current.emit('fpsPlantBomb', { 
-                position: [camera.position.x, camera.position.y, camera.position.z],
+                position: [bombPos.x, bombPos.y, bombPos.z],
                 site: atBombSite
               });
             }
           }, 3000); // 3 second plant time
-        } else if (selectedTeam === 'CT' && bombPlanted && !isDefusing) {
-          // Check if near bomb (simplified)
-          setIsDefusing(true);
-          setTimeout(() => {
-            setBombPlanted(false);
-            setIsDefusing(false);
-            setCtScore(prev => prev + 1);
-            if (socketRef.current) {
-              socketRef.current.emit('fpsDefuseBomb');
-            }
-          }, 10000); // 10 second defuse time
+        } else if (selectedTeam === 'CT' && bombPlanted && !isDefusing && bombPosition) {
+          // Check if near bomb
+          const distToBomb = Math.sqrt(
+            Math.pow(camera.position.x - bombPosition.x, 2) + 
+            Math.pow(camera.position.z - bombPosition.z, 2)
+          );
+          
+          if (distToBomb < 2) {
+            setIsDefusing(true);
+            setTimeout(() => {
+              setBombPlanted(false);
+              setIsDefusing(false);
+              setBombPosition(null);
+              bombGroup.visible = false;
+              setCtScore(prev => prev + 1);
+              if (socketRef.current) {
+                socketRef.current.emit('fpsDefuseBomb');
+              }
+            }, 10000); // 10 second defuse time
+          }
         }
       }
     });
@@ -1145,7 +1228,19 @@ export default function FPSArena() {
       const socket = io(serverUrl);
       socketRef.current = socket;
 
-      socket.emit('fpsJoin', { name: playerName });
+      socket.emit('fpsJoin', { name: playerName, team: selectedTeam });
+
+      // Listen for team counts
+      socket.on('fpsTeamCounts', (counts: {T: number, CT: number}) => {
+        setTeamCounts(counts);
+        // Check if both teams have at least 1 player
+        if (counts.T > 0 && counts.CT > 0) {
+          setWaitingForPlayers(false);
+        } else {
+          setWaitingForPlayers(true);
+          setCountdown(10); // Reset countdown when teams become unbalanced
+        }
+      });
 
       socket.on('fpsPlayers', (players: any) => {
         Object.entries(players).forEach(([id, playerData]: [string, any]) => {
@@ -1236,6 +1331,24 @@ export default function FPSArena() {
           scene.remove(player.mesh);
           remotePlayers.delete(id);
         }
+      });
+
+      socket.on('fpsBombPlanted', ({ position }: any) => {
+        setBombPlanted(true);
+        const bombPos = { x: position[0], y: position[1], z: position[2] };
+        setBombPosition(bombPos);
+        bombGroup.position.set(bombPos.x, bombPos.y, bombPos.z);
+        bombGroup.visible = true;
+        
+        // Play bomb plant sound
+        if (bombPlantSound.isPlaying) bombPlantSound.stop();
+        bombPlantSound.play();
+      });
+
+      socket.on('fpsBombDefused', () => {
+        setBombPlanted(false);
+        setBombPosition(null);
+        bombGroup.visible = false;
       });
 
       socket.on('fpsShot', ({ id, position, direction, damage }: any) => {
@@ -1565,6 +1678,13 @@ export default function FPSArena() {
       updateRemotePlayers();
       teleportPlayerIfOob();
       
+      // Make bomb LED blink when planted
+      if (bombPlanted && bombGroup.visible) {
+        const blinkSpeed = 2; // Blinks per second
+        const intensity = (Math.sin(Date.now() * 0.001 * blinkSpeed * Math.PI * 2) + 1) / 2;
+        ledDisplay.material.emissiveIntensity = 0.4 + intensity * 0.6;
+      }
+      
       // Check if player is at bomb site
       const distToA = Math.sqrt(
         Math.pow(camera.position.x - 50, 2) + 
@@ -1687,19 +1807,6 @@ export default function FPSArena() {
       }
     }
   }, [gameStarted, roundPhase, selectedTeam, countdown, waitingForPlayers]);
-
-  // Team balance check - need at least 1 player per team
-  useEffect(() => {
-    if (!gameStarted) return;
-    
-    // This would normally check server-side for team counts
-    // For now, assume teams are balanced after 3 seconds (simplified)
-    const timer = setTimeout(() => {
-      setWaitingForPlayers(false);
-    }, 3000);
-    
-    return () => clearTimeout(timer);
-  }, [gameStarted]);
 
   // Handle weapon change from menu
   const handleWeaponSelect = (weapon: WeaponType) => {
@@ -1880,6 +1987,11 @@ export default function FPSArena() {
         )}
         {isPlanting && (
           <div className="text-sm text-yellow-400 font-bold mt-2">PLANTING...</div>
+        )}
+        {bombPlanted && selectedTeam === 'CT' && bombPosition && (
+          <div className="text-sm text-orange-400 font-bold mt-2">
+            FIND THE BOMB - Press E to Defuse
+          </div>
         )}
         {isDefusing && (
           <div className="text-sm text-blue-400 font-bold mt-2">DEFUSING...</div>
