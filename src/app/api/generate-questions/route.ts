@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'AIzaSyCYugGiZqVvV3hJwi5BXIbJX40WOGSEzng');
 
 interface Question {
   question: string;
@@ -11,60 +11,23 @@ interface Question {
 
 export async function POST(request: NextRequest) {
   try {
-    const { category, difficulty, count, progressive, categories, questionNumber } = await request.json();
+    const { category, difficulty, count } = await request.json();
 
-    // Progressive loading: Generate 2 questions at a time with increasing difficulty
-    if (progressive && questionNumber !== undefined) {
-      // Determine difficulty based on question number
-      let difficultyLevel = 'college medium';
-      if (questionNumber >= 9) difficultyLevel = 'genius level';
-      else if (questionNumber >= 7) difficultyLevel = 'expert hard';
-      else if (questionNumber >= 5) difficultyLevel = 'expert';
-      else if (questionNumber >= 3) difficultyLevel = 'college hard';
-      
-      const response = await client.responses.create({
-        model: 'gpt-5-nano',
-        input: `Generate 2 ${difficultyLevel} trivia questions. Each from a different random category from: ${categories.join(', ')}. Return JSON array: [{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`
-      });
-
-      let text = response.output_text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const questions: Question[] = JSON.parse(text);
-
-      if (questions.length !== 2) {
-        throw new Error('Invalid response format from AI');
-      }
-
-      for (const q of questions) {
-        if (!q.question || !Array.isArray(q.options) || q.options.length !== 4 || 
-            typeof q.correctAnswer !== 'number' || q.correctAnswer < 0 || q.correctAnswer > 3) {
-          throw new Error('Invalid question format');
-        }
-      }
-
-      return NextResponse.json({ questions });
-    }
-
-    // Standard single request for multiplayer or non-progressive mode
-    let prompt = '';
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     
-    if (progressive && categories) {
-      prompt = `Generate ${count} unique trivia questions. Each from a different category: ${categories.join(', ')}. Progressive difficulty. Return JSON array: [{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`;
-    } else {
-      prompt = `Generate ${count} ${difficulty} trivia questions about ${category}. Return JSON array: [{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]`;
-    }
+    const prompt = `Generate ${count} ${difficulty} trivia questions about ${category}. Return ONLY a JSON array:\n[{"question":"text","options":["A","B","C","D"],"correctAnswer":0}]\ncorrectAnswer is the index (0-3).`;
 
-    // Use OpenAI GPT-5-nano for free text generation
-    const response = await client.responses.create({
-      model: 'gpt-5-nano',
-      input: prompt
-    });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     
-    let text = response.output_text;
-
-    // Clean up the response - remove markdown code blocks if present
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-    const questions: Question[] = JSON.parse(text);
+    // Extract JSON from response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response');
+    }
+    
+    const questions: Question[] = JSON.parse(jsonMatch[0]);
 
     // Validate the response
     if (!Array.isArray(questions) || questions.length !== count) {
