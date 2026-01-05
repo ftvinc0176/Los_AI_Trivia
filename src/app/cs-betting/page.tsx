@@ -215,12 +215,19 @@ export default function CSBetting() {
     const wallH = 6;
     const wallThick = 1;
 
-    // Helper to add mesh with collision
+    // Helper to add mesh with collision (for walls)
     const addMesh = (mesh: THREE.Mesh) => {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       scene.add(mesh);
       worldOctree.fromGraphNode(mesh);
+    };
+
+    // Helper to add mesh WITHOUT collision (for floors)
+    const addFloor = (mesh: THREE.Mesh) => {
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      // Don't add to octree - bots should walk on floors, not collide with them
     };
 
     // ===== ROOM BUILDER =====
@@ -231,10 +238,10 @@ export default function CSBetting() {
       hasRoof: boolean = true,
       mat: THREE.Material = wallMat
     ) => {
-      // Floor
+      // Floor - visual only, no collision
       const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), tileMat);
       floor.position.set(x, 0.15, z);
-      addMesh(floor);
+      addFloor(floor);
 
       const buildWallWithDoor = (
         wx: number, wz: number, 
@@ -312,7 +319,7 @@ export default function CSBetting() {
     ground.position.y = -0.1;
     ground.receiveShadow = true;
     scene.add(ground);
-    worldOctree.fromGraphNode(ground);
+    // Don't add ground to octree - bots walk on it
 
     // ============================================
     // MIRAGE MAP LAYOUT
@@ -321,7 +328,7 @@ export default function CSBetting() {
     // === T SPAWN ===
     const tSpawnFloor = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 20), sandMat);
     tSpawnFloor.position.set(0, -0.25, -70);
-    addMesh(tSpawnFloor);
+    addFloor(tSpawnFloor);
 
     // === T APARTMENTS ===
     buildRoom(-20, -55, 10, 15, [
