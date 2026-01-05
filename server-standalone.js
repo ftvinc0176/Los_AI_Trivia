@@ -63,8 +63,7 @@ async function generateQuestions(category, difficulty, count) {
 
     const response = await client.responses.create({
       model: 'gpt-5-nano',
-      input: prompt,
-      max_tokens: 2000
+      input: prompt
     });
 
     const text = response.output_text;
