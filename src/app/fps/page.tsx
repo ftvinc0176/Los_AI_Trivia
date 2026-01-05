@@ -56,6 +56,10 @@ export default function FPSArena() {
   const playerCapsuleRef = useRef<Capsule | null>(null);
   const defuseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isDefusingRef = useRef(false);
+  const bombGroupRef = useRef<THREE.Group | null>(null);
+  const plantTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPlantingRef = useRef(false);
+  const plantStartPosRef = useRef<{x: number, z: number} | null>(null);
 
   // Weapon configs
   const weaponConfig = {
@@ -96,12 +100,21 @@ export default function FPSArena() {
     setPlantedSite(null);
     setBombTimer(40);
     setIsPlanting(false);
+    isPlantingRef.current = false;
     setIsDefusing(false);
     isDefusingRef.current = false;
     setDefuseTimer(5);
     if (defuseIntervalRef.current) {
       clearInterval(defuseIntervalRef.current);
       defuseIntervalRef.current = null;
+    }
+    if (plantTimeoutRef.current) {
+      clearTimeout(plantTimeoutRef.current);
+      plantTimeoutRef.current = null;
+    }
+    // Hide bomb model on round reset
+    if (bombGroupRef.current) {
+      bombGroupRef.current.visible = false;
     }
     
     // Reset bomb for Terrorists
@@ -1170,93 +1183,251 @@ export default function FPSArena() {
     }
     
     bombGroup.visible = false;
+    bombGroupRef.current = bombGroup;
     scene.add(bombGroup);
 
     // === FIRST PERSON WEAPON (dynamic based on selected weapon) ===
     const createFirstPersonWeapon = (weaponType: WeaponType) => {
       const fpWeapon = new THREE.Group();
       
+      const metalMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.7, roughness: 0.3 });
+      const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.8, roughness: 0.2 });
+      const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.7 });
+      const greenMat = new THREE.MeshStandardMaterial({ color: 0x2d4a3e, metalness: 0.5, roughness: 0.4 });
+      
       if (weaponType === 'awp') {
-        const fpBarrel = new THREE.Mesh(
-          new THREE.BoxGeometry(0.04, 0.8, 0.04),
-          new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.3 })
+        // AWP - Long sniper rifle with scope
+        // Barrel (long, extending forward into -Z)
+        const barrel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.015, 0.02, 0.6, 8),
+          darkMat
         );
-        fpBarrel.position.set(0, 0, -0.4);
-        fpWeapon.add(fpBarrel);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0, -0.4);
+        fpWeapon.add(barrel);
         
-        const fpScope = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.025, 0.03, 0.2, 8),
-          new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 })
+        // Receiver body
+        const receiver = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.08, 0.25),
+          greenMat
         );
-        fpScope.rotation.x = Math.PI / 2;
-        fpScope.position.set(0, 0.08, -0.1);
-        fpWeapon.add(fpScope);
+        receiver.position.set(0, -0.02, -0.05);
+        fpWeapon.add(receiver);
         
-        const fpStock = new THREE.Mesh(
-          new THREE.BoxGeometry(0.05, 0.12, 0.2),
-          new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.5 })
+        // Scope
+        const scope = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.025, 0.18, 12),
+          darkMat
         );
-        fpStock.position.set(0, -0.02, 0.2);
-        fpWeapon.add(fpStock);
+        scope.rotation.x = Math.PI / 2;
+        scope.position.set(0, 0.06, -0.08);
+        fpWeapon.add(scope);
+        
+        // Scope lens (front)
+        const lens = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.02, 0.025, 0.01, 12),
+          new THREE.MeshStandardMaterial({ color: 0x4488ff, metalness: 0.9, roughness: 0.1 })
+        );
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(0, 0.06, -0.17);
+        fpWeapon.add(lens);
+        
+        // Stock
+        const stock = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.1, 0.18),
+          greenMat
+        );
+        stock.position.set(0, -0.02, 0.15);
+        fpWeapon.add(stock);
+        
+        // Magazine
+        const mag = new THREE.Mesh(
+          new THREE.BoxGeometry(0.03, 0.08, 0.05),
+          darkMat
+        );
+        mag.position.set(0, -0.08, 0);
+        fpWeapon.add(mag);
         
       } else if (weaponType === 'm4') {
-        const fpBarrel = new THREE.Mesh(
-          new THREE.BoxGeometry(0.03, 0.5, 0.03),
-          new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 })
+        // M4A4 - Modern tactical rifle
+        // Barrel
+        const barrel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.012, 0.015, 0.4, 8),
+          darkMat
         );
-        fpBarrel.position.set(0, 0, -0.25);
-        fpWeapon.add(fpBarrel);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0, -0.35);
+        fpWeapon.add(barrel);
         
-        const fpReceiver = new THREE.Mesh(
-          new THREE.BoxGeometry(0.05, 0.12, 0.18),
-          new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 })
+        // Flash hider
+        const flashHider = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.018, 0.015, 0.04, 8),
+          metalMat
         );
-        fpReceiver.position.set(0, -0.03, 0);
-        fpWeapon.add(fpReceiver);
+        flashHider.rotation.x = Math.PI / 2;
+        flashHider.position.set(0, 0, -0.56);
+        fpWeapon.add(flashHider);
         
-        const fpMag = new THREE.Mesh(
-          new THREE.BoxGeometry(0.03, 0.12, 0.06),
-          new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.4 })
+        // Handguard (quad rail)
+        const handguard = new THREE.Mesh(
+          new THREE.BoxGeometry(0.045, 0.045, 0.18),
+          metalMat
         );
-        fpMag.position.set(0, -0.10, 0.05);
-        fpWeapon.add(fpMag);
+        handguard.position.set(0, -0.01, -0.22);
+        fpWeapon.add(handguard);
         
-        const fpStock = new THREE.Mesh(
-          new THREE.BoxGeometry(0.04, 0.08, 0.15),
-          new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.5 })
+        // Upper receiver
+        const upperReceiver = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.05, 0.14),
+          darkMat
         );
-        fpStock.position.set(0, -0.02, 0.18);
-        fpWeapon.add(fpStock);
+        upperReceiver.position.set(0, -0.01, -0.02);
+        fpWeapon.add(upperReceiver);
+        
+        // Carry handle / rail
+        const rail = new THREE.Mesh(
+          new THREE.BoxGeometry(0.02, 0.015, 0.1),
+          metalMat
+        );
+        rail.position.set(0, 0.03, -0.05);
+        fpWeapon.add(rail);
+        
+        // Lower receiver + grip
+        const lowerReceiver = new THREE.Mesh(
+          new THREE.BoxGeometry(0.035, 0.06, 0.08),
+          darkMat
+        );
+        lowerReceiver.position.set(0, -0.05, 0.02);
+        fpWeapon.add(lowerReceiver);
+        
+        // Pistol grip
+        const grip = new THREE.Mesh(
+          new THREE.BoxGeometry(0.025, 0.07, 0.03),
+          darkMat
+        );
+        grip.position.set(0, -0.09, 0.05);
+        grip.rotation.x = 0.3;
+        fpWeapon.add(grip);
+        
+        // Stock tube
+        const stockTube = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.01, 0.01, 0.12, 8),
+          metalMat
+        );
+        stockTube.rotation.x = Math.PI / 2;
+        stockTube.position.set(0, -0.02, 0.12);
+        fpWeapon.add(stockTube);
+        
+        // Stock pad
+        const stockPad = new THREE.Mesh(
+          new THREE.BoxGeometry(0.035, 0.06, 0.02),
+          darkMat
+        );
+        stockPad.position.set(0, -0.02, 0.19);
+        fpWeapon.add(stockPad);
+        
+        // Magazine
+        const mag = new THREE.Mesh(
+          new THREE.BoxGeometry(0.025, 0.1, 0.035),
+          darkMat
+        );
+        mag.position.set(0, -0.1, 0);
+        mag.rotation.x = 0.1;
+        fpWeapon.add(mag);
         
       } else if (weaponType === 'ak47') {
-        const fpBarrel = new THREE.Mesh(
-          new THREE.BoxGeometry(0.035, 0.55, 0.035),
-          new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3 })
+        // AK-47 - Iconic rifle with wood furniture and curved mag
+        // Barrel
+        const barrel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.015, 0.018, 0.35, 8),
+          darkMat
         );
-        fpBarrel.position.set(0, 0, -0.28);
-        fpWeapon.add(fpBarrel);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0, -0.38);
+        fpWeapon.add(barrel);
         
-        const fpReceiver = new THREE.Mesh(
-          new THREE.BoxGeometry(0.055, 0.14, 0.20),
-          new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 })
+        // Front sight block
+        const frontSight = new THREE.Mesh(
+          new THREE.BoxGeometry(0.025, 0.04, 0.025),
+          darkMat
         );
-        fpReceiver.position.set(0, -0.04, 0);
-        fpWeapon.add(fpReceiver);
+        frontSight.position.set(0, 0.015, -0.5);
+        fpWeapon.add(frontSight);
         
-        const fpMag = new THREE.Mesh(
-          new THREE.BoxGeometry(0.04, 0.15, 0.08),
-          new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.5 })
+        // Gas tube (above barrel)
+        const gasTube = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.01, 0.01, 0.2, 8),
+          darkMat
         );
-        fpMag.position.set(0, -0.12, 0.04);
-        fpMag.rotation.x = 0.15;
-        fpWeapon.add(fpMag);
+        gasTube.rotation.x = Math.PI / 2;
+        gasTube.position.set(0, 0.025, -0.28);
+        fpWeapon.add(gasTube);
         
-        const fpStock = new THREE.Mesh(
-          new THREE.BoxGeometry(0.04, 0.10, 0.16),
-          new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.6 })
+        // Wooden handguard (below gas tube)
+        const handguard = new THREE.Mesh(
+          new THREE.BoxGeometry(0.035, 0.03, 0.16),
+          woodMat
         );
-        fpStock.position.set(0, -0.03, 0.19);
-        fpWeapon.add(fpStock);
+        handguard.position.set(0, -0.015, -0.25);
+        fpWeapon.add(handguard);
+        
+        // Receiver (stamped steel)
+        const receiver = new THREE.Mesh(
+          new THREE.BoxGeometry(0.045, 0.06, 0.16),
+          darkMat
+        );
+        receiver.position.set(0, -0.01, -0.02);
+        fpWeapon.add(receiver);
+        
+        // Dust cover
+        const dustCover = new THREE.Mesh(
+          new THREE.BoxGeometry(0.035, 0.015, 0.1),
+          metalMat
+        );
+        dustCover.position.set(0, 0.03, -0.04);
+        fpWeapon.add(dustCover);
+        
+        // Rear sight
+        const rearSight = new THREE.Mesh(
+          new THREE.BoxGeometry(0.025, 0.02, 0.015),
+          darkMat
+        );
+        rearSight.position.set(0, 0.045, -0.08);
+        fpWeapon.add(rearSight);
+        
+        // Pistol grip (wood)
+        const grip = new THREE.Mesh(
+          new THREE.BoxGeometry(0.028, 0.07, 0.035),
+          woodMat
+        );
+        grip.position.set(0, -0.07, 0.02);
+        grip.rotation.x = 0.25;
+        fpWeapon.add(grip);
+        
+        // Wooden stock
+        const stock = new THREE.Mesh(
+          new THREE.BoxGeometry(0.035, 0.055, 0.22),
+          woodMat
+        );
+        stock.position.set(0, -0.02, 0.18);
+        fpWeapon.add(stock);
+        
+        // Stock buttpad
+        const buttpad = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.065, 0.015),
+          darkMat
+        );
+        buttpad.position.set(0, -0.02, 0.3);
+        fpWeapon.add(buttpad);
+        
+        // Curved magazine (iconic AK banana mag)
+        const mag = new THREE.Mesh(
+          new THREE.BoxGeometry(0.028, 0.12, 0.04),
+          new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.6 })
+        );
+        mag.position.set(0, -0.1, 0);
+        mag.rotation.x = 0.2;
+        fpWeapon.add(mag);
       }
       
       fpWeapon.position.set(0.25, -0.2, -0.5);
@@ -1408,35 +1579,66 @@ export default function FPSArena() {
       // E key to plant/defuse bomb
       if (event.code === 'KeyE' && document.pointerLockElement === document.body) {
         console.log('E key pressed', { selectedTeam, hasBomb: hasBombRef.current, bombPlanted, roundPhase: roundPhaseRef.current, atBombSite: atBombSiteRef.current });
-        if (selectedTeam === 'T' && hasBombRef.current && !bombPlanted && roundPhaseRef.current === 'active' && atBombSiteRef.current) {
-          // Must be at bomb site to plant
+        if (selectedTeam === 'T' && hasBombRef.current && !bombPlanted && roundPhaseRef.current === 'active' && atBombSiteRef.current && !isPlantingRef.current) {
+          // Must be at bomb site to plant - must stay still
           console.log('Starting bomb plant...');
           setIsPlanting(true);
-          setTimeout(() => {
-            console.log('Bomb planted!');
-            setBombPlanted(true);
-            bombPlantedRef.current = true;
-            setIsPlanting(false);
-            setPlantedSite(atBombSiteRef.current);
-            const bombPos = { x: camera.position.x, y: 0.2, z: camera.position.z };
-            setBombPosition(bombPos);
-            bombPositionRef.current = bombPos;
-            
-            // Show and position bomb model
-            bombGroup.position.set(bombPos.x, bombPos.y, bombPos.z);
-            bombGroup.visible = true;
-            
-            // Play bomb plant sound
-            if (bombPlantSound.isPlaying) bombPlantSound.stop();
-            bombPlantSound.play();
-            
-            if (socketRef.current) {
-              socketRef.current.emit('fpsPlantBomb', { 
-                position: [bombPos.x, bombPos.y, bombPos.z],
-                site: atBombSiteRef.current
-              });
+          isPlantingRef.current = true;
+          plantStartPosRef.current = { x: camera.position.x, z: camera.position.z };
+          
+          let plantTime = 3; // 3 seconds to plant
+          
+          const checkPlanting = setInterval(() => {
+            // Check if player moved
+            if (plantStartPosRef.current) {
+              const distMoved = Math.sqrt(
+                Math.pow(camera.position.x - plantStartPosRef.current.x, 2) + 
+                Math.pow(camera.position.z - plantStartPosRef.current.z, 2)
+              );
+              
+              if (distMoved > 0.5) {
+                // Player moved - cancel plant
+                clearInterval(checkPlanting);
+                setIsPlanting(false);
+                isPlantingRef.current = false;
+                plantStartPosRef.current = null;
+                console.log('Plant cancelled - player moved');
+                return;
+              }
             }
-          }, 3000); // 3 second plant time
+            
+            plantTime--;
+            
+            if (plantTime <= 0) {
+              // Plant complete!
+              clearInterval(checkPlanting);
+              console.log('Bomb planted!');
+              setBombPlanted(true);
+              bombPlantedRef.current = true;
+              setIsPlanting(false);
+              isPlantingRef.current = false;
+              plantStartPosRef.current = null;
+              setPlantedSite(atBombSiteRef.current);
+              const bombPos = { x: camera.position.x, y: 0.2, z: camera.position.z };
+              setBombPosition(bombPos);
+              bombPositionRef.current = bombPos;
+              
+              // Show and position bomb model
+              bombGroup.position.set(bombPos.x, bombPos.y, bombPos.z);
+              bombGroup.visible = true;
+              
+              // Play bomb plant sound
+              if (bombPlantSound.isPlaying) bombPlantSound.stop();
+              bombPlantSound.play();
+              
+              if (socketRef.current) {
+                socketRef.current.emit('fpsPlantBomb', { 
+                  position: [bombPos.x, bombPos.y, bombPos.z],
+                  site: atBombSiteRef.current
+                });
+              }
+            }
+          }, 1000);
         } else if (selectedTeam === 'CT' && bombPlantedRef.current && !isDefusingRef.current && bombPositionRef.current) {
           // Check if near bomb
           const distToBomb = Math.sqrt(
@@ -1865,7 +2067,10 @@ export default function FPSArena() {
         return;
       }
       
-      const speedDelta = deltaTime * 25; // Reduced from 50 to make players slower
+      // Reduce speed while in air to prevent bunny hopping
+      const baseSpeed = 25;
+      const airSpeedMultiplier = playerOnFloor ? 1.0 : 0.15; // Much less air control
+      const speedDelta = deltaTime * baseSpeed * airSpeedMultiplier;
 
       if (keyStates['KeyW']) {
         playerVelocity.add(getForwardVector().multiplyScalar(speedDelta));
@@ -1881,6 +2086,15 @@ export default function FPSArena() {
       }
       if (keyStates['Space'] && playerOnFloor) {
         playerVelocity.y = 8; // Reduced from 15 for lower jumps
+      }
+      
+      // Cap horizontal velocity to prevent speed buildup from bunny hopping
+      const maxHorizontalSpeed = 12;
+      const horizontalSpeed = Math.sqrt(playerVelocity.x * playerVelocity.x + playerVelocity.z * playerVelocity.z);
+      if (horizontalSpeed > maxHorizontalSpeed) {
+        const scale = maxHorizontalSpeed / horizontalSpeed;
+        playerVelocity.x *= scale;
+        playerVelocity.z *= scale;
       }
     };
 

@@ -1887,6 +1887,7 @@ function checkBlackjackRoundEnd(roomId) {
 // ==================== FPS ARENA GAME ====================
 let fpsPlayers = {};
 let fpsTeamCounts = { T: 0, CT: 0 };
+let fpsBombPlanted = false;
 
 // High-frequency position broadcast (like three-arena's 120Hz)
 setInterval(function () {
@@ -1974,8 +1975,8 @@ io.on('connection', (socket) => {
           }
         });
         
-        // Team elimination
-        if (aliveTCount === 0 && aliveCTCount > 0) {
+        // Team elimination - CTs only win if bomb not planted
+        if (aliveTCount === 0 && aliveCTCount > 0 && !fpsBombPlanted) {
           io.emit('fpsTeamEliminated', { winner: 'CT' });
         } else if (aliveCTCount === 0 && aliveTCount > 0) {
           io.emit('fpsTeamEliminated', { winner: 'T' });
@@ -1987,18 +1988,21 @@ io.on('connection', (socket) => {
   // Bomb plant handler - broadcast to all players
   socket.on('fpsPlantBomb', ({ position, site }) => {
     console.log('Bomb planted at', site, 'position:', position);
+    fpsBombPlanted = true;
     io.emit('fpsBombPlanted', { position, site });
   });
 
   // Bomb defuse handler - broadcast to all players
   socket.on('fpsDefuseBomb', () => {
     console.log('Bomb defused!');
+    fpsBombPlanted = false;
     io.emit('fpsBombDefused');
   });
 
   // Round reset handler - reset all player health
   socket.on('fpsRoundReset', () => {
     console.log('Round reset - resetting all player health');
+    fpsBombPlanted = false;
     Object.keys(fpsPlayers).forEach(id => {
       fpsPlayers[id].health = 100;
     });
