@@ -42,6 +42,8 @@ export default function FPSArena() {
   const isReloadingRef = useRef(false);
   const isShootingRef = useRef(false); // For full auto
   const lastShotTimeRef = useRef(0); // Rate of fire control
+  const countdownRef = useRef(10);
+  const roundPhaseRef = useRef<'buy' | 'active' | 'end'>('buy');
 
   // Weapon configs
   const weaponConfig = {
@@ -1209,12 +1211,15 @@ export default function FPSArena() {
               bombGroup.visible = false;
               setCtScore(prev => prev + 1);
               setRoundPhase('end');
+              roundPhaseRef.current = 'end';
               setRoundWinner('CT');
               setTimeout(() => {
                 setRoundPhase('buy');
+                roundPhaseRef.current = 'buy';
                 setRoundTime(115);
                 setRoundWinner(null);
                 setCountdown(10);
+                countdownRef.current = 10;
                 setWaitingForPlayers(false);
               }, 5000);
               if (socketRef.current) {
@@ -1566,7 +1571,7 @@ export default function FPSArena() {
     };
 
     document.addEventListener('mousedown', () => {
-      if (document.pointerLockElement === document.body && !(countdown > 0 && roundPhase === 'buy')) {
+      if (document.pointerLockElement === document.body && !(countdownRef.current > 0 && roundPhaseRef.current === 'buy')) {
         isShootingRef.current = true;
         tryShoot(); // Shoot immediately
       }
@@ -1601,7 +1606,7 @@ export default function FPSArena() {
 
     const controls = (deltaTime: number) => {
       // Freeze players during countdown in buy phase
-      if (roundPhase === 'buy' && countdown > 0) {
+      if (roundPhaseRef.current === 'buy' && countdownRef.current > 0) {
         return;
       }
       
@@ -1852,13 +1857,16 @@ export default function FPSArena() {
           // Time's up - CTs win
           setCtScore(s => s + 1);
           setRoundPhase('end');
+          roundPhaseRef.current = 'end';
           setRoundWinner('CT');
           setTimeout(() => {
             setRoundPhase('buy');
+            roundPhaseRef.current = 'buy';
             setRoundTime(115);
             setHealth(100);
             setRoundWinner(null);
             setCountdown(10);
+            countdownRef.current = 10;
             setWaitingForPlayers(false);
             // Reset to spawn will happen in teleport function
           }, 5000);
@@ -1882,14 +1890,17 @@ export default function FPSArena() {
           setTScore(s => s + 1);
           setBombPlanted(false);
           setRoundPhase('end');
+          roundPhaseRef.current = 'end';
           setRoundWinner('T');
           setTimeout(() => {
             setRoundPhase('buy');
+            roundPhaseRef.current = 'buy';
             setRoundTime(115);
             setBombTimer(40);
             setHealth(100);
             setRoundWinner(null);
             setCountdown(10);
+            countdownRef.current = 10;
             setWaitingForPlayers(false);
           }, 5000);
           return 40;
@@ -1923,13 +1934,19 @@ export default function FPSArena() {
       oscillator.stop(audioContext.currentTime + 0.2);
       
       const timer = setTimeout(() => {
-        setCountdown(prev => prev - 1);
+        setCountdown(prev => {
+          const newVal = prev - 1;
+          countdownRef.current = newVal;
+          return newVal;
+        });
       }, 1000);
       return () => clearTimeout(timer);
     } else {
       // Start active round
       setRoundPhase('active');
+      roundPhaseRef.current = 'active';
       setCountdown(10); // Reset for next round
+      countdownRef.current = 10;
       // Assign bomb to random T player (for now, just give it to everyone on T team)
       if (selectedTeam === 'T') {
         setHasBomb(true);
