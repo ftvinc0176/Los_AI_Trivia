@@ -38,6 +38,7 @@ export default function FPSArena() {
   const [teamCounts, setTeamCounts] = useState({T: 0, CT: 0});
   const [roundWinner, setRoundWinner] = useState<'T' | 'CT' | null>(null);
   const [plantedSite, setPlantedSite] = useState<'A' | 'B' | null>(null);
+  const [isDead, setIsDead] = useState(false);
   
   const ammoRef = useRef(1);
   const isReloadingRef = useRef(false);
@@ -1413,6 +1414,28 @@ export default function FPSArena() {
         bombGroup.visible = false;
       });
 
+      socket.on('fpsTeamEliminated', ({ winner }: any) => {
+        console.log('Team eliminated, winner:', winner);
+        setRoundPhase('end');
+        roundPhaseRef.current = 'end';
+        setRoundWinner(winner);
+        if (winner === 'T') {
+          setTScore(s => s + 1);
+        } else {
+          setCtScore(s => s + 1);
+        }
+        setTimeout(() => {
+          setRoundPhase('buy');
+          roundPhaseRef.current = 'buy';
+          setRoundTime(115);
+          setHealth(100);
+          setRoundWinner(null);
+          setCountdown(5);
+          countdownRef.current = 5;
+          setWaitingForPlayers(false);
+        }, 5000);
+      });
+
       socket.on('fpsShot', ({ id, position, direction, damage }: any) => {
         const rocket = rockets.find((r: any) => !r.alive);
         if (rocket) {
@@ -1455,21 +1478,7 @@ export default function FPSArena() {
       socket.on('fpsKill', ({ killer, victim }: any) => {
         if (victim === socket.id) {
           setDeaths((prev) => prev + 1);
-          setHealth(100);
-          const spawn = selectedTeam === 'T'
-            ? { x: Math.random() * 20 - 10, z: -70 + Math.random() * 10 }
-            : { x: 25 + Math.random() * 20 - 10, z: 20 + Math.random() * 10 };
-          playerCapsule.start.set(
-            spawn.x,
-            0.35,
-            spawn.z
-          );
-          playerCapsule.end.set(
-            spawn.x,
-            1.8,
-            spawn.z
-          );
-          playerVelocity.set(0, 0, 0);
+          // Don't respawn during round - wait for round end
         }
         if (killer === socket.id) {
           setKills((prev) => prev + 1);
@@ -1960,6 +1969,19 @@ export default function FPSArena() {
       }
     }
   }, [gameStarted, roundPhase, selectedTeam, countdown, waitingForPlayers]);
+
+  // Check for death and team elimination
+  useEffect(() => {
+    if (health <= 0 && !isDead) {
+      setIsDead(true);
+      // Check for team elimination via server
+      if (socketRef.current) {
+        socketRef.current.emit('fpsPlayerDied', { team: selectedTeam });
+      }
+    } else if (health > 0 && isDead) {
+      setIsDead(false);
+    }
+  }, [health, isDead, selectedTeam]);
 
   // Handle weapon change from menu
   const handleWeaponSelect = (weapon: WeaponType) => {

@@ -1960,14 +1960,26 @@ io.on('connection', (socket) => {
       socket.emit('fpsHit', { damage: damage || 20, victim: victim });
       
       if (fpsPlayers[victim].health <= 0) {
-        fpsPlayers[victim].health = 100;
-        // Random respawn position
-        fpsPlayers[victim].position = [
-          Math.random() * 40 - 20,
-          1.8,
-          Math.random() * 40 - 20
-        ];
+        fpsPlayers[victim].health = 0; // Mark as dead
         io.emit('fpsKill', { killer: socket.id, victim });
+        
+        // Check for team elimination
+        let aliveTCount = 0;
+        let aliveCTCount = 0;
+        
+        Object.values(fpsPlayers).forEach(player => {
+          if (player.health > 0) {
+            if (player.team === 'T') aliveTCount++;
+            else if (player.team === 'CT') aliveCTCount++;
+          }
+        });
+        
+        // Team elimination
+        if (aliveTCount === 0 && aliveCTCount > 0) {
+          io.emit('fpsTeamEliminated', { winner: 'CT' });
+        } else if (aliveCTCount === 0 && aliveTCount > 0) {
+          io.emit('fpsTeamEliminated', { winner: 'T' });
+        }
       }
     }
   });
