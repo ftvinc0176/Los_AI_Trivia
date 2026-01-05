@@ -3,13 +3,32 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+type GameType = 'blackjack' | 'andar-bahar' | null;
+
 export default function Casino() {
   const router = useRouter();
+  const [selectedGame, setSelectedGame] = useState<GameType>(null);
   const [showMultiplayerOptions, setShowMultiplayerOptions] = useState(false);
+
+  const handleGameSelect = (game: GameType, mode: 'single' | 'multiplayer') => {
+    if (mode === 'single') {
+      router.push(`/casino/${game}?mode=single`);
+    } else {
+      setSelectedGame(game);
+      setShowMultiplayerOptions(true);
+    }
+  };
+
+  const handleBack = () => {
+    if (showMultiplayerOptions) {
+      setShowMultiplayerOptions(false);
+      setSelectedGame(null);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
+      <div className="max-w-5xl w-full">
         <h1 className="text-6xl font-bold text-center mb-4 bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 bg-clip-text text-transparent">
           🎰 The Casino 🎰
         </h1>
@@ -18,53 +37,85 @@ export default function Casino() {
         </p>
 
         {!showMultiplayerOptions ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Single Player */}
-            <button
-              onClick={() => router.push('/casino/blackjack?mode=single')}
-              className="group relative bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg rounded-3xl p-8 border border-white/20 hover:border-white/40 transition-all hover:scale-105"
-            >
-              <div className="text-6xl mb-4">🃏</div>
-              <h2 className="text-3xl font-bold text-white mb-2">Single Player</h2>
-              <p className="text-white/70 text-lg">Play Blackjack against the dealer</p>
-              <div className="mt-4 text-yellow-300 text-sm">Start with 1000 LosBucks</div>
-            </button>
+          <div className="space-y-8">
+            {/* Blackjack */}
+            <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🃏</div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Blackjack</h2>
+                  <p className="text-white/70">Beat the dealer to 21</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleGameSelect('blackjack', 'single')}
+                  className="py-3 bg-purple-500/30 hover:bg-purple-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  🎮 Single Player
+                </button>
+                <button
+                  onClick={() => handleGameSelect('blackjack', 'multiplayer')}
+                  className="py-3 bg-blue-500/30 hover:bg-blue-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  👥 Multiplayer
+                </button>
+              </div>
+            </div>
 
-            {/* Multiplayer */}
-            <button
-              onClick={() => setShowMultiplayerOptions(true)}
-              className="group relative bg-gradient-to-br from-blue-500/20 to-green-500/20 backdrop-blur-lg rounded-3xl p-8 border border-white/20 hover:border-white/40 transition-all hover:scale-105"
-            >
-              <div className="text-6xl mb-4">👥</div>
-              <h2 className="text-3xl font-bold text-white mb-2">Multiplayer</h2>
-              <p className="text-white/70 text-lg">Play with friends online</p>
-              <div className="mt-4 text-green-300 text-sm">Create or join lobby</div>
-            </button>
+            {/* Andar Bahar */}
+            <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🎴</div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Andar Bahar</h2>
+                  <p className="text-white/70">Guess which side gets the matching card</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleGameSelect('andar-bahar', 'single')}
+                  className="py-3 bg-orange-500/30 hover:bg-orange-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  🎮 Single Player
+                </button>
+                <button
+                  onClick={() => handleGameSelect('andar-bahar', 'multiplayer')}
+                  className="py-3 bg-red-500/30 hover:bg-red-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  👥 Multiplayer
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
             <button
-              onClick={() => setShowMultiplayerOptions(false)}
+              onClick={handleBack}
               className="text-white/60 hover:text-white mb-4 flex items-center gap-2"
             >
               ← Back
             </button>
 
+            <h2 className="text-3xl font-bold text-white text-center mb-6">
+              {selectedGame === 'blackjack' ? '🃏 Blackjack' : '🎴 Andar Bahar'} Multiplayer
+            </h2>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Create Lobby */}
               <button
-                onClick={() => router.push('/casino/blackjack?mode=create')}
+                onClick={() => router.push(`/casino/${selectedGame}?mode=create`)}
                 className="group relative bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-lg rounded-3xl p-8 border border-white/20 hover:border-white/40 transition-all hover:scale-105"
               >
                 <div className="text-6xl mb-4">➕</div>
                 <h2 className="text-3xl font-bold text-white mb-2">Create Lobby</h2>
                 <p className="text-white/70 text-lg">Start a new multiplayer game</p>
-                <div className="mt-4 text-green-300 text-sm">Up to 4 players</div>
+                <div className="mt-4 text-green-300 text-sm">Up to 6 players</div>
               </button>
 
               {/* See Lobbies */}
               <button
-                onClick={() => router.push('/casino/blackjack?mode=browse')}
+                onClick={() => router.push(`/casino/${selectedGame}?mode=browse`)}
                 className="group relative bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-lg rounded-3xl p-8 border border-white/20 hover:border-white/40 transition-all hover:scale-105"
               >
                 <div className="text-6xl mb-4">👁️</div>

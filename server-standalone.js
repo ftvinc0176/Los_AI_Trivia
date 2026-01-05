@@ -1901,6 +1901,223 @@ function checkBlackjackRoundEnd(roomId) {
   }
 }
 
+// ============================================
+// ANDAR BAHAR GAME HANDLERS
+// ============================================
+
+function createAndarBaharDeck() {
+  const suits = ['♠', '♥', '♦', '♣'];
+  const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const deck = [];
+  for (const suit of suits) {
+    for (let i = 0; i < values.length; i++) {
+      deck.push({ suit, value: values[i], numValue: i + 1 });
+    }
+  }
+  // Shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+io.on('connection', (socket) => {
+  
+  socket.on('andarBaharCreateLobby', ({ playerName, isPublic }) => {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      currentBet: 0,
+      betSide: null,
+      result: null
+    };
+
+    rooms.set(`andarbahar_${roomId}`, {
+      players: [player],
+      jokerCard: null,
+      andarCards: [],
+      baharCards: [],
+      winningSide: null,
+      deck: [],
+      state: 'lobby',
+      isPublic: isPublic !== false
+    });
+
+    socket.join(`andarbahar_${roomId}`);
+    socket.emit('andarBaharLobbyCreated', { roomId, players: [player] });
+    console.log(`Andar Bahar lobby ${roomId} created by ${playerName}`);
+  });
+
+  socket.on('getAndarBaharPublicLobbies', () => {
+    const publicLobbies = [];
+    rooms.forEach((room, key) => {
+      if (key.startsWith('andarbahar_') && room.isPublic && room.players.length < 6 && room.state === 'lobby') {
+        const roomId = key.replace('andarbahar_', '');
+        publicLobbies.push({
+          roomId,
+          playerCount: room.players.length,
+          maxPlayers: 6
+        });
+      }
+    });
+    socket.emit('andarBaharPublicLobbies', { lobbies: publicLobbies });
+  });
+
+  socket.on('andarBaharJoinLobby', ({ roomId, playerName }) => {
+    const room = rooms.get(`andarbahar_${roomId}`);
+    if (!room) {
+      socket.emit('error', { message: 'Lobby not found' });
+      return;
+    }
+
+    if (room.players.length >= 6) {
+      socket.emit('error', { message: 'Lobby is full (max 6 players)' });
+      return;
+    }
+
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      currentBet: 0,
+      betSide: null,
+      result: null
+    };
+
+    room.players.push(player);
+    socket.join(`andarbahar_${roomId}`);
+    
+    io.to(`andarbahar_${roomId}`).emit('andarBaharPlayerJoined', { players: room.players });
+    socket.emit('andarBaharGameState', { 
+      state: room.state,
+      players: room.players,
+      jokerCard: room.jokerCard,
+      andarCards: room.andarCards,
+      baharCards: room.baharCards
+    });
+    
+    console.log(`${playerName} joined Andar Bahar lobby ${roomId}`);
+  });
+
+  socket.on('andarBaharStartGame', ({ roomId }) => {
+    const room = rooms.get(`andarbahar_${roomId}`);
+    if (!room) return;
+
+    room.state = 'betting';
+    io.to(`andarbahar_${roomId}`).emit('andarBaharGameStarted');
+    console.log(`Andar Bahar game started in ${roomId}`);
+  });
+
+  socket.on('andarBaharPlaceBet', ({ roomId, bet, side }) => {
+    const room = rooms.get(`andarbahar_${roomId}`);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || bet > player.balance) return;
+
+    player.currentBet = bet;
+    player.betSide = side;
+    player.balance -= bet;
+
+    io.to(`andarbahar_${roomId}`).emit('andarBaharPlayersUpdate', { players: room.players });
+
+    // Check if all players have bet
+    const allBet = room.players.every(p => p.currentBet > 0 && p.betSide);
+    if (allBet) {
+      startAndarBaharDealing(roomId);
+    }
+  });
+
+  socket.on('andarBaharNextRound', ({ roomId }) => {
+    const room = rooms.get(`andarbahar_${roomId}`);
+    if (!room) return;
+
+    // Reset for new round
+    room.jokerCard = null;
+    room.andarCards = [];
+    room.baharCards = [];
+    room.winningSide = null;
+    room.state = 'betting';
+    
+    room.players.forEach(player => {
+      player.currentBet = 0;
+      player.betSide = null;
+      player.result = null;
+    });
+
+    io.to(`andarbahar_${roomId}`).emit('andarBaharNewRoundStarted');
+    console.log(`New Andar Bahar round started in ${roomId}`);
+  });
+
+});
+
+async function startAndarBaharDealing(roomId) {
+  const room = rooms.get(`andarbahar_${roomId}`);
+  if (!room) return;
+
+  room.state = 'dealing';
+  room.deck = createAndarBaharDeck();
+  
+  // Deal joker card
+  room.jokerCard = room.deck.pop();
+  io.to(`andarbahar_${roomId}`).emit('andarBaharJokerRevealed', { jokerCard: room.jokerCard });
+  
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // Deal cards alternately
+  let currentSide = 'andar';
+  let winner = null;
+  
+  while (!winner && room.deck.length > 0) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const card = room.deck.pop();
+    
+    if (currentSide === 'andar') {
+      room.andarCards.push(card);
+    } else {
+      room.baharCards.push(card);
+    }
+    
+    io.to(`andarbahar_${roomId}`).emit('andarBaharCardDealt', { side: currentSide, card });
+    
+    // Check if card matches joker value
+    if (card.value === room.jokerCard.value) {
+      winner = currentSide;
+      break;
+    }
+    
+    currentSide = currentSide === 'andar' ? 'bahar' : 'andar';
+  }
+  
+  room.winningSide = winner;
+  room.state = 'results';
+  
+  // Calculate payouts
+  room.players.forEach(player => {
+    if (player.betSide === winner) {
+      // Win - Andar pays 0.9:1, Bahar pays 1:1
+      const payout = player.betSide === 'andar' 
+        ? Math.floor(player.currentBet * 1.9) 
+        : player.currentBet * 2;
+      player.balance += payout;
+      player.result = 'win';
+    } else {
+      player.result = 'lose';
+    }
+  });
+  
+  io.to(`andarbahar_${roomId}`).emit('andarBaharRoundEnd', {
+    winningSide: winner,
+    players: room.players
+  });
+  
+  console.log(`Andar Bahar round ended in ${roomId}, winner: ${winner}`);
+}
+
 // ==================== FPS ARENA GAME ====================
 let fpsPlayers = {};
 let fpsTeamCounts = { T: 0, CT: 0 };
