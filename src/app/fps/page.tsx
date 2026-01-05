@@ -345,254 +345,281 @@ export default function FPSArena() {
     const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.8 });
     const concreteMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
     const metalMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.6, roughness: 0.4 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 });
 
     // Helper to add mesh with collision
-    const addMesh = (mesh: THREE.Mesh, noCollision = false) => {
+    const addMesh = (mesh: THREE.Mesh) => {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       scene.add(mesh);
-      if (!noCollision) worldOctree.fromGraphNode(mesh);
+      worldOctree.fromGraphNode(mesh);
     };
 
-    // Helper to create building with windows/doors
-    const createBuilding = (w: number, h: number, d: number, mat: THREE.Material, hasWindows = true) => {
-      const group = new THREE.Group();
-      const main = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-      main.castShadow = true;
-      main.receiveShadow = true;
-      group.add(main);
-      
-      if (hasWindows) {
-        // Add window frames
-        const windowMat = new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.2 });
-        const numWindows = Math.floor(w / 5);
-        for (let i = 0; i < numWindows; i++) {
-          const window = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2, 0.2), windowMat);
-          window.position.set(-w/2 + 3 + i * 4, h * 0.2, d/2 + 0.1);
-          group.add(window);
-        }
-      }
-      return group;
+    // Helper to add wall segment
+    const addWall = (x: number, z: number, w: number, d: number, h = 5) => {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+      wall.position.set(x, h/2, z);
+      addMesh(wall);
     };
 
-    // === GROUND ===
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(250, 250), sandMat);
+    // Helper to add floor section
+    const addFloor = (x: number, z: number, w: number, d: number, y = 0) => {
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), tileMat);
+      floor.position.set(x, y + 0.15, z);
+      addMesh(floor);
+    };
+
+    // Helper to add roof/ceiling
+    const addRoof = (x: number, z: number, w: number, d: number, y: number) => {
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), roofMat);
+      roof.position.set(x, y, z);
+      addMesh(roof);
+    };
+
+    // === BASE GROUND (only outside areas) ===
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), sandMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
     worldOctree.fromGraphNode(ground);
 
-    // === A SITE (Mirage style - right side) ===
-    // A site platform with stone texture
-    const aSitePlatform = new THREE.Mesh(new THREE.BoxGeometry(25, 0.3, 25), tileMat);
-    aSitePlatform.position.set(50, 0.15, 0);
-    addMesh(aSitePlatform);
+    // ============================================
+    // MIRAGE MAP LAYOUT (Based on actual CS2 map)
+    // Coordinate system: +X = right (A), -X = left (B), +Z = CT, -Z = T
+    // ============================================
 
-    // Triple box (classic A site default)
-    const tripleBox1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 5), woodMat);
-    tripleBox1.position.set(52, 1.25, 2);
-    addMesh(tripleBox1);
-    const tripleBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 3), woodMat);
-    tripleBox2.position.set(49, 1.25, 0);
-    addMesh(tripleBox2);
-    const tripleBox3 = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 2), woodMat);
-    tripleBox3.position.set(52, 0.75, -3);
-    addMesh(tripleBox3);
+    // === T SPAWN AREA (bottom of map, -Z) ===
+    // T Spawn open area with surrounding walls
+    addWall(-40, -85, 1, 30, 6); // Left boundary
+    addWall(40, -85, 1, 30, 6);  // Right boundary
+    addWall(0, -100, 82, 1, 6); // Back wall
+    addFloor(0, -85, 80, 30);
 
-    // Ninja box
-    const ninjaBox = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), woodMat);
-    ninjaBox.position.set(45, 1, 8);
-    addMesh(ninjaBox);
+    // === T APARTMENTS / T RAMP (path to B) ===
+    // Left corridor from T spawn to B apartments
+    addWall(-35, -60, 1, 20, 5);
+    addWall(-50, -60, 1, 20, 5);
+    addFloor(-42.5, -60, 14, 20);
+    addRoof(-42.5, -60, 14, 20, 5);
 
-    // A site back wall (Ticket booth)
-    const ticketBooth = createBuilding(12, 6, 8, wallMat);
-    ticketBooth.position.set(58, 3, -8);
-    scene.add(ticketBooth);
-    const ticketMesh = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 8), wallMat);
-    ticketMesh.position.set(58, 3, -8);
-    worldOctree.fromGraphNode(ticketMesh);
+    // T Apartments interior hallway
+    addWall(-55, -45, 10, 1, 5);
+    addWall(-55, -30, 10, 1, 5);
+    addWall(-60, -37.5, 1, 16, 5);
+    addFloor(-55, -37.5, 10, 15);
+    addRoof(-55, -37.5, 10, 15, 5);
 
-    // === RAMP (A Ramp) ===
-    const aRamp = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 15), tileMat);
-    aRamp.position.set(40, 0.25, -15);
-    aRamp.rotation.x = -0.08;
-    addMesh(aRamp);
+    // === B APARTMENTS (walkable building leading to B) ===
+    // Long corridor
+    addWall(-65, -15, 1, 30, 5);
+    addWall(-50, -15, 1, 30, 5);
+    addFloor(-57.5, -15, 14, 30);
+    addRoof(-57.5, -15, 14, 30, 5);
+    
+    // B Apps drop down area
+    addWall(-70, 5, 10, 1, 5);
+    addWall(-65, 10, 1, 10, 5);
+    addFloor(-67.5, 10, 6, 10);
+    addRoof(-67.5, 10, 6, 10, 5);
 
-    // Ramp side walls
-    const rampWall1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
-    rampWall1.position.set(44, 2, -15);
-    addMesh(rampWall1);
-    const rampWall2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
-    rampWall2.position.set(36, 2, -15);
-    addMesh(rampWall2);
+    // === B SITE ===
+    // B site is an enclosed courtyard
+    addFloor(-55, 25, 30, 30);
+    
+    // B site walls forming the area
+    addWall(-70, 10, 1, 30, 6);  // Far left
+    addWall(-70, 35, 30, 1, 6);  // Back wall
+    addWall(-40, 25, 1, 20, 6);  // Right side (partial)
+    
+    // B Bench (box)
+    const bBench = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 3), woodMat);
+    bBench.position.set(-55, 1, 30);
+    addMesh(bBench);
+    
+    // B Van
+    const van = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 8), concreteMat);
+    van.position.set(-60, 1.5, 20);
+    addMesh(van);
 
-    // === PALACE ===
-    const palace = createBuilding(20, 10, 15, wallMat);
-    palace.position.set(55, 5, -40);
-    scene.add(palace);
-    const palaceMesh = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 15), wallMat);
-    palaceMesh.position.set(55, 5, -40);
-    worldOctree.fromGraphNode(palaceMesh);
+    // === B SHORT (Apartments exit to B) ===
+    addWall(-45, 0, 10, 1, 5);
+    addWall(-45, -8, 10, 1, 5);
+    addWall(-40, -4, 1, 9, 5);
+    addFloor(-45, -4, 10, 8);
+    addRoof(-45, -4, 10, 8, 5);
 
-    // Palace arch entrance
-    const palaceArch = new THREE.Mesh(new THREE.BoxGeometry(6, 8, 2), darkWallMat);
-    palaceArch.position.set(45, 4, -35);
-    addMesh(palaceArch);
+    // === MARKET / KITCHEN (B side of mid) ===
+    // Enclosed building you walk through
+    addWall(-35, -25, 1, 20, 5);
+    addWall(-20, -25, 1, 20, 5);
+    addWall(-27.5, -35, 16, 1, 5);
+    addFloor(-27.5, -25, 14, 20);
+    addRoof(-27.5, -25, 14, 20, 5);
+    
+    // Market interior boxes
+    const marketBox1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    marketBox1.position.set(-30, 1, -28);
+    addMesh(marketBox1);
+    const marketBox2 = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 2), woodMat);
+    marketBox2.position.set(-24, 0.75, -22);
+    addMesh(marketBox2);
 
-    // === MID ===
-    // Mid boxes (window peek spot)
-    const midBox1 = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), woodMat);
-    midBox1.position.set(0, 1.5, 0);
+    // === MID (Central corridor) ===
+    // Mid is a long corridor connecting T to CT
+    addWall(-18, -30, 1, 40, 5);  // Left side of mid
+    addWall(18, -30, 1, 40, 5);   // Right side of mid
+    addFloor(0, -30, 35, 40);
+    
+    // Mid boxes for cover
+    const midBox1 = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
+    midBox1.position.set(0, 1.25, -25);
     addMesh(midBox1);
     const midBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
-    midBox2.position.set(-4, 1, 3);
+    midBox2.position.set(-8, 1, -35);
     addMesh(midBox2);
 
-    // Connector building (mid to A)
-    const connector = createBuilding(10, 7, 20, wallMat);
-    connector.position.set(20, 3.5, -10);
-    scene.add(connector);
-    const connectorMesh = new THREE.Mesh(new THREE.BoxGeometry(10, 7, 20), wallMat);
-    connectorMesh.position.set(20, 3.5, -10);
-    worldOctree.fromGraphNode(connectorMesh);
-
-    // === CATWALK (A to Jungle) ===
-    const catwalk = new THREE.Mesh(new THREE.BoxGeometry(20, 0.3, 4), woodMat);
-    catwalk.position.set(35, 2.5, 15);
-    addMesh(catwalk);
-    // Catwalk railing
-    const catwalkRail = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 0.1), metalMat);
-    catwalkRail.position.set(35, 3.2, 17);
-    addMesh(catwalkRail);
-
-    // Stairs up to catwalk
-    for (let i = 0; i < 5; i++) {
-      const stair = new THREE.Mesh(new THREE.BoxGeometry(4, 0.3, 1), tileMat);
-      stair.position.set(25, 0.5 + i * 0.5, 15 + i * 0.8);
+    // === WINDOW ROOM (overlooks mid) ===
+    // Elevated room with window to mid
+    addWall(25, -25, 14, 1, 5);
+    addWall(25, -15, 14, 1, 5);
+    addWall(32, -20, 1, 11, 5);
+    addFloor(25, -20, 14, 10, 2);  // Elevated
+    addRoof(25, -20, 14, 10, 7);
+    
+    // Stairs up to window
+    for (let i = 0; i < 4; i++) {
+      const stair = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 1.5), tileMat);
+      stair.position.set(19, 0.5 + i * 0.5, -18 + i * 1.2);
       addMesh(stair);
     }
 
-    // === B SITE (left side) ===
-    // B site platform
-    const bSitePlatform = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 28), tileMat);
-    bSitePlatform.position.set(-50, 0.15, 0);
-    addMesh(bSitePlatform);
+    // === UNDERPASS (below window) ===
+    // Tunnel under window room
+    addWall(25, -5, 1, 10, 2);
+    addWall(32, -5, 1, 10, 2);
+    addFloor(28.5, -5, 6, 10);
+    addRoof(28.5, -5, 6, 10, 2);
 
-    // B site boxes
-    const bBox1 = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 3), woodMat);
-    bBox1.position.set(-52, 1.5, 5);
-    addMesh(bBox1);
-    const bBox2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 4), woodMat);
-    bBox2.position.set(-48, 1, -8);
-    addMesh(bBox2);
+    // === CONNECTOR / JUNGLE (Mid to A) ===
+    // Corridor from mid to A site
+    addWall(18, 0, 1, 20, 5);
+    addWall(35, 0, 1, 20, 5);
+    addFloor(26.5, 0, 16, 20);
+    addRoof(26.5, 0, 16, 20, 5);
+    
+    // Connector boxes
+    const connectorBox = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    connectorBox.position.set(25, 1, 5);
+    addMesh(connectorBox);
 
-    // Van (B site iconic)
-    const vanBody = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 3), concreteMat);
-    vanBody.position.set(-55, 2, 0);
-    addMesh(vanBody);
-    const vanCab = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), concreteMat);
-    vanCab.position.set(-55, 1.5, 3);
-    addMesh(vanCab);
+    // === A RAMP (T to A site) ===
+    // Corridor with ramp leading up to A
+    addWall(40, -40, 1, 30, 5);
+    addWall(55, -40, 1, 30, 5);
+    addFloor(47.5, -40, 14, 30);
+    addRoof(47.5, -40, 14, 30, 5);
+    
+    // Actual ramp incline
+    const aRamp = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, 15), tileMat);
+    aRamp.position.set(47.5, 0.7, -30);
+    aRamp.rotation.x = -0.12;
+    addMesh(aRamp);
 
-    // === B APARTMENTS ===
-    const bApps = createBuilding(18, 12, 12, wallMat);
-    bApps.position.set(-55, 6, 40);
-    scene.add(bApps);
-    const bAppsMesh = new THREE.Mesh(new THREE.BoxGeometry(18, 12, 12), wallMat);
-    bAppsMesh.position.set(-55, 6, 40);
-    worldOctree.fromGraphNode(bAppsMesh);
+    // === PALACE (Top right, leads to A) ===
+    // Palace interior rooms
+    addWall(60, -55, 1, 20, 5);
+    addWall(75, -55, 1, 20, 5);
+    addWall(67.5, -65, 16, 1, 5);
+    addFloor(67.5, -55, 14, 20);
+    addRoof(67.5, -55, 14, 20, 5);
+    
+    // Palace second room
+    addWall(60, -40, 1, 10, 5);
+    addWall(75, -40, 1, 10, 5);
+    addFloor(67.5, -40, 14, 10);
+    addRoof(67.5, -40, 14, 10, 5);
 
-    // Apartments balcony
-    const appsBalcony = new THREE.Mesh(new THREE.BoxGeometry(12, 0.3, 4), tileMat);
-    appsBalcony.position.set(-46, 4, 36);
-    addMesh(appsBalcony);
-    // Balcony railing
-    const balconyRail = new THREE.Mesh(new THREE.BoxGeometry(12, 1.2, 0.1), metalMat);
-    balconyRail.position.set(-46, 4.75, 34);
-    addMesh(balconyRail);
+    // === A SITE ===
+    // Open bombsite with surrounding structures
+    addFloor(55, -10, 40, 40);
+    
+    // A site surrounding walls (with gaps for entries)
+    addWall(75, -10, 1, 40, 6);   // Far right wall
+    addWall(55, 10, 40, 1, 6);    // Back wall (CT side)
+    addWall(35, -5, 1, 30, 6);    // Left wall (partial, connector side)
+    
+    // Default boxes (triple stack)
+    const aDefault1 = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 5), woodMat);
+    aDefault1.position.set(55, 1.5, -5);
+    addMesh(aDefault1);
+    const aDefault2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 3), woodMat);
+    aDefault2.position.set(52, 1.25, -8);
+    addMesh(aDefault2);
+    
+    // Ninja corner
+    const ninja = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), woodMat);
+    ninja.position.set(72, 1, 5);
+    addMesh(ninja);
+    
+    // Tetris boxes
+    const tetris1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    tetris1.position.set(45, 1, 0);
+    addMesh(tetris1);
+    const tetris2 = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), woodMat);
+    tetris2.position.set(43, 1.5, -3);
+    addMesh(tetris2);
 
-    // === MARKET/KITCHEN ===
-    const market = createBuilding(15, 6, 10, wallMat);
-    market.position.set(-30, 3, -35);
-    scene.add(market);
-    const marketMesh = new THREE.Mesh(new THREE.BoxGeometry(15, 6, 10), wallMat);
-    marketMesh.position.set(-30, 3, -35);
-    worldOctree.fromGraphNode(marketMesh);
-
-    // === UNDERPASS ===
-    const underpassCeiling = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 15), concreteMat);
-    underpassCeiling.position.set(-15, 4, -15);
-    addMesh(underpassCeiling);
-    const underpassWall1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
-    underpassWall1.position.set(-11, 2, -15);
-    addMesh(underpassWall1);
-    const underpassWall2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 15), wallMat);
-    underpassWall2.position.set(-19, 2, -15);
-    addMesh(underpassWall2);
-
-    // === T SPAWN ===
-    const tSpawn = createBuilding(25, 10, 15, wallMat);
-    tSpawn.position.set(0, 5, -80);
-    scene.add(tSpawn);
-    const tSpawnMesh = new THREE.Mesh(new THREE.BoxGeometry(25, 10, 15), wallMat);
-    tSpawnMesh.position.set(0, 5, -80);
-    worldOctree.fromGraphNode(tSpawnMesh);
-
-    // T spawn side buildings
-    const tSpawnLeft = createBuilding(12, 8, 10, darkWallMat);
-    tSpawnLeft.position.set(-20, 4, -70);
-    scene.add(tSpawnLeft);
-    const tSpawnLeftMesh = new THREE.Mesh(new THREE.BoxGeometry(12, 8, 10), darkWallMat);
-    tSpawnLeftMesh.position.set(-20, 4, -70);
-    worldOctree.fromGraphNode(tSpawnLeftMesh);
+    // === STAIRS (A site to CT) ===
+    // Stairs connecting A to CT spawn
+    for (let i = 0; i < 6; i++) {
+      const stair = new THREE.Mesh(new THREE.BoxGeometry(6, 0.4, 1.5), tileMat);
+      stair.position.set(60, 0.2 + i * 0.4, 12 + i * 1.5);
+      addMesh(stair);
+    }
 
     // === CT SPAWN ===
-    const ctSpawn = createBuilding(20, 8, 12, wallMat);
-    ctSpawn.position.set(0, 4, 80);
-    scene.add(ctSpawn);
-    const ctSpawnMesh = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 12), wallMat);
-    ctSpawnMesh.position.set(0, 4, 80);
-    worldOctree.fromGraphNode(ctSpawnMesh);
+    // Open area behind A site
+    addFloor(50, 35, 50, 30);
+    
+    // CT Spawn walls
+    addWall(75, 35, 1, 30, 6);
+    addWall(50, 50, 50, 1, 6);
+    addWall(25, 35, 1, 30, 6);
+    
+    // CT boxes
+    const ctBox1 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), woodMat);
+    ctBox1.position.set(60, 1, 40);
+    addMesh(ctBox1);
+    const ctBox2 = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 2.5), woodMat);
+    ctBox2.position.set(40, 0.75, 35);
+    addMesh(ctBox2);
 
-    // === BOUNDARY WALLS (styled) ===
-    const boundaryHeight = 18;
-    const boundaryWalls = [
-      { pos: [0, boundaryHeight/2, -120], size: [250, boundaryHeight, 3] },
-      { pos: [0, boundaryHeight/2, 120], size: [250, boundaryHeight, 3] },
-      { pos: [-120, boundaryHeight/2, 0], size: [3, boundaryHeight, 250] },
-      { pos: [120, boundaryHeight/2, 0], size: [3, boundaryHeight, 250] },
-    ];
-    boundaryWalls.forEach(w => {
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(w.size[0], w.size[1], w.size[2]), darkWallMat);
-      wall.position.set(w.pos[0], w.pos[1], w.pos[2]);
-      addMesh(wall);
-    });
+    // === TICKET BOOTH / SANDWICH ===
+    // Small room between CT and A
+    addWall(40, 15, 10, 1, 5);
+    addWall(40, 25, 10, 1, 5);
+    addWall(35, 20, 1, 11, 5);
+    addFloor(40, 20, 10, 10);
+    addRoof(40, 20, 10, 10, 5);
 
-    // === SCATTERED COVER ===
-    const coverSpots = [
-      { pos: [15, 1, 35], size: [3, 2, 2] },
-      { pos: [-15, 1, -25], size: [2.5, 1.8, 2.5] },
-      { pos: [30, 1, -50], size: [3, 2.5, 3] },
-      { pos: [-35, 1, 50], size: [2, 1.5, 3] },
-      { pos: [70, 1, 25], size: [2.5, 2, 2.5] },
-      { pos: [-70, 1, -25], size: [3, 2, 2] },
-      { pos: [10, 1, 60], size: [2, 1.8, 2] },
-      { pos: [-10, 1, -60], size: [2.5, 2, 2.5] },
-    ];
-    coverSpots.forEach(c => {
-      const cover = new THREE.Mesh(new THREE.BoxGeometry(c.size[0], c.size[1], c.size[2]), woodMat);
-      cover.position.set(c.pos[0], c.pos[1], c.pos[2]);
-      addMesh(cover);
-    });
+    // === JUNGLE (covered area near A) ===
+    addWall(35, 5, 1, 10, 4);
+    addRoof(38, 5, 7, 10, 4);
 
-    // === BARRELS & PROPS ===
-    const barrelSpots = [
-      [38, 1, 12], [-38, 1, -12], [8, 1, 45], [-8, 1, -45],
-      [60, 1, -15], [-60, 1, 15], [25, 1, 30], [-25, 1, -30],
+    // === BOUNDARY WALLS (outer map limits) ===
+    addWall(-80, 0, 1, 200, 10);  // Far left
+    addWall(85, 0, 1, 200, 10);   // Far right
+    addWall(0, -110, 170, 1, 10); // Far back (T)
+    addWall(0, 60, 170, 1, 10);   // Far front (CT)
+
+    // === BARRELS scattered around ===
+    const barrels = [
+      [-50, 1, -5], [-25, 1, -40], [10, 1, -45], [35, 1, -50],
+      [65, 1, 25], [30, 1, 30], [-55, 1, 25], [50, 1, -25],
     ];
-    barrelSpots.forEach(pos => {
+    barrels.forEach(pos => {
       const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.8, 0.8, 1.8, 12),
+        new THREE.CylinderGeometry(0.7, 0.7, 1.6, 10),
         new THREE.MeshStandardMaterial({ color: 0x3a5a4a, roughness: 0.7 })
       );
       barrel.position.set(pos[0], pos[1], pos[2]);
