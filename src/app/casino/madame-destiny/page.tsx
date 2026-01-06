@@ -525,11 +525,34 @@ export default function MadameDestinyMegaways() {
   const renderSymbol = (symbol: Symbol, colIdx: number, rowIdx: number, reelSize: number) => {
     const config = SYMBOLS[symbol.type];
     const size = reelSize > 5 ? 'w-10 h-10 text-xl' : reelSize > 4 ? 'w-12 h-12 text-2xl' : 'w-14 h-14 text-3xl';
-    const isReelSpinning = isSpinning && colIdx >= revealedReels;
+    const isReelHidden = isSpinning && colIdx >= revealedReels;
+    const isReelJustRevealed = isSpinning && colIdx === revealedReels - 1;
+    
+    // Hidden reel - empty placeholder
+    if (isReelHidden) {
+      return (
+        <div
+          key={symbol.id}
+          className={`
+            ${size}
+            rounded-lg flex items-center justify-center
+            bg-gray-800/50
+            border border-white/10
+          `}
+        >
+          <span className="text-white/20">•</span>
+        </div>
+      );
+    }
     
     return (
       <div
         key={symbol.id}
+        style={{
+          animation: isReelJustRevealed ? `dropIn 0.4s ease-out` : undefined,
+          animationDelay: isReelJustRevealed ? `${rowIdx * 50}ms` : undefined,
+          animationFillMode: 'both'
+        }}
         className={`
           ${size}
           rounded-lg flex items-center justify-center
@@ -538,17 +561,32 @@ export default function MadameDestinyMegaways() {
           transition-all duration-300
           ${symbol.isWinning ? 'animate-pulse scale-110 ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/50' : ''}
           ${symbol.isNew ? 'animate-bounce' : ''}
-          ${isReelSpinning ? 'animate-spin opacity-50' : ''}
           ${symbol.type === 'madame' ? 'ring-2 ring-purple-400' : ''}
         `}
       >
-        <span className="drop-shadow-lg">{isReelSpinning ? '❓' : config.emoji}</span>
+        <span className="drop-shadow-lg">{config.emoji}</span>
       </div>
     );
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-violet-950 p-2 md:p-4">
+      {/* Drop animation keyframes */}
+      <style jsx>{`
+        @keyframes dropIn {
+          0% {
+            transform: translateY(-100px);
+            opacity: 0;
+          }
+          60% {
+            transform: translateY(10px);
+          }
+          100% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
       {/* Huge Win Popup */}
       {showHugeWin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
