@@ -436,6 +436,39 @@ export default function CSBetting() {
       const aliveT = cur.filter(b => b.team === 'T' && b.alive);
       const aliveCT = cur.filter(b => b.team === 'CT' && b.alive);
       
+      // === CT INTEL GATHERING ===
+      // Count how many Ts each CT can see
+      const ctIntel: Map<string, {enemiesSpotted: number, spotLocation: {x:number,y:number} | null}> = new Map();
+      for (const ct of aliveCT) {
+        let enemiesSpotted = 0;
+        let spotLocation: {x:number,y:number} | null = null;
+        for (const t of aliveT) {
+          const d = Math.hypot(t.x - ct.x, t.y - ct.y);
+          if (d < 350 && hasLOS(ct.x, ct.y, t.x, t.y)) {
+            enemiesSpotted++;
+            spotLocation = {x: t.x, y: t.y};
+          }
+        }
+        ctIntel.set(ct.id, {enemiesSpotted, spotLocation});
+      }
+      
+      // Check if any CT spots 3+ enemies - trigger team rotation
+      let hotspot: {x: number, y: number} | null = null;
+      for (const [, intel] of ctIntel) {
+        if (intel.enemiesSpotted >= 3 && intel.spotLocation) {
+          hotspot = intel.spotLocation;
+          break;
+        }
+      }
+      
+      // Count alive CTs at each site
+      const ctsAtA = aliveCT.filter(ct => ct.assignedSite === 'A').length;
+      const ctsAtB = aliveCT.filter(ct => ct.assignedSite === 'B').length;
+      
+      // Detect if a site is overwhelmed (0 CTs left there)
+      const needRotateToA = ctsAtA === 0 && aliveCT.length > 0;
+      const needRotateToB = ctsAtB === 0 && aliveCT.length > 0;
+      
       // Win conditions
       if (aliveT.length === 0 && !bombRef.current) {
         // All T dead and bomb NOT planted - CT wins
@@ -525,7 +558,7 @@ export default function CSBetting() {
               goalY = botSitePos.y + (Math.random() - 0.5) * 60;
             }
           } else {
-            // CT behavior - go to assigned site
+            // CT behavior - smart rotation and positioning
             if (bombRef.current && bombPosRef.current) {
               // Rush to defuse - closest CT goes directly, others provide cover
               const distToBomb = Math.hypot(bombPosRef.current.x - bot.x, bombPosRef.current.y - bot.y);
@@ -542,8 +575,35 @@ export default function CSBetting() {
                 goalX = bombPosRef.current.x + Math.cos(coverAngle) * 80;
                 goalY = bombPosRef.current.y + Math.sin(coverAngle) * 80;
               }
+            } else if (hotspot) {
+              // ROTATE: Another CT spotted 3+ enemies - go help!
+              const helpAngle = Math.random() * Math.PI * 2;
+              const helpDist = 50 + Math.random() * 50;
+              goalX = hotspot.x + Math.cos(helpAngle) * helpDist;
+              goalY = hotspot.y + Math.sin(helpAngle) * helpDist;
+            } else if (needRotateToA && bot.assignedSite === 'B') {
+              // ROTATE: No CTs left at A - one B player rotates
+              // Only rotate if this is the first B player (by ID)
+              const bPlayers = aliveCT.filter(ct => ct.assignedSite === 'B');
+              if (bPlayers.length > 0 && bPlayers[0].id === bot.id) {
+                goalX = SITE_A.x;
+                goalY = SITE_A.y;
+              } else {
+                goalX = botSitePos.x + Math.cos((parseInt(bot.id.slice(2)) - 1) * (Math.PI / 3)) * 40;
+                goalY = botSitePos.y + 20;
+              }
+            } else if (needRotateToB && bot.assignedSite === 'A') {
+              // ROTATE: No CTs left at B - one A player rotates
+              const aPlayers = aliveCT.filter(ct => ct.assignedSite === 'A');
+              if (aPlayers.length > 0 && aPlayers[0].id === bot.id) {
+                goalX = SITE_B.x;
+                goalY = SITE_B.y;
+              } else {
+                goalX = botSitePos.x + Math.cos((parseInt(bot.id.slice(2)) - 1) * (Math.PI / 3)) * 40;
+                goalY = botSitePos.y + 20;
+              }
             } else {
-              // Position at assigned site with variation
+              // Default: Position at assigned site with variation
               const spreadAngle = (parseInt(bot.id.slice(2)) - 1) * (Math.PI / 3);
               const spreadDist = 30 + Math.random() * 40;
               goalX = botSitePos.x + Math.cos(spreadAngle) * spreadDist;
