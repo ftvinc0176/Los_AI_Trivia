@@ -75,8 +75,8 @@ export default function Craps() {
 
   const processRoll = (total: number, die1: number, die2: number) => {
     let winnings = 0;
+    let losses = 0;
     let newBets = [...bets];
-    let newBalance = balance;
     let msg = '';
 
     // Come-out roll (no point established)
@@ -84,14 +84,16 @@ export default function Craps() {
       // CRAPLESS CRAPS: Only 7 wins on come-out, 2,3,11,12 become points
       if (total === 7) {
         msg = '7 - Winner! Pass Line wins!';
-        newBets.forEach(bet => {
+        newBets = newBets.filter(bet => {
           if (bet.type === 'pass') {
-            winnings += bet.amount * 2; // 1:1 payout
+            winnings += bet.amount * 2; // Return bet + winnings
+            return false; // Remove bet
           } else if (bet.type === 'dontPass') {
-            // Don't pass loses
+            losses += bet.amount; // Lose the bet
+            return false; // Remove bet
           }
+          return true; // Keep other bets
         });
-        newBets = newBets.filter(bet => bet.type !== 'pass' && bet.type !== 'dontPass');
       } else {
         // All other numbers (2,3,4,5,6,8,9,10,11,12) become the point
         setPoint(total);
@@ -102,132 +104,171 @@ export default function Craps() {
     else {
       if (total === point) {
         msg = `${total} - Winner! Point made!`;
-        newBets.forEach(bet => {
+        newBets = newBets.filter(bet => {
           if (bet.type === 'pass') {
             winnings += bet.amount * 2; // 1:1 on pass line
             if (bet.odds) {
               // Odds payouts based on point number
-              const oddsMultiplier = getOddsMultiplier(point);
-              winnings += bet.odds * oddsMultiplier;
+              winnings += bet.odds + (bet.odds * (getOddsMultiplier(point) - 1));
             }
+            return false; // Remove bet
           } else if (bet.type === 'dontPass') {
-            // Don't pass loses
+            losses += bet.amount;
+            if (bet.odds) losses += bet.odds;
+            return false; // Remove bet
           }
+          return true; // Keep other bets
         });
-        newBets = newBets.filter(bet => bet.type !== 'pass' && bet.type !== 'dontPass');
         setPoint(null);
       } else if (total === 7) {
-        msg = '7 out! Don\'t Pass wins!';
-        newBets.forEach(bet => {
+        msg = '7 out! Don&apos;t Pass wins!';
+        newBets = newBets.filter(bet => {
           if (bet.type === 'dontPass') {
             winnings += bet.amount * 2; // 1:1 payout
+            if (bet.odds) {
+              winnings += bet.odds * 2; // Even money on don't pass odds
+            }
+            return false;
           } else if (bet.type === 'pass') {
-            // Pass line loses
+            losses += bet.amount;
+            if (bet.odds) losses += bet.odds;
+            return false;
           }
+          return true;
         });
-        newBets = newBets.filter(bet => bet.type !== 'pass' && bet.type !== 'dontPass');
         setPoint(null);
       } else {
         msg = `Rolled ${total}`;
       }
     }
 
-    // Process place bets
-    newBets.forEach(bet => {
-      if (bet.type.startsWith('place')) {
-        const placeNum = parseInt(bet.type.replace('place', ''));
-        if (total === placeNum) {
-          const payout = getPlaceBetPayout(placeNum, bet.amount);
-          winnings += payout;
-          msg += ` - Place ${placeNum} wins!`;
+    // Process place bets - they stay up unless they win or 7 out
+    if (total === 7 && point !== null) {
+      // 7 out - all place bets lose
+      newBets = newBets.filter(bet => {
+        if (bet.type.startsWith('place')) {
+          losses += bet.amount;
+          return false;
         }
-      }
-    });
-
-    // Process field bet
-    const fieldBet = newBets.find(bet => bet.type === 'field');
-    if (fieldBet) {
-      if ([2, 3, 4, 9, 10, 11, 12].includes(total)) {
-        if (total === 2) {
-          winnings += fieldBet.amount * 3; // 2:1 payout on 2
-          msg += ' - Field pays 2:1!';
-        } else if (total === 12) {
-          winnings += fieldBet.amount * 4; // 3:1 payout on 12
-          msg += ' - Field pays 3:1!';
-        } else {
-          winnings += fieldBet.amount * 2; // 1:1 payout
-          msg += ' - Field wins!';
+        return true;
+      });
+    } else {
+      newBets = newBets.filter(bet => {
+        if (bet.type.startsWith('place')) {
+          const placeNum = parseInt(bet.type.replace('place', ''));
+          if (total === placeNum) {
+            winnings += getPlaceBetPayout(placeNum, bet.amount);
+            msg += ` - Place ${placeNum} wins!`;
+            return false; // Take bet down after win
+          }
         }
-        newBets = newBets.filter(bet => bet.type !== 'field');
-      } else {
-        // Field loses on 5,6,7,8
-        newBets = newBets.filter(bet => bet.type !== 'field');
-        msg += ' - Field loses';
-      }
+        return true;
+      });
     }
+
+    // Process field bet (one roll bet)
+    newBets = newBets.filter(bet => {
+      if (bet.type === 'field') {
+        if ([2, 3, 4, 9, 10, 11, 12].includes(total)) {
+          if (total === 2) {
+            winnings += bet.amount * 3; // 2:1 payout (bet + 2x)
+            msg += ' - Field pays 2:1!';
+          } else if (total === 12) {
+            winnings += bet.amount * 4; // 3:1 payout (bet + 3x)
+            msg += ' - Field pays 3:1!';
+          } else {
+            winnings += bet.amount * 2; // 1:1 payout
+            msg += ' - Field wins!';
+          }
+        } else {
+          // Field loses on 5,6,7,8
+          losses += bet.amount;
+          msg += ' - Field loses';
+        }
+        return false; // Always remove field bet after roll
+      }
+      return true;
+    });
 
     // Process hardways
     if (die1 === die2) { // Hard way rolled
       const hardNum = total;
-      newBets.forEach(bet => {
+      newBets = newBets.filter(bet => {
         if (bet.type === `hard${hardNum}`) {
-          const payout = getHardwayPayout(hardNum, bet.amount);
-          winnings += payout;
+          winnings += getHardwayPayout(hardNum, bet.amount);
           msg += ` - Hard ${hardNum} wins!`;
+          return false;
         }
+        return true;
       });
     } else {
-      // Easy way rolled - check if it matches any hardway bets
+      // Easy way rolled - hardway loses
       if ([4, 6, 8, 10].includes(total)) {
-        newBets = newBets.filter(bet => bet.type !== `hard${total}`);
+        newBets = newBets.filter(bet => {
+          if (bet.type === `hard${total}`) {
+            losses += bet.amount;
+            return false;
+          }
+          return true;
+        });
       }
     }
     
     // Check if 7 was rolled (kills all hardways)
     if (total === 7) {
-      newBets = newBets.filter(bet => !bet.type.startsWith('hard'));
-    }
-
-    // Process proposition bets
-    const anyCrapsBet = newBets.find(bet => bet.type === 'anyCraps');
-    if (anyCrapsBet && [2, 3, 12].includes(total)) {
-      winnings += anyCrapsBet.amount * 8; // 7:1 payout
-      msg += ' - Any Craps wins!';
-      newBets = newBets.filter(bet => bet.type !== 'anyCraps');
-    } else if (anyCrapsBet) {
-      newBets = newBets.filter(bet => bet.type !== 'anyCraps');
-    }
-
-    const any7Bet = newBets.find(bet => bet.type === 'any7');
-    if (any7Bet && total === 7) {
-      winnings += any7Bet.amount * 5; // 4:1 payout
-      msg += ' - Any 7 wins!';
-      newBets = newBets.filter(bet => bet.type !== 'any7');
-    } else if (any7Bet) {
-      newBets = newBets.filter(bet => bet.type !== 'any7');
-    }
-
-    // Process horn bets
-    ['horn2', 'horn3', 'horn11', 'horn12'].forEach(hornType => {
-      const hornBet = newBets.find(bet => bet.type === hornType);
-      if (hornBet) {
-        const hornNum = parseInt(hornType.replace('horn', ''));
-        if (total === hornNum) {
-          const payout = getHornPayout(hornNum, hornBet.amount);
-          winnings += payout;
-          msg += ` - Horn ${hornNum} wins!`;
+      newBets = newBets.filter(bet => {
+        if (bet.type.startsWith('hard')) {
+          losses += bet.amount;
+          return false;
         }
-        newBets = newBets.filter(bet => bet.type !== hornType);
+        return true;
+      });
+    }
+
+    // Process proposition bets (all one-roll)
+    newBets = newBets.filter(bet => {
+      if (bet.type === 'anyCraps') {
+        if ([2, 3, 12].includes(total)) {
+          winnings += bet.amount * 8; // 7:1 payout
+          msg += ' - Any Craps wins!';
+        } else {
+          losses += bet.amount;
+        }
+        return false;
       }
+      
+      if (bet.type === 'any7') {
+        if (total === 7) {
+          winnings += bet.amount * 5; // 4:1 payout
+          msg += ' - Any 7 wins!';
+        } else {
+          losses += bet.amount;
+        }
+        return false;
+      }
+
+      // Horn bets
+      if (bet.type.startsWith('horn')) {
+        const hornNum = parseInt(bet.type.replace('horn', ''));
+        if (total === hornNum) {
+          winnings += getHornPayout(hornNum, bet.amount);
+          msg += ` - Horn ${hornNum} wins!`;
+        } else {
+          losses += bet.amount;
+        }
+        return false;
+      }
+
+      return true;
     });
 
-    newBalance += winnings;
-    setBalance(newBalance);
+    const netChange = winnings - losses;
+    setBalance(balance + netChange);
     setBets(newBets);
     setMessage(msg);
 
-    if (winnings > 0) {
-      recordWin(winnings);
+    if (winnings > losses) {
+      recordWin(netChange);
     }
 
     // Check if reload needed
@@ -239,67 +280,70 @@ export default function Craps() {
     switch (point) {
       case 2:
       case 12:
-        return 7; // 6:1
+        return 7; // 6:1 true odds
       case 3:
       case 11:
-        return 4; // 3:1
+        return 4; // 3:1 true odds
       case 4:
       case 10:
-        return 3; // 2:1
+        return 3; // 2:1 true odds
       case 5:
       case 9:
-        return 2.5; // 3:2
+        return 2.5; // 3:2 true odds
       case 6:
       case 8:
-        return 2.2; // 6:5
+        return 2.2; // 6:5 true odds
       default:
         return 2;
     }
   };
 
   const getPlaceBetPayout = (num: number, amount: number): number => {
+    // Returns total amount including original bet
     switch (num) {
       case 2:
       case 12:
-        return amount + (amount * 11); // 11:1
+        return amount * 12; // 11:1 payout
       case 3:
       case 11:
-        return amount + (amount * 11); // 11:1
+        return amount * 12; // 11:1 payout
       case 4:
       case 10:
-        return amount + (amount * 2); // 2:1
+        return amount * 3; // 2:1 payout
       case 5:
       case 9:
-        return amount + (amount * 1.5); // 3:2
+        return amount * 2.5; // 3:2 payout
       case 6:
       case 8:
-        return amount + (amount * 1.2); // 6:5
+        return amount * 2.2; // 6:5 payout
       default:
         return amount;
     }
   };
 
   const getHardwayPayout = (num: number, amount: number): number => {
+    // Returns total amount including original bet
     switch (num) {
       case 4:
       case 10:
-        return amount + (amount * 7); // 7:1
+        return amount * 8; // 7:1 payout
       case 6:
       case 8:
-        return amount + (amount * 9); // 9:1
+        return amount * 10; // 9:1 payout
       default:
         return amount;
     }
   };
 
   const getHornPayout = (num: number, amount: number): number => {
+    // Returns total amount including original bet
     switch (num) {
       case 2:
       case 12:
-        return amount + (amount * 30); // 30:1
+        return amount * 31; // 30:1 payout
       case 3:
       case 11:
-        return amount + (amount * 15); // 15:1
+        return amount * 16; // 15:1 payout
       default:
         return amount;
     }
