@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 
 interface LeaderboardEntry {
   name: string;
@@ -19,6 +19,7 @@ interface CasinoContextType {
   highestBalances: LeaderboardEntry[];
   biggestWins: LeaderboardEntry[];
   recordWin: (winAmount: number) => void;
+  refreshLeaderboards: () => void;
 }
 
 const CasinoContext = createContext<CasinoContextType | undefined>(undefined);
@@ -31,12 +32,24 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
   const [biggestWins, setBiggestWins] = useState<LeaderboardEntry[]>([]);
   const [peakBalance, setPeakBalance] = useState(25000);
 
-  // Load from localStorage on mount (use localStorage for leaderboards to persist)
+  // Fetch leaderboards from API
+  const fetchLeaderboards = useCallback(async () => {
+    try {
+      const response = await fetch('/api/leaderboard');
+      if (response.ok) {
+        const data = await response.json();
+        setHighestBalances(data.highestBalances || []);
+        setBiggestWins(data.biggestWins || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch leaderboards:', error);
+    }
+  }, []);
+
+  // Load session data and fetch leaderboards on mount
   useEffect(() => {
     const savedName = sessionStorage.getItem('casinoPlayerName');
     const savedBalance = sessionStorage.getItem('casinoBalance');
-    const savedHighest = localStorage.getItem('casinoHighestBalances');
-    const savedWins = localStorage.getItem('casinoBiggestWins');
     const savedPeak = sessionStorage.getItem('casinoPeakBalance');
     
     if (savedName) {
@@ -46,16 +59,17 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
     if (savedBalance) {
       setBalance(parseInt(savedBalance));
     }
-    if (savedHighest) {
-      setHighestBalances(JSON.parse(savedHighest));
-    }
-    if (savedWins) {
-      setBiggestWins(JSON.parse(savedWins));
-    }
     if (savedPeak) {
       setPeakBalance(parseInt(savedPeak));
     }
-  }, []);
+    
+    // Fetch leaderboards from server
+    fetchLeaderboards();
+    
+    // Refresh leaderboards every 30 seconds
+    const interval = setInterval(fetchLeaderboards, 30000);
+    return () => clearInterval(interval);
+  }, [fetchLeaderboards]);
 
   // Save to sessionStorage when values change
   useEffect(() => {
@@ -65,7 +79,7 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
     }
   }, [playerName]);
 
-  // Track highest balance and update leaderboard
+  // Track highest balance and update leaderboard via API
   useEffect(() => {
     sessionStorage.setItem('casinoBalance', balance.toString());
     
@@ -74,22 +88,22 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
       setPeakBalance(balance);
       sessionStorage.setItem('casinoPeakBalance', balance.toString());
       
-      // Update highest balances leaderboard
-      const newEntry: LeaderboardEntry = {
-        name: playerName,
-        amount: balance,
-        date: new Date().toLocaleDateString()
-      };
-      
-      setHighestBalances(prev => {
-        // Remove any existing entry for this player and add new one
-        const filtered = prev.filter(e => e.name !== playerName);
-        const updated = [...filtered, newEntry]
-          .sort((a, b) => b.amount - a.amount)
-          .slice(0, 5);
-        localStorage.setItem('casinoHighestBalances', JSON.stringify(updated));
-        return updated;
-      });
+      // Update highest balances leaderboard via API
+      fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'balance',
+          name: playerName,
+          amount: balance
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setHighestBalances(data.highestBalances || []);
+          setBiggestWins(data.biggestWins || []);
+        })
+        .catch(err => console.error('Failed to update balance leaderboard:', err));
     }
   }, [balance, peakBalance, playerName]);
 
@@ -101,24 +115,31 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Record a single win for biggest wins leaderboard
-  const recordWin = (winAmount: number) => {
+  // Record a single win for biggest wins leaderboard via API
+  const recordWin = useCallback((winAmount: number) => {
     if (!playerName || winAmount <= 0) return;
     
-    const newEntry: LeaderboardEntry = {
-      name: playerName,
-      amount: winAmount,
-      date: new Date().toLocaleDateString()
-    };
-    
-    setBiggestWins(prev => {
-      const updated = [...prev, newEntry]
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 5);
-      localStorage.setItem('casinoBiggestWins', JSON.stringify(updated));
-      return updated;
-    });
-  };
+    fetch('/api/leaderboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'win',
+        name: playerName,
+        amount: winAmount
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setHighestBalances(data.highestBalances || []);
+        setBiggestWins(data.biggestWins || []);
+      })
+      .catch(err => console.error('Failed to record win:', err));
+  }, [playerName]);
+
+  // Refresh leaderboards manually
+  const refreshLeaderboards = useCallback(() => {
+    fetchLeaderboards();
+  }, [fetchLeaderboards]);
 
   const logout = () => {
     sessionStorage.removeItem('casinoPlayerName');
@@ -141,7 +162,8 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
       logout,
       highestBalances,
       biggestWins,
-      recordWin
+      recordWin,
+      refreshLeaderboards
     }}>
       {children}
     </CasinoContext.Provider>
