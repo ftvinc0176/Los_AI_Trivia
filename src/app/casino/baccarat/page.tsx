@@ -26,7 +26,7 @@ function BaccaratGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'dealing' | 'results'>('lobby');
@@ -325,8 +325,10 @@ function BaccaratGame() {
       } else {
         win = betAmt * 9; // 8:1 payout for tie
       }
+      const profit = win - betAmt;
       setBalance(prev => prev + win);
       setWinnings(win);
+      recordWin(profit); // Record win for leaderboard
     }
   };
 

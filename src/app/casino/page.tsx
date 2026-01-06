@@ -8,7 +8,7 @@ type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'horse-racing' | 
 
 export default function Casino() {
   const router = useRouter();
-  const { playerName, setPlayerName, balance, isLoggedIn, logout } = useCasino();
+  const { playerName, setPlayerName, balance, isLoggedIn, logout, highestBalances, biggestWins } = useCasino();
   const [selectedGame, setSelectedGame] = useState<GameType>(null);
   const [showMultiplayerOptions, setShowMultiplayerOptions] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -90,8 +90,8 @@ export default function Casino() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-5xl w-full">
+    <div className="min-h-screen p-4">
+      <div className="max-w-7xl mx-auto">
         {/* Header with player info */}
         <div className="flex items-center justify-between mb-6 bg-black/40 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
           <div className="flex items-center gap-3">
@@ -111,15 +111,55 @@ export default function Casino() {
           </div>
         </div>
 
-        <h1 className="text-6xl font-bold text-center mb-4 bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-5xl md:text-6xl font-bold text-center mb-4 bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 bg-clip-text text-transparent">
           🎰 The Casino 🎰
         </h1>
-        <p className="text-white/80 text-center mb-8 text-xl">
+        <p className="text-white/80 text-center mb-8 text-lg md:text-xl">
           Your balance carries across all games!
         </p>
 
-        {!showMultiplayerOptions ? (
-          <div className="space-y-8">
+        {/* Main Layout with Leaderboards */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left Leaderboard - Highest Balances */}
+          <div className="lg:w-64 flex-shrink-0">
+            <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-lg rounded-2xl p-4 border border-yellow-500/30 sticky top-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">🏆</span>
+                <h3 className="text-lg font-bold text-yellow-400">Highest Balances</h3>
+              </div>
+              {highestBalances.length > 0 ? (
+                <div className="space-y-2">
+                  {highestBalances.map((entry, i) => (
+                    <div 
+                      key={i} 
+                      className={`flex items-center justify-between p-2 rounded-lg ${
+                        i === 0 ? 'bg-yellow-500/30' : 
+                        i === 1 ? 'bg-gray-400/20' : 
+                        i === 2 ? 'bg-orange-600/20' : 'bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">
+                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                        </span>
+                        <span className="text-white font-medium text-sm truncate max-w-20">{entry.name}</span>
+                      </div>
+                      <span className="text-green-400 font-bold text-sm">${entry.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-white/40 text-center text-sm py-4">
+                  No records yet!<br/>Play to set a record
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Center - Games */}
+          <div className="flex-1">
+            {!showMultiplayerOptions ? (
+              <div className="space-y-6">
             {/* Blackjack */}
             <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
               <div className="flex items-center gap-4 mb-4">
@@ -258,7 +298,8 @@ export default function Casino() {
               {selectedGame === 'blackjack' ? '🃏 Blackjack' : 
                selectedGame === 'andar-bahar' ? '🎴 Andar Bahar' : 
                selectedGame === 'texas-holdem' ? '🃏 Texas Hold\'em' : 
-               '🏇 Horse Racing'} Multiplayer
+               selectedGame === 'horse-racing' ? '🏇 Horse Racing' :
+               '🎴 Baccarat'} Multiplayer
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -286,6 +327,44 @@ export default function Casino() {
             </div>
           </div>
         )}
+          </div>
+
+          {/* Right Leaderboard - Biggest Wins */}
+          <div className="lg:w-64 flex-shrink-0">
+            <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-lg rounded-2xl p-4 border border-green-500/30 sticky top-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">💰</span>
+                <h3 className="text-lg font-bold text-green-400">Biggest Wins</h3>
+              </div>
+              {biggestWins.length > 0 ? (
+                <div className="space-y-2">
+                  {biggestWins.map((entry, i) => (
+                    <div 
+                      key={i} 
+                      className={`flex items-center justify-between p-2 rounded-lg ${
+                        i === 0 ? 'bg-green-500/30' : 
+                        i === 1 ? 'bg-green-400/20' : 
+                        i === 2 ? 'bg-green-300/15' : 'bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">
+                          {i === 0 ? '🔥' : i === 1 ? '⚡' : i === 2 ? '✨' : `${i + 1}.`}
+                        </span>
+                        <span className="text-white font-medium text-sm truncate max-w-20">{entry.name}</span>
+                      </div>
+                      <span className="text-green-400 font-bold text-sm">+${entry.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-white/40 text-center text-sm py-4">
+                  No big wins yet!<br/>Win big to get listed
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Back to Home */}
         <div className="text-center mt-8 space-x-4">
@@ -295,33 +374,6 @@ export default function Casino() {
           >
             🚪 Leave Casino
           </button>
-        </div>
-
-        {/* Coming Soon Games */}
-        <div className="mt-12 bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/10">
-          <h3 className="text-xl font-bold text-white mb-4 text-center">Coming Soon</h3>
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-4 text-center opacity-50">
-            <div>
-              <div className="text-4xl mb-2">🎲</div>
-              <div className="text-white/60 text-sm">Craps</div>
-            </div>
-            <div>
-              <div className="text-4xl mb-2">🎰</div>
-              <div className="text-white/60 text-sm">Slots</div>
-            </div>
-            <div>
-              <div className="text-4xl mb-2">🃏</div>
-              <div className="text-white/60 text-sm">Poker</div>
-            </div>
-            <div>
-              <div className="text-4xl mb-2">⚪</div>
-              <div className="text-white/60 text-sm">Roulette</div>
-            </div>
-            <div>
-              <div className="text-4xl mb-2">🎯</div>
-              <div className="text-white/60 text-sm">Baccarat</div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

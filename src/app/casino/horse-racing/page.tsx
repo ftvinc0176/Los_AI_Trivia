@@ -41,7 +41,7 @@ function HorseRacingGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'racing' | 'results'>('lobby');
@@ -313,6 +313,7 @@ function HorseRacingGame() {
             const win = Math.floor(myBet.amount * winningHorse!.odds);
             setWinnings(win);
             setBalance(prev => prev + win + myBet.amount);
+            recordWin(win); // Record win for leaderboard
           }
         }, 500);
       }

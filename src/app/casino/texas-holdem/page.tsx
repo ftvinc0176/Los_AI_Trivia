@@ -56,7 +56,7 @@ function TexasHoldemGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown' | 'results'>('lobby');
@@ -622,6 +622,7 @@ function TexasHoldemGame() {
       if (bestHand.id === 'player') {
         setMessage(`🎉 You win $${newPot} with ${playerEval.rankName}!`);
         setBalance(newBalance + newPot);
+        recordWin(newPot); // Record win for leaderboard
       } else {
         setMessage(`${bestHand.name} wins $${newPot} with ${bestHand.eval.rankName}!`);
       }
