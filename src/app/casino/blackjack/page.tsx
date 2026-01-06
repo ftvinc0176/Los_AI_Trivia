@@ -50,7 +50,7 @@ function BlackjackGame() {
   const [isDealing, setIsDealing] = useState(false);
   const [canHit, setCanHit] = useState(true);
   const [resultMessage, setResultMessage] = useState('');
-  const [selectedChip, setSelectedChip] = useState(25);
+  const [selectedChip, setSelectedChip] = useState(500);
   const [sideBets, setSideBets] = useState({ perfectPairs: 0, twentyOnePlus3: 0 });
   const [sideBetResults, setSideBetResults] = useState({ perfectPairs: '', twentyOnePlus3: '', perfectPairsWin: 0, twentyOnePlus3Win: 0 });
   const [showDealerHole, setShowDealerHole] = useState(false);
@@ -1188,7 +1188,7 @@ function BlackjackGame() {
 
             {/* Chip Selection */}
             <div className="relative flex justify-center gap-1 sm:gap-2 mb-3 sm:mb-6 flex-wrap">
-              {[25, 50, 100, 250, 500, 1000, 5000, 10000].map((value) => (
+              {[500, 1000, 2500, 5000, 10000, 15000, 20000, 25000].map((value) => (
                 <button
                   key={value}
                   onClick={() => setSelectedChip(value)}

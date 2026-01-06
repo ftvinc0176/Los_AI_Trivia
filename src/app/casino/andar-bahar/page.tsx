@@ -51,7 +51,7 @@ function AndarBaharGame() {
   const [baharCards, setBaharCards] = useState<Card[]>([]);
   const [winningSide, setWinningSide] = useState<'andar' | 'bahar' | null>(null);
   const [resultMessage, setResultMessage] = useState('');
-  const [selectedChip, setSelectedChip] = useState(100);
+  const [selectedChip, setSelectedChip] = useState(500);
   const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; playerCount: number; maxPlayers: number }>>([]);
   const [isDealing, setIsDealing] = useState(false);
   const [lastBet, setLastBet] = useState<{ amount: number; side: 'andar' | 'bahar' } | null>(null);
@@ -686,7 +686,7 @@ function AndarBaharGame() {
             
             {/* Chip Selection */}
             <div className="flex justify-center gap-2 mb-4">
-              {[25, 100, 500, 1000, 5000].map(chip => (
+              {[500, 1000, 2500, 5000, 10000, 25000].map(chip => (
                 <button
                   key={chip}
                   onClick={() => setSelectedChip(chip)}

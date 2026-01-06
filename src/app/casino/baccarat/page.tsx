@@ -615,7 +615,7 @@ function BaccaratGame() {
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 text-center text-2xl"
             />
             <div className="grid grid-cols-4 gap-2 mt-3">
-              {[100, 500, 1000, 5000].map(amt => (
+              {[500, 1000, 2500, 5000, 10000, 25000].map(amt => (
                 <button
                   key={amt}
                   onClick={() => setBetAmount(amt.toString())}

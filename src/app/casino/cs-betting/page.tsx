@@ -52,7 +52,7 @@ export default function CSBetting() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [started,setStarted] = useState(false);
-  const [bet,setBet] = useState(100);
+  const [bet,setBet] = useState(500);
   const [betOn,setBetOn] = useState<boolean|null>(null);
   const [phase,setPhase] = useState<'bet'|'play'|'end'>('bet');
   const [round,setRound] = useState(1);
@@ -99,7 +99,7 @@ export default function CSBetting() {
     if(w==='T')setTScore(s=>s+1);else setCTScore(s=>s+1);
     if(betOn!==null&&bet>0){
       const won=betOn===planted;
-      if(won)setBalance((b: number)=>b+bet*2);
+      if(won)setBalance(balance+bet*2);
       setBetResult({won,amt:bet});
     }
     const newT=w==='T'?tScore+1:tScore,newCT=w==='CT'?ctScore+1:ctScore;
@@ -244,7 +244,7 @@ export default function CSBetting() {
             <div className="space-y-4">
               <h2 className="text-lg font-bold text-white">Place Bet</h2>
               <input type="number" value={bet} onChange={e=>setBet(Math.max(0,+e.target.value||0))} className="w-full bg-gray-700 text-white px-3 py-2 rounded" min={0} max={balance}/>
-              <div className="flex gap-2">{[100,500,1000].map(a=><button key={a} onClick={()=>setBet(Math.min(a,balance))} className="flex-1 bg-gray-700 text-white py-1 rounded text-sm">${a}</button>)}</div>
+              <div className="flex gap-2">{[500,1000,5000,10000].map(a=><button key={a} onClick={()=>setBet(Math.min(a,balance))} className="flex-1 bg-gray-700 text-white py-1 rounded text-sm">${a}</button>)}</div>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={()=>startRound(true,bet)} disabled={bet<=0||bet>balance} className="bg-orange-600 text-white py-3 rounded font-bold disabled:opacity-50">💣 PLANTED</button>
                 <button onClick={()=>startRound(false,bet)} disabled={bet<=0||bet>balance} className="bg-blue-600 text-white py-3 rounded font-bold disabled:opacity-50">🛡️ NOT</button>

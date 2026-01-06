@@ -34,7 +34,7 @@ export default function Craps() {
   ]);
   const [point, setPoint] = useState<number | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
-  const [betAmount, setBetAmount] = useState(10);
+  const [betAmount, setBetAmount] = useState(500);
   const [selectedBet, setSelectedBet] = useState<BetType | null>(null);
   const [rolling, setRolling] = useState(false);
   const [message, setMessage] = useState('Place your bets!');
@@ -793,7 +793,7 @@ export default function Craps() {
             <div className="flex flex-col gap-2">
               {/* Bet Amount Selection */}
               <div className="flex gap-1 sm:gap-2">
-                {[5, 10, 25, 50, 100].map(amount => (
+                {[500, 1000, 2500, 5000, 10000].map(amount => (
                   <button
                     key={amount}
                     onClick={() => setBetAmount(amount)}

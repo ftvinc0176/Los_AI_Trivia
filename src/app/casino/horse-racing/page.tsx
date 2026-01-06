@@ -692,7 +692,7 @@ function HorseRacingGame() {
               
               {/* Quick bet buttons */}
               <div className="flex gap-2">
-                {[100, 500, 1000, 5000].map(amount => (
+                {[500, 1000, 2500, 5000, 10000, 25000].map(amount => (
                   <button
                     key={amount}
                     onClick={() => setBetAmount(String(amount))}

@@ -26,7 +26,7 @@ export default function UltimateTexasHoldem() {
   const [blindBet, setBlindBet] = useState(0);
   const [tripsBet, setTripsBet] = useState(0);
   const [playBet, setPlayBet] = useState(0);
-  const [chipValue, setChipValue] = useState(100);
+  const [chipValue, setChipValue] = useState(500);
   
   const [message, setMessage] = useState('Place your Ante and Blind bets to start!');
   const [canPlay4x, setCanPlay4x] = useState(false);
@@ -546,7 +546,7 @@ export default function UltimateTexasHoldem() {
             <div className="space-y-4">
               {/* Chip Selector */}
               <div className="grid grid-cols-6 gap-2">
-                {[100, 500, 1000, 5000, 10000, 25000].map(amount => (
+                {[500, 1000, 2500, 5000, 10000, 25000].map(amount => (
                   <button
                     key={amount}
                     onClick={() => setChipValue(amount)}

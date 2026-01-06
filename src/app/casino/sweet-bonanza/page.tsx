@@ -102,7 +102,7 @@ export default function SweetBonanza() {
   const { balance, setBalance, recordBet, checkAndReload } = useCasino();
   
   const [grid, setGrid] = useState<Symbol[][]>([]);
-  const [betAmount, setBetAmount] = useState(20);
+  const [betAmount, setBetAmount] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isTumbling, setIsTumbling] = useState(false);
   const [message, setMessage] = useState('Place your bet and spin!');
@@ -586,7 +586,7 @@ export default function SweetBonanza() {
 
             {/* Quick Bet Buttons */}
             <div className="flex gap-2">
-              {[20, 50, 100, 200].map(amount => (
+              {[500, 1000, 5000, 10000, 25000, 50000].map(amount => (
                 <button
                   key={amount}
                   onClick={() => setBetAmount(amount)}

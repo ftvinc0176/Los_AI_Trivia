@@ -27,7 +27,7 @@ function UltimateTexasHoldemContent() {
   const [tripsAmount, setTripsAmount] = useState(0);
   const [playAmount, setPlayAmount] = useState(0);
   
-  const [betAmount, setBetAmount] = useState(100);
+  const [betAmount, setBetAmount] = useState(500);
   const [message, setMessage] = useState('Place your Ante and Blind bets to begin');
   const [result, setResult] = useState('');
   const [payouts, setPayouts] = useState<{ label: string; amount: number }[]>([]);
@@ -559,7 +559,7 @@ function UltimateTexasHoldemContent() {
               </div>
 
               <div className="grid grid-cols-5 gap-2">
-                {[5, 10, 25, 50, 100].map(amount => (
+                {[500, 1000, 2500, 5000, 10000].map(amount => (
                   <button
                     key={amount}
                     onClick={() => setBetAmount(amount)}

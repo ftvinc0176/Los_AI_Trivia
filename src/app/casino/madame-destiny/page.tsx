@@ -110,7 +110,7 @@ export default function MadameDestinyMegaways() {
   
   const [grid, setGrid] = useState<Symbol[][]>([]);
   const [reelSizes, setReelSizes] = useState<number[]>([4, 4, 4, 4, 4, 4]);
-  const [betAmount, setBetAmount] = useState(20);
+  const [betAmount, setBetAmount] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isTumbling, setIsTumbling] = useState(false);
   const [message, setMessage] = useState('Gaze into your destiny...');
@@ -533,7 +533,7 @@ export default function MadameDestinyMegaways() {
   };
 
   const adjustBet = (amount: number) => {
-    const newBet = Math.max(20, Math.min(500, betAmount + amount));
+    const newBet = Math.max(500, Math.min(50000, betAmount + amount));
     setBetAmount(Math.round(newBet * 100) / 100);
   };
 
