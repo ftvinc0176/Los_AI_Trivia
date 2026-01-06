@@ -115,6 +115,7 @@ export default function SweetBonanza() {
   const [showPaytable, setShowPaytable] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
   const [spinHistory, setSpinHistory] = useState<{ win: number; bet: number }[]>([]);
+  const [totalBonusWin, setTotalBonusWin] = useState(0);
 
   // Initialize grid
   useEffect(() => {
@@ -218,6 +219,7 @@ export default function SweetBonanza() {
     setFreeSpins(10);
     setCurrentMultipliers([]);
     setTotalWin(0);
+    setTotalBonusWin(0);
   };
 
   const checkWins = (currentGrid: Symbol[][], currentTumble: number, multipliers: number[], accumulatedWin: number) => {
@@ -245,6 +247,7 @@ export default function SweetBonanza() {
           setIsFreeSpinMode(true);
           setFreeSpins(10);
           setCurrentMultipliers([]);
+          setTotalBonusWin(0);
         }, 1500);
       } else {
         // Retrigger during free spins
@@ -290,14 +293,7 @@ export default function SweetBonanza() {
     });
     
     if (spinWin > 0) {
-      // Apply multipliers during free spins
-      let totalMultiplier = 1;
-      if (isFreeSpinMode && multipliers.length > 0) {
-        totalMultiplier = multipliers.reduce((a, b) => a + b, 0);
-        spinWin *= totalMultiplier;
-      }
-      
-      // Mark winning symbols
+      // Mark winning symbols (multipliers are applied at the end of all tumbles)
       const markedGrid = currentGrid.map((col, colIdx) =>
         col.map((symbol, rowIdx) => ({
           ...symbol,
@@ -306,19 +302,18 @@ export default function SweetBonanza() {
       );
       setGrid(markedGrid);
       
-      // Accumulate win for display but don't pay yet
+      // Accumulate base win (without multiplier - applied at end)
       const newAccumulatedWin = accumulatedWin + spinWin;
       setTotalWin(newAccumulatedWin);
       
-      const multiplierText = totalMultiplier > 1 ? ` (${totalMultiplier}x multiplier!)` : '';
-      setMessage(`Tumble Win! +$${spinWin.toFixed(2)}${multiplierText}`);
+      setMessage(`Tumble Win! +$${spinWin.toFixed(2)}`);
       
       // Tumble - remove winning symbols and drop new ones
       setTimeout(() => {
         tumble(markedGrid, currentTumble + 1, multipliers, newAccumulatedWin);
       }, 800);
     } else {
-      // No more wins - finalize with accumulated total
+      // No more wins - finalize with accumulated total and apply multipliers
       finalizeRound(currentTumble, multipliers, accumulatedWin);
     }
   };
@@ -357,24 +352,44 @@ export default function SweetBonanza() {
   };
 
   const finalizeRound = (tumbles: number, multipliers: number[], accumulatedWin: number) => {
-    // Pay out the total accumulated win from all tumbles
-    if (accumulatedWin > 0) {
-      setBalance(balance + accumulatedWin);
-      recordWin(accumulatedWin);
-      setSpinHistory(prev => [...prev.slice(-9), { win: accumulatedWin, bet: betAmount }]);
+    // Apply multipliers to accumulated win at the end during free spins
+    let finalWin = accumulatedWin;
+    let totalMultiplier = 1;
+    if (isFreeSpinMode && multipliers.length > 0) {
+      totalMultiplier = multipliers.reduce((a, b) => a + b, 0);
+      finalWin = accumulatedWin * totalMultiplier;
+    }
+    
+    // Update display with multiplied total
+    setTotalWin(finalWin);
+    setLastWin(finalWin);
+    
+    // Pay out the total win
+    if (finalWin > 0) {
+      setBalance(balance + finalWin);
+      recordWin(finalWin);
+      setSpinHistory(prev => [...prev.slice(-9), { win: finalWin, bet: betAmount }]);
+      
+      // Track total bonus winnings across all free spins
+      if (isFreeSpinMode) {
+        setTotalBonusWin(prev => prev + finalWin);
+      }
       
       const tumbleText = tumbles > 1 ? ` (${tumbles} tumbles!)` : '';
-      setMessage(`Total Win: $${accumulatedWin.toFixed(2)}${tumbleText}`);
+      const multiplierText = totalMultiplier > 1 ? ` ${totalMultiplier}x!` : '';
+      setMessage(`Total Win: $${finalWin.toFixed(2)}${tumbleText}${multiplierText}`);
     } else {
       setMessage(isFreeSpinMode ? 'No win this spin' : 'No win - try again!');
     }
     
     // Check if free spins ended
     if (isFreeSpinMode && freeSpins <= 1) {
+      const bonusTotal = totalBonusWin + finalWin;
       setTimeout(() => {
         setIsFreeSpinMode(false);
         setCurrentMultipliers([]);
-        setMessage(`Free Spins Complete! Total Won: $${accumulatedWin.toFixed(2)}`);
+        setMessage(`Free Spins Complete! Total Won: $${bonusTotal.toFixed(2)}`);
+        setTotalBonusWin(0);
       }, 1500);
     }
     
@@ -478,9 +493,9 @@ export default function SweetBonanza() {
             )}
             
             <div className="text-white">
-              <span className="text-white/70">Last Win:</span>
-              <span className={`text-2xl font-bold ml-2 ${lastWin > 0 ? 'text-green-400' : 'text-gray-400'}`}>
-                ${lastWin.toFixed(2)}
+              <span className="text-white/70">{isFreeSpinMode ? 'Bonus Total:' : 'Last Win:'}</span>
+              <span className={`text-2xl font-bold ml-2 ${(isFreeSpinMode ? totalBonusWin : lastWin) > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                ${(isFreeSpinMode ? totalBonusWin + totalWin : lastWin).toFixed(2)}
               </span>
             </div>
           </div>
