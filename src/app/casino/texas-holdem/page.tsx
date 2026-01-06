@@ -27,7 +27,7 @@ type GamePhase = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
 
 function TexasHoldemGameContent() {
   const router = useRouter();
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin, checkAndReload } = useCasino();
 
   const [gameStarted, setGameStarted] = useState(false);
   const [phase, setPhase] = useState<GamePhase>('preflop');
@@ -50,10 +50,6 @@ function TexasHoldemGameContent() {
   // Update casino context
   useEffect(() => {
     setCasinoBalance(playerBalance);
-    if (playerBalance < 1000) {
-      setPlayerBalance(25000);
-      setCasinoBalance(25000);
-    }
   }, [playerBalance, setCasinoBalance]);
 
   const suits = ['♠', '♥', '♦', '♣'];
@@ -359,8 +355,20 @@ function TexasHoldemGameContent() {
     await new Promise(resolve => setTimeout(resolve, 800));
 
     const activePlayers = currentPlayers.filter(p => !p.hasFolded && !p.isAllIn);
-    if (activePlayers.length === 1) {
-      // Only one player left
+    const nonFoldedPlayers = currentPlayers.filter(p => !p.hasFolded);
+    
+    if (activePlayers.length === 0) {
+      // Everyone is either all-in or folded, deal remaining cards and showdown
+      if (nonFoldedPlayers.length > 1) {
+        dealAllRemainingCards(currentPlayers, currentPot);
+      } else {
+        endHand(currentPlayers, currentPot);
+      }
+      return;
+    }
+    
+    if (activePlayers.length === 1 && nonFoldedPlayers.length === 1) {
+      // Only one player left not folded
       endHand(currentPlayers, currentPot);
       return;
     }
@@ -426,6 +434,45 @@ function TexasHoldemGameContent() {
       setPot(newPot);
       processNextPlayer(updatedPlayers, newPot);
     }, 1200);
+  };
+
+  const dealAllRemainingCards = async (currentPlayers: Player[], currentPot: number) => {
+    const gameDeck = [...deck];
+    const newCommunityCards = [...communityCards];
+    
+    // Deal flop if not dealt
+    if (phase === 'preflop') {
+      gameDeck.pop(); // Burn
+      newCommunityCards.push(gameDeck.pop()!, gameDeck.pop()!, gameDeck.pop()!);
+      setPhaseMessage('Flop dealt (all-in)');
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Deal turn if not dealt
+    if (phase === 'preflop' || phase === 'flop') {
+      gameDeck.pop(); // Burn
+      newCommunityCards.push(gameDeck.pop()!);
+      setPhaseMessage('Turn dealt (all-in)');
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Deal river if not dealt
+    if (phase === 'preflop' || phase === 'flop' || phase === 'turn') {
+      gameDeck.pop(); // Burn
+      newCommunityCards.push(gameDeck.pop()!);
+      setPhaseMessage('River dealt (all-in)');
+    }
+    
+    setCommunityCards(newCommunityCards);
+    setDeck(gameDeck);
+    setPhase('river');
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Go to showdown
+    endHand(currentPlayers, currentPot);
   };
 
   const proceedToNextPhase = (currentPlayers: Player[], currentPot: number) => {
@@ -508,13 +555,15 @@ function TexasHoldemGameContent() {
     if (activePlayers.length === 1) {
       // Everyone else folded
       const winnerPlayer = activePlayers[0];
+      winnerPlayer.balance += currentPot;
+      
       if (winnerPlayer.id === 'player') {
-        setPlayerBalance(playerBalance + currentPot);
-        winnerPlayer.balance += currentPot;
-        recordWin(currentPot);
-      } else {
-        winnerPlayer.balance += currentPot;
+        setPlayerBalance(winnerPlayer.balance);
+        const winnerContribution = currentPlayers.find(p => p.id === 'player')?.totalBetThisRound || 0;
+        const profit = currentPot - winnerContribution;
+        if (profit > 0) recordWin(profit);
       }
+      
       setWinner({ name: winnerPlayer.name, handRank: 'All opponents folded', winAmount: currentPot });
       setShowdown(true);
       setPlayers(currentPlayers);
@@ -532,12 +581,13 @@ function TexasHoldemGameContent() {
     const bestHand = handsWithPlayers[0];
     const winnerPlayer = currentPlayers.find(p => p.id === bestHand.player.id)!;
     
+    winnerPlayer.balance += currentPot;
+    
     if (winnerPlayer.id === 'player') {
-      setPlayerBalance(playerBalance + currentPot);
-      winnerPlayer.balance += currentPot;
-      recordWin(currentPot);
-    } else {
-      winnerPlayer.balance += currentPot;
+      setPlayerBalance(winnerPlayer.balance);
+      const winnerContribution = currentPlayers.find(p => p.id === 'player')?.totalBetThisRound || 0;
+      const profit = currentPot - winnerContribution;
+      if (profit > 0) recordWin(profit);
     }
 
     setWinner({ 
@@ -550,6 +600,9 @@ function TexasHoldemGameContent() {
   };
 
   const nextHand = () => {
+    // Check and reload balance if needed
+    checkAndReload();
+    
     setDealerIndex((dealerIndex + 1) % 4);
     startGame();
   };

@@ -31,7 +31,7 @@ function BlackjackGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin, checkAndReload } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'playing' | 'results'>('lobby');
@@ -847,6 +847,9 @@ function BlackjackGame() {
       setBalance(balance + totalWinnings);
       setResultMessage(results.join(' | '));
       setGameState('results');
+      
+      // Check and reload balance after round ends
+      setTimeout(() => checkAndReload(), 100);
     };
     
     dealerPlay();
@@ -883,6 +886,9 @@ function BlackjackGame() {
     setBalance(balance + winAmount);
     setShowDealerHole(true);
     setRoundResults({ 'single': message });
+    
+    // Check and reload balance after round ends
+    setTimeout(() => checkAndReload(), 100);
   };
 
   const playAgain = () => {

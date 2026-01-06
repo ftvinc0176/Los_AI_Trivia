@@ -14,6 +14,7 @@ interface CasinoContextType {
   balance: number;
   setBalance: (balance: number) => void;
   updateBalance: (amount: number) => void;
+  checkAndReload: () => boolean;
   isLoggedIn: boolean;
   logout: () => void;
   highestBalances: LeaderboardEntry[];
@@ -97,12 +98,6 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     sessionStorage.setItem('casinoBalance', balance.toString());
     
-    // Auto-reload if balance drops below $1k
-    if (balance < 1000 && playerName) {
-      setBalance(25000);
-      sessionStorage.setItem('casinoBalance', '25000');
-    }
-    
     // Check if this is a new peak balance for this session
     if (balance > peakBalance && playerName) {
       setPeakBalance(balance);
@@ -133,6 +128,16 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem('casinoBalance', newBalance.toString());
       return newBalance;
     });
+  };
+
+  // Manual reload check - call this after a game round ends
+  const checkAndReload = () => {
+    if (balance < 1000 && playerName) {
+      setBalance(25000);
+      sessionStorage.setItem('casinoBalance', '25000');
+      return true;
+    }
+    return false;
   };
 
   // Record a single win for biggest wins leaderboard via API
@@ -178,6 +183,7 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
       balance,
       setBalance,
       updateBalance,
+      checkAndReload,
       isLoggedIn,
       logout,
       highestBalances,
