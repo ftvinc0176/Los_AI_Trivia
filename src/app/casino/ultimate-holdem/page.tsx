@@ -26,7 +26,7 @@ export default function UltimateTexasHoldem() {
   const [blindBet, setBlindBet] = useState(0);
   const [tripsBet, setTripsBet] = useState(0);
   const [playBet, setPlayBet] = useState(0);
-  const [betAmount, setBetAmount] = useState(10);
+  const [chipValue, setChipValue] = useState(100);
   
   const [message, setMessage] = useState('Place your Ante and Blind bets to start!');
   const [canPlay4x, setCanPlay4x] = useState(false);
@@ -34,6 +34,9 @@ export default function UltimateTexasHoldem() {
   const [canPlay1x, setCanPlay1x] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [winAmount, setWinAmount] = useState(0);
+  const [playerHandRank, setPlayerHandRank] = useState<number>(0);
+  const [tripsPayoutHit, setTripsPayoutHit] = useState<number>(0);
+  const [blindPayoutHit, setBlindPayoutHit] = useState<number>(0);
 
   const createDeck = (): Card[] => {
     const suits = ['♠', '♥', '♦', '♣'];
@@ -179,6 +182,8 @@ export default function UltimateTexasHoldem() {
     const playerHand = evaluateHand([...playerCards, ...community]);
     const dealerHand = evaluateHand([...dealerCards, ...community]);
     
+    setPlayerHandRank(playerHand.rank);
+    
     let totalWin = 0;
     let resultMsg = '';
 
@@ -202,15 +207,18 @@ export default function UltimateTexasHoldem() {
     }
 
     // Pay Trips bet (pays regardless of dealer)
+    let tripsMultiplier = 0;
     if (tripsBet > 0) {
-      const tripsMultiplier = getTripsMultiplier(playerHand.rank);
+      tripsMultiplier = getTripsMultiplier(playerHand.rank);
       if (tripsMultiplier > 0) {
         const tripsPayout = tripsBet * (tripsMultiplier + 1);
         totalWin += tripsPayout;
+        setTripsPayoutHit(tripsMultiplier);
         resultMsg += `Trips pays ${tripsMultiplier}:1 ($${tripsPayout}). `;
       }
     }
 
+    let blindMultiplier = 0;
     if (playerWins) {
       // Player wins
       resultMsg += `You win with ${playerHand.rankName}! `;
@@ -224,9 +232,10 @@ export default function UltimateTexasHoldem() {
       }
       
       // Blind bet pays according to pay table
-      const blindMultiplier = getBlindMultiplier(playerHand.rank);
+      blindMultiplier = getBlindMultiplier(playerHand.rank);
       if (blindMultiplier > 0) {
         totalWin += blindBet * (blindMultiplier + 1);
+        setBlindPayoutHit(blindMultiplier);
         resultMsg += `Blind pays ${blindMultiplier}:1. `;
       } else {
         totalWin += blindBet; // Push
@@ -344,24 +353,23 @@ export default function UltimateTexasHoldem() {
     }
   };
 
-  const placeBet = (type: 'ante' | 'trips') => {
+  const placeBet = (type: 'ante' | 'blind' | 'trips') => {
     if (phase !== 'betting') return;
     
+    if (balance < chipValue) {
+      setMessage('Insufficient balance!');
+      return;
+    }
+
     if (type === 'ante') {
-      if (balance >= betAmount * 2) {
-        setAnteBet(betAmount);
-        setBlindBet(betAmount);
-        setMessage(`Ante and Blind set to $${betAmount} each. Add Trips or click Deal.`);
-      } else {
-        setMessage('Insufficient balance!');
-      }
+      setAnteBet(anteBet + chipValue);
+      setMessage(`Ante bet: $${anteBet + chipValue}`);
+    } else if (type === 'blind') {
+      setBlindBet(blindBet + chipValue);
+      setMessage(`Blind bet: $${blindBet + chipValue}`);
     } else if (type === 'trips') {
-      if (balance >= (anteBet + blindBet + betAmount)) {
-        setTripsBet(betAmount);
-        setMessage(`Trips bet set to $${betAmount}. Click Deal to start.`);
-      } else {
-        setMessage('Insufficient balance!');
-      }
+      setTripsBet(tripsBet + chipValue);
+      setMessage(`Trips bet: $${tripsBet + chipValue}`);
     }
   };
 
@@ -376,6 +384,16 @@ export default function UltimateTexasHoldem() {
     setCommunityCards([]);
     setMessage('Place your Ante and Blind bets to start!');
     setResult(null);
+    setPlayerHandRank(0);
+    setTripsPayoutHit(0);
+    setBlindPayoutHit(0);
+  };
+
+  const clearBets = () => {
+    setAnteBet(0);
+    setBlindBet(0);
+    setTripsBet(0);
+    setMessage('Bets cleared. Place your bets!');
   };
 
   const renderCard = (card: Card, hidden = false) => {
@@ -468,62 +486,91 @@ export default function UltimateTexasHoldem() {
           {/* Betting Area */}
           {phase === 'betting' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-5 gap-2">
-                {[5, 10, 25, 50, 100].map(amount => (
+              {/* Chip Selector */}
+              <div className="grid grid-cols-6 gap-2">
+                {[100, 500, 1000, 5000, 10000, 25000].map(amount => (
                   <button
                     key={amount}
-                    onClick={() => setBetAmount(amount)}
-                    className={`py-2 rounded-lg font-bold transition-colors ${
-                      betAmount === amount
-                        ? 'bg-yellow-500 text-black'
-                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                    onClick={() => setChipValue(amount)}
+                    className={`py-2 px-1 rounded-full font-bold transition-all text-xs sm:text-sm ${
+                      chipValue === amount
+                        ? amount === 100 ? 'bg-white text-black ring-4 ring-yellow-400' :
+                          amount === 500 ? 'bg-red-500 text-white ring-4 ring-yellow-400' :
+                          amount === 1000 ? 'bg-blue-500 text-white ring-4 ring-yellow-400' :
+                          amount === 5000 ? 'bg-green-500 text-white ring-4 ring-yellow-400' :
+                          amount === 10000 ? 'bg-orange-500 text-white ring-4 ring-yellow-400' :
+                          'bg-purple-600 text-white ring-4 ring-yellow-400'
+                        : amount === 100 ? 'bg-white text-black hover:bg-gray-200' :
+                          amount === 500 ? 'bg-red-500 text-white hover:bg-red-600' :
+                          amount === 1000 ? 'bg-blue-500 text-white hover:bg-blue-600' :
+                          amount === 5000 ? 'bg-green-500 text-white hover:bg-green-600' :
+                          amount === 10000 ? 'bg-orange-500 text-white hover:bg-orange-600' :
+                          'bg-purple-600 text-white hover:bg-purple-700'
                     }`}
                   >
-                    ${amount}
+                    ${amount >= 1000 ? `${amount / 1000}K` : amount}
                   </button>
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Betting Spots */}
+              <div className="grid grid-cols-3 gap-4">
                 <button
                   onClick={() => placeBet('ante')}
-                  className="py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold"
+                  className="relative py-8 bg-gradient-to-br from-green-700 to-green-900 hover:from-green-600 hover:to-green-800 text-white rounded-xl font-bold border-4 border-yellow-600 transition-all"
                 >
-                  Set Ante + Blind (${betAmount} each)
+                  <div className="text-sm mb-1">ANTE</div>
+                  {anteBet > 0 && (
+                    <div className="text-2xl font-bold text-yellow-400">${anteBet.toLocaleString()}</div>
+                  )}
+                  {anteBet === 0 && (
+                    <div className="text-white/60 text-sm">Click to bet</div>
+                  )}
                 </button>
+                
+                <button
+                  onClick={() => placeBet('blind')}
+                  className="relative py-8 bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800 text-white rounded-xl font-bold border-4 border-yellow-600 transition-all"
+                >
+                  <div className="text-sm mb-1">BLIND</div>
+                  {blindBet > 0 && (
+                    <div className="text-2xl font-bold text-yellow-400">${blindBet.toLocaleString()}</div>
+                  )}
+                  {blindBet === 0 && (
+                    <div className="text-white/60 text-sm">Click to bet</div>
+                  )}
+                </button>
+                
                 <button
                   onClick={() => placeBet('trips')}
-                  disabled={anteBet === 0}
-                  className="py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg font-bold"
+                  className="relative py-8 bg-gradient-to-br from-purple-700 to-purple-900 hover:from-purple-600 hover:to-purple-800 text-white rounded-xl font-bold border-4 border-yellow-600 transition-all"
                 >
-                  Add Trips (${betAmount})
+                  <div className="text-sm mb-1">TRIPS</div>
+                  <div className="text-[8px] text-white/60 mb-1">(Optional)</div>
+                  {tripsBet > 0 && (
+                    <div className="text-2xl font-bold text-yellow-400">${tripsBet.toLocaleString()}</div>
+                  )}
+                  {tripsBet === 0 && (
+                    <div className="text-white/60 text-sm">Click to bet</div>
+                  )}
                 </button>
               </div>
 
-              <div className="bg-black/40 p-4 rounded-lg">
-                <div className="grid grid-cols-3 gap-4 text-white text-sm">
-                  <div>
-                    <div className="font-bold text-yellow-400">Ante:</div>
-                    <div className="text-2xl">${anteBet}</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-yellow-400">Blind:</div>
-                    <div className="text-2xl">${blindBet}</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-purple-400">Trips:</div>
-                    <div className="text-2xl">${tripsBet}</div>
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={clearBets}
+                  className="py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold"
+                >
+                  Clear Bets
+                </button>
+                <button
+                  onClick={dealHand}
+                  disabled={anteBet === 0 || blindBet === 0}
+                  className="py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg font-bold text-xl"
+                >
+                  DEAL
+                </button>
               </div>
-
-              <button
-                onClick={dealHand}
-                disabled={anteBet === 0 || blindBet === 0}
-                className="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg font-bold text-xl"
-              >
-                DEAL
-              </button>
             </div>
           )}
 
@@ -603,28 +650,56 @@ export default function UltimateTexasHoldem() {
 
         {/* Pay Tables */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-black/40 p-4 rounded-lg">
-            <h3 className="text-yellow-400 font-bold mb-2">Blind Pays</h3>
+          <div className="bg-black/40 p-4 rounded-lg border-2 border-white/20">
+            <h3 className="text-yellow-400 font-bold mb-3 text-lg">Blind Pays</h3>
             <div className="text-white text-sm space-y-1">
-              <div>Royal Flush: 500:1</div>
-              <div>Straight Flush: 50:1</div>
-              <div>Four of a Kind: 10:1</div>
-              <div>Full House: 3:1</div>
-              <div>Flush: 3:1</div>
-              <div>Straight: 1:1</div>
-              <div>Less than Straight: Push</div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 9 && blindPayoutHit === 500 ? 'bg-green-600 font-bold' : ''}`}>
+                Royal Flush: 500:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 8 && blindPayoutHit === 50 ? 'bg-green-600 font-bold' : ''}`}>
+                Straight Flush: 50:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 7 && blindPayoutHit === 10 ? 'bg-green-600 font-bold' : ''}`}>
+                Four of a Kind: 10:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 6 && blindPayoutHit === 3 ? 'bg-green-600 font-bold' : ''}`}>
+                Full House: 3:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 5 && blindPayoutHit === 3 ? 'bg-green-600 font-bold' : ''}`}>
+                Flush: 3:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 4 && blindPayoutHit === 1 ? 'bg-green-600 font-bold' : ''}`}>
+                Straight: 1:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank < 4 && blindPayoutHit === 0 ? 'bg-yellow-600 font-bold' : ''}`}>
+                Less than Straight: Push
+              </div>
             </div>
           </div>
-          <div className="bg-black/40 p-4 rounded-lg">
-            <h3 className="text-purple-400 font-bold mb-2">Trips Pays</h3>
+          <div className="bg-black/40 p-4 rounded-lg border-2 border-white/20">
+            <h3 className="text-purple-400 font-bold mb-3 text-lg">Trips Pays</h3>
             <div className="text-white text-sm space-y-1">
-              <div>Royal Flush: 50:1</div>
-              <div>Straight Flush: 40:1</div>
-              <div>Four of a Kind: 30:1</div>
-              <div>Full House: 8:1</div>
-              <div>Flush: 7:1</div>
-              <div>Straight: 4:1</div>
-              <div>Three of a Kind: 3:1</div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 9 && tripsPayoutHit === 50 ? 'bg-green-600 font-bold' : ''}`}>
+                Royal Flush: 50:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 8 && tripsPayoutHit === 40 ? 'bg-green-600 font-bold' : ''}`}>
+                Straight Flush: 40:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 7 && tripsPayoutHit === 30 ? 'bg-green-600 font-bold' : ''}`}>
+                Four of a Kind: 30:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 6 && tripsPayoutHit === 8 ? 'bg-green-600 font-bold' : ''}`}>
+                Full House: 8:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 5 && tripsPayoutHit === 7 ? 'bg-green-600 font-bold' : ''}`}>
+                Flush: 7:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 4 && tripsPayoutHit === 4 ? 'bg-green-600 font-bold' : ''}`}>
+                Straight: 4:1
+              </div>
+              <div className={`p-2 rounded ${phase === 'showdown' && playerHandRank === 3 && tripsPayoutHit === 3 ? 'bg-green-600 font-bold' : ''}`}>
+                Three of a Kind: 3:1
+              </div>
             </div>
           </div>
         </div>
