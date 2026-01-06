@@ -423,30 +423,37 @@ export default function Craps() {
         </div>
 
         {/* Game Info */}
-        <div className="bg-black/40 rounded-lg p-4 mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <h1 className="text-3xl font-bold text-white">🎲 Crapless Craps</h1>
+        <div className="bg-black/40 rounded-lg p-2 sm:p-4 mb-2">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-3xl font-bold text-white">🎲 Craps</h1>
+              {point === null ? (
+                <span className="text-sm sm:text-lg text-green-400 font-bold">COME OUT</span>
+              ) : (
+                <span className="text-sm sm:text-lg text-yellow-400 font-bold">POINT: {point}</span>
+              )}
+            </div>
             <button
               onClick={() => setShowPayoutTable(!showPayoutTable)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs sm:text-base"
             >
-              {showPayoutTable ? 'Hide' : 'Show'} Payouts
+              {showPayoutTable ? 'Hide' : 'Payouts'}
             </button>
           </div>
           
           {showPayoutTable && (
-            <div className="bg-black/60 p-4 rounded-lg mb-4 grid grid-cols-2 gap-4 text-white text-sm">
+            <div className="bg-black/60 p-2 sm:p-4 rounded-lg mt-2 grid grid-cols-2 gap-2 sm:gap-4 text-white text-xs sm:text-sm">
               <div>
-                <h3 className="font-bold mb-2 text-yellow-400">Line Bets</h3>
+                <h3 className="font-bold mb-1 text-yellow-400">Line Bets</h3>
                 <p>Pass/Don&apos;t Pass: 1:1</p>
-                <h3 className="font-bold mb-2 mt-3 text-yellow-400">Place Bets</h3>
+                <h3 className="font-bold mb-1 mt-2 text-yellow-400">Place Bets</h3>
                 <p>2, 3, 11, 12: 11:1</p>
                 <p>4, 10: 2:1</p>
                 <p>5, 9: 3:2</p>
                 <p>6, 8: 6:5</p>
               </div>
               <div>
-                <h3 className="font-bold mb-2 text-yellow-400">Proposition Bets</h3>
+                <h3 className="font-bold mb-1 text-yellow-400">Proposition Bets</h3>
                 <p>Hard 4/10: 7:1</p>
                 <p>Hard 6/8: 9:1</p>
                 <p>Any Craps: 7:1</p>
@@ -459,194 +466,201 @@ export default function Craps() {
             </div>
           )}
 
-          <div className="flex justify-between items-center text-white">
-            <div className="text-xl">
-              {point === null ? (
-                <span className="text-green-400">COME OUT ROLL</span>
-              ) : (
-                <span className="text-yellow-400">POINT: {point}</span>
-              )}
-            </div>
-            <div className="text-lg">{message}</div>
-          </div>
+          <div className="text-white text-xs sm:text-base mt-2">{message}</div>
         </div>
 
         {/* Dice Display */}
-        <div className="bg-green-800 rounded-lg p-8 mb-4 flex justify-center items-center gap-4">
+        <div className="bg-green-800 rounded-lg p-3 sm:p-6 mb-2 flex justify-center items-center gap-2 sm:gap-4">
           {renderDie(dice[0])}
           {renderDie(dice[1])}
-          <div className="text-4xl font-bold text-white ml-4">
+          <div className="text-2xl sm:text-4xl font-bold text-white ml-2 sm:ml-4">
             = {dice[0].value + dice[1].value}
           </div>
         </div>
 
-        {/* Craps Table */}
-        <div className="bg-green-700 rounded-3xl border-8 border-yellow-800 p-6 mb-4">
-          {/* Pass Line and Don't Pass */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <button
-              onClick={() => placeBet('pass')}
-              className="relative bg-white border-4 border-black rounded-lg p-6 hover:bg-yellow-100 transition-colors"
-            >
-              <div className="text-center font-bold text-black text-xl">PASS LINE</div>
-              {getBetTotal('pass') > 0 && (
-                <div className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 rounded-full font-bold">
-                  ${getBetTotal('pass')}
-                </div>
-              )}
-            </button>
-            <button
-              onClick={() => placeBet('dontPass')}
-              className="relative bg-black border-4 border-white rounded-lg p-6 hover:bg-gray-800 transition-colors"
-            >
-              <div className="text-center font-bold text-white text-xl">DON&apos;T PASS</div>
-              {getBetTotal('dontPass') > 0 && (
-                <div className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 rounded-full font-bold">
-                  ${getBetTotal('dontPass')}
-                </div>
-              )}
-            </button>
+        {/* Craps Table - Redesigned for mobile */}
+        <div className="bg-green-700 rounded-2xl border-4 sm:border-8 border-yellow-800 p-2 sm:p-4 mb-20">
+          {/* Top Row - Place Bets */}
+          <div className="grid grid-cols-6 gap-1 mb-2">
+            {[2, 3, 4, 5, 6, 8].map(num => (
+              <button
+                key={num}
+                onClick={() => placeBet(`place${num}` as BetType)}
+                className="relative bg-white border-2 border-black rounded p-1 sm:p-2 hover:bg-yellow-100 transition-colors"
+              >
+                <div className="text-center font-bold text-black text-sm sm:text-xl">{num === 6 ? 'Six' : num}</div>
+                {getBetTotal(`place${num}` as BetType) > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-red-600 text-white px-1 rounded-full text-[8px] sm:text-xs font-bold">
+                    ${getBetTotal(`place${num}` as BetType)}
+                  </div>
+                )}
+              </button>
+            ))}
           </div>
 
-          {/* Place Bets */}
-          <div className="bg-yellow-600 rounded-lg p-4 mb-4">
-            <div className="text-center font-bold text-black mb-3">PLACE BETS</div>
-            <div className="grid grid-cols-6 gap-2">
-              {[2, 3, 4, 5, 6, 8].map(num => (
+          {/* Second Row - More Place Bets */}
+          <div className="grid grid-cols-6 gap-1 mb-2">
+            {[9, 10, 11, 12].map(num => (
+              <button
+                key={num}
+                onClick={() => placeBet(`place${num}` as BetType)}
+                className="relative bg-white border-2 border-black rounded p-1 sm:p-2 hover:bg-yellow-100 transition-colors"
+              >
+                <div className="text-center font-bold text-black text-sm sm:text-xl">{num === 9 ? 'Nine' : num}</div>
+                {getBetTotal(`place${num}` as BetType) > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-red-600 text-white px-1 rounded-full text-[8px] sm:text-xs font-bold">
+                    ${getBetTotal(`place${num}` as BetType)}
+                  </div>
+                )}
+              </button>
+            ))}
+            <div className="col-span-2"></div>
+          </div>
+
+          {/* Main Layout */}
+          <div className="grid grid-cols-12 gap-1 sm:gap-2">
+            {/* Left Side - Hardways */}
+            <div className="col-span-2 space-y-1">
+              <div className="text-center text-[8px] sm:text-xs font-bold text-white bg-red-700 rounded p-0.5">HARD</div>
+              {[4, 6, 8, 10].map(num => (
                 <button
                   key={num}
-                  onClick={() => placeBet(`place${num}` as BetType)}
-                  className="relative bg-white border-2 border-black rounded-lg p-4 hover:bg-yellow-100 transition-colors"
+                  onClick={() => placeBet(`hard${num}` as BetType)}
+                  className="relative w-full bg-white border border-black rounded p-1 hover:bg-yellow-100 transition-colors"
                 >
-                  <div className="text-center font-bold text-black text-2xl">{num}</div>
-                  {getBetTotal(`place${num}` as BetType) > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                      ${getBetTotal(`place${num}` as BetType)}
+                  <div className="text-center font-bold text-black text-xs sm:text-base">{num}</div>
+                  {getBetTotal(`hard${num}` as BetType) > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-red-600 text-white px-1 rounded-full text-[8px] font-bold">
+                      ${getBetTotal(`hard${num}` as BetType)}
                     </div>
                   )}
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-6 gap-2 mt-2">
-              {[9, 10, 11, 12].map(num => (
-                <button
-                  key={num}
-                  onClick={() => placeBet(`place${num}` as BetType)}
-                  className="relative bg-white border-2 border-black rounded-lg p-4 hover:bg-yellow-100 transition-colors"
-                >
-                  <div className="text-center font-bold text-black text-2xl">{num}</div>
-                  {getBetTotal(`place${num}` as BetType) > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                      ${getBetTotal(`place${num}` as BetType)}
-                    </div>
-                  )}
-                </button>
-              ))}
-              <div className="col-span-2"></div>
+
+            {/* Center - Come/Field/Pass */}
+            <div className="col-span-10 space-y-1">
+              {/* Come */}
+              <button
+                onClick={() => placeBet('come')}
+                className="relative w-full bg-blue-100 border-2 border-black rounded p-2 sm:p-3 hover:bg-blue-200 transition-colors"
+              >
+                <div className="text-center font-bold text-black text-sm sm:text-xl">COME</div>
+                {getBetTotal('come') > 0 && (
+                  <div className="absolute top-1 right-1 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                    ${getBetTotal('come')}
+                  </div>
+                )}
+              </button>
+
+              {/* Field */}
+              <button
+                onClick={() => placeBet('field')}
+                className="relative w-full bg-white border-2 border-black rounded p-2 sm:p-3 hover:bg-yellow-100 transition-colors"
+              >
+                <div className="text-center font-bold text-black text-xs sm:text-base">
+                  FIELD • 2 3 4 9 10 11 12
+                </div>
+                <div className="text-center text-[8px] sm:text-xs text-black">(2→2:1, 12→3:1)</div>
+                {getBetTotal('field') > 0 && (
+                  <div className="absolute top-1 right-1 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                    ${getBetTotal('field')}
+                  </div>
+                )}
+              </button>
+
+              {/* Pass Line */}
+              <button
+                onClick={() => placeBet('pass')}
+                className="relative w-full bg-white border-4 border-yellow-500 rounded p-2 sm:p-4 hover:bg-yellow-100 transition-colors"
+              >
+                <div className="text-center font-bold text-black text-base sm:text-2xl">PASS LINE</div>
+                {getBetTotal('pass') > 0 && (
+                  <div className="absolute top-1 right-1 bg-red-600 text-white px-2 py-1 rounded-full text-xs sm:text-sm font-bold">
+                    ${getBetTotal('pass')}
+                  </div>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Field Bet */}
-          <button
-            onClick={() => placeBet('field')}
-            className="relative w-full bg-white border-4 border-black rounded-lg p-6 mb-4 hover:bg-yellow-100 transition-colors"
-          >
-            <div className="text-center font-bold text-black text-xl">
-              FIELD • 2 3 4 9 10 11 12 • (2 pays 2:1, 12 pays 3:1)
-            </div>
-            {getBetTotal('field') > 0 && (
-              <div className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 rounded-full font-bold">
-                ${getBetTotal('field')}
-              </div>
-            )}
-          </button>
-
-          {/* Proposition Bets */}
-          <div className="grid grid-cols-3 gap-4">
-            {/* Hardways */}
-            <div className="bg-red-700 rounded-lg p-4">
-              <div className="text-center font-bold text-white mb-2">HARDWAYS</div>
-              <div className="grid grid-cols-2 gap-2">
-                {[4, 6, 8, 10].map(num => (
-                  <button
-                    key={num}
-                    onClick={() => placeBet(`hard${num}` as BetType)}
-                    className="relative bg-white border-2 border-black rounded-lg p-3 hover:bg-yellow-100 transition-colors"
-                  >
-                    <div className="text-center font-bold text-black">H{num}</div>
-                    {getBetTotal(`hard${num}` as BetType) > 0 && (
-                      <div className="absolute -top-2 -right-2 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                        ${getBetTotal(`hard${num}` as BetType)}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* One Roll Bets */}
-            <div className="bg-blue-700 rounded-lg p-4">
-              <div className="text-center font-bold text-white mb-2">ONE ROLL</div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => placeBet('anyCraps')}
-                  className="relative bg-white border-2 border-black rounded-lg p-3 hover:bg-yellow-100 transition-colors"
-                >
-                  <div className="text-center font-bold text-black text-xs">ANY CRAPS</div>
-                  {getBetTotal('anyCraps') > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                      ${getBetTotal('anyCraps')}
-                    </div>
-                  )}
-                </button>
-                <button
-                  onClick={() => placeBet('any7')}
-                  className="relative bg-white border-2 border-black rounded-lg p-3 hover:bg-yellow-100 transition-colors"
-                >
-                  <div className="text-center font-bold text-black text-xs">ANY 7</div>
-                  {getBetTotal('any7') > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                      ${getBetTotal('any7')}
-                    </div>
-                  )}
-                </button>
-              </div>
-            </div>
-
+          {/* Bottom Row - Proposition Bets */}
+          <div className="grid grid-cols-12 gap-1 sm:gap-2 mt-1 sm:mt-2">
             {/* Horn Bets */}
-            <div className="bg-purple-700 rounded-lg p-4">
-              <div className="text-center font-bold text-white mb-2">HORN</div>
-              <div className="grid grid-cols-2 gap-2">
-                {[2, 3, 11, 12].map(num => (
-                  <button
-                    key={num}
-                    onClick={() => placeBet(`horn${num}` as BetType)}
-                    className="relative bg-white border-2 border-black rounded-lg p-3 hover:bg-yellow-100 transition-colors"
-                  >
-                    <div className="text-center font-bold text-black">{num}</div>
-                    {getBetTotal(`horn${num}` as BetType) > 0 && (
-                      <div className="absolute -top-2 -right-2 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                        ${getBetTotal(`horn${num}` as BetType)}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
+            <div className="col-span-4 grid grid-cols-2 gap-1">
+              <div className="col-span-2 text-center text-[8px] sm:text-xs font-bold text-white bg-purple-700 rounded p-0.5">HORN</div>
+              {[2, 3, 11, 12].map(num => (
+                <button
+                  key={num}
+                  onClick={() => placeBet(`horn${num}` as BetType)}
+                  className="relative bg-white border border-black rounded p-1 hover:bg-yellow-100 transition-colors"
+                >
+                  <div className="text-center font-bold text-black text-xs sm:text-base">{num}</div>
+                  {getBetTotal(`horn${num}` as BetType) > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-red-600 text-white px-1 rounded-full text-[8px] font-bold">
+                      ${getBetTotal(`horn${num}` as BetType)}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Any Craps & Seven */}
+            <div className="col-span-4 space-y-1">
+              <button
+                onClick={() => placeBet('anyCraps')}
+                className="relative w-full bg-white border border-black rounded p-1 sm:p-2 hover:bg-yellow-100 transition-colors"
+              >
+                <div className="text-center font-bold text-black text-xs sm:text-sm">Any Craps</div>
+                <div className="text-center text-[8px] sm:text-xs text-black">7 to 1</div>
+                {getBetTotal('anyCraps') > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-red-600 text-white px-1 rounded-full text-[8px] font-bold">
+                    ${getBetTotal('anyCraps')}
+                  </div>
+                )}
+              </button>
+              <button
+                onClick={() => placeBet('any7')}
+                className="relative w-full bg-red-600 border border-black rounded p-1 sm:p-2 hover:bg-red-700 transition-colors"
+              >
+                <div className="text-center font-bold text-white text-xs sm:text-sm">Seven</div>
+                <div className="text-center text-[8px] sm:text-xs text-white">4 to 1</div>
+                {getBetTotal('any7') > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-yellow-400 text-black px-1 rounded-full text-[8px] font-bold">
+                    ${getBetTotal('any7')}
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* Don't Pass */}
+            <div className="col-span-4">
+              <button
+                onClick={() => placeBet('dontPass')}
+                className="relative w-full h-full bg-black border-2 border-white rounded p-2 sm:p-3 hover:bg-gray-800 transition-colors"
+              >
+                <div className="text-center font-bold text-white text-xs sm:text-base">DON&apos;T PASS</div>
+                {getBetTotal('dontPass') > 0 && (
+                  <div className="absolute top-1 right-1 bg-red-600 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                    ${getBetTotal('dontPass')}
+                  </div>
+                )}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Betting Controls */}
-        <div className="bg-black/40 rounded-lg p-6">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-white font-bold mb-2">Bet Amount:</label>
-              <div className="flex gap-2">
+        {/* Betting Controls - Fixed at bottom */}
+        <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-white/20 p-2 sm:p-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col gap-2">
+              {/* Bet Amount Selection */}
+              <div className="flex gap-1 sm:gap-2">
                 {[5, 10, 25, 50, 100].map(amount => (
                   <button
                     key={amount}
                     onClick={() => setBetAmount(amount)}
-                    className={`flex-1 py-2 rounded-lg font-bold transition-colors ${
+                    className={`flex-1 py-1 sm:py-2 rounded-lg font-bold transition-colors text-xs sm:text-base ${
                       betAmount === amount
                         ? 'bg-yellow-500 text-black'
                         : 'bg-gray-700 text-white hover:bg-gray-600'
@@ -656,49 +670,51 @@ export default function Craps() {
                   </button>
                 ))}
               </div>
-            </div>
-            <div className="flex items-end gap-4">
-              <button
-                onClick={rollDice}
-                disabled={rolling || bets.length === 0}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold text-xl transition-colors"
-              >
-                {rolling ? 'Rolling...' : 'ROLL DICE'}
-              </button>
-              <button
-                onClick={clearBets}
-                disabled={bets.length === 0}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold transition-colors"
-              >
-                Clear Bets
-              </button>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={rollDice}
+                  disabled={rolling || bets.length === 0}
+                  className="flex-1 py-2 sm:py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm sm:text-xl transition-colors"
+                >
+                  {rolling ? 'Rolling...' : 'ROLL DICE'}
+                </button>
+                <button
+                  onClick={clearBets}
+                  disabled={bets.length === 0}
+                  className="px-3 sm:px-6 py-2 sm:py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm sm:text-base transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Active Bets Display */}
+              {bets.length > 0 && (
+                <div className="bg-black/60 rounded-lg p-2">
+                  <div className="text-white font-bold mb-1 text-xs sm:text-sm">Active Bets:</div>
+                  <div className="flex gap-1 flex-wrap">
+                    {bets.map((bet, index) => (
+                      <div key={index} className="bg-yellow-600 text-black px-2 py-1 rounded text-xs font-bold">
+                        {formatBetName(bet.type)}: ${bet.amount}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Active Bets Display */}
-          {bets.length > 0 && (
-            <div className="bg-black/60 rounded-lg p-4">
-              <div className="text-white font-bold mb-2">Active Bets:</div>
-              <div className="grid grid-cols-4 gap-2">
-                {bets.map((bet, index) => (
-                  <div key={index} className="bg-yellow-600 text-black px-3 py-2 rounded-lg font-bold text-sm">
-                    {formatBetName(bet.type)}: ${bet.amount}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Roll History */}
         {history.length > 0 && (
-          <div className="mt-4 bg-black/40 rounded-lg p-4">
-            <div className="text-white font-bold mb-2">Roll History:</div>
-            <div className="flex gap-2 flex-wrap">
+          <div className="bg-black/40 rounded-lg p-2 sm:p-4 mb-24">
+            <div className="text-white font-bold mb-2 text-xs sm:text-base">Roll History:</div>
+            <div className="flex gap-1 sm:gap-2 flex-wrap">
               {history.slice(-20).map((roll, index) => (
                 <div
                   key={index}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                  className={`w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-base ${
                     roll === 7 ? 'bg-red-600 text-white' : 'bg-yellow-500 text-black'
                   }`}
                 >
