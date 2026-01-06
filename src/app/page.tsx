@@ -141,6 +141,21 @@ export default function Home() {
             </div>
           </button>
 
+          {/* UNO Card */}
+          <button
+            onClick={() => router.push('/uno')}
+            className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-white/20"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 via-yellow-500/20 to-blue-500/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative">
+              <div className="text-6xl mb-4">🎴</div>
+              <h2 className="text-3xl font-bold text-white mb-3">UNO</h2>
+              <p className="text-purple-100 font-light">
+                Classic card game vs AI
+              </p>
+            </div>
+          </button>
+
           {/* Donate Card */}
           <a
             href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=ftvinc1999@gmail.com&currency_code=USD&item_name=LosGames%20Donation"
