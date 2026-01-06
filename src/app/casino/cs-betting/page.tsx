@@ -566,6 +566,9 @@ export default function CSBetting() {
       weaponGroup.rotation.x = Math.PI / 6;
       soldier.add(weaponGroup);
 
+      // Scale up the soldier to be more visible
+      soldier.scale.set(3, 3, 3);
+
       return soldier;
     };
 
@@ -573,10 +576,10 @@ export default function CSBetting() {
     const initializeBots = () => {
       const bots: Bot[] = [];
       
-      // T bots (spawn at T spawn area - south)
+      // T bots (spawn at T spawn area - south) - spread out more
       for (let i = 0; i < 5; i++) {
         const mesh = createSoldierModel('T');
-        const xOffset = (i - 2) * 3;
+        const xOffset = (i - 2) * 6; // Spread more for bigger models
         mesh.position.set(xOffset, 0, -70);
         scene.add(mesh);
         
@@ -584,9 +587,9 @@ export default function CSBetting() {
           id: `T${i}`,
           team: 'T',
           capsule: new Capsule(
-            new THREE.Vector3(xOffset, 0.35, -70),
-            new THREE.Vector3(xOffset, 1.7, -70),
-            0.35
+            new THREE.Vector3(xOffset, 0.5, -70),
+            new THREE.Vector3(xOffset, 4.5, -70),
+            1.0 // Larger radius for bigger model
           ),
           velocity: new THREE.Vector3(),
           health: 100,
@@ -601,10 +604,10 @@ export default function CSBetting() {
         });
       }
 
-      // CT bots (spawn at CT spawn - north)
+      // CT bots (spawn at CT spawn - north) - spread out more
       for (let i = 0; i < 5; i++) {
         const mesh = createSoldierModel('CT');
-        const xOffset = (i - 2) * 3 + 25;
+        const xOffset = (i - 2) * 6 + 25; // Spread more
         mesh.position.set(xOffset, 0, 15);
         scene.add(mesh);
         
@@ -612,9 +615,9 @@ export default function CSBetting() {
           id: `CT${i}`,
           team: 'CT',
           capsule: new Capsule(
-            new THREE.Vector3(xOffset, 0.35, 15),
-            new THREE.Vector3(xOffset, 1.7, 15),
-            0.35
+            new THREE.Vector3(xOffset, 0.5, 15),
+            new THREE.Vector3(xOffset, 4.5, 15),
+            1.0 // Larger radius for bigger model
           ),
           velocity: new THREE.Vector3(),
           health: 100,
@@ -795,35 +798,42 @@ export default function CSBetting() {
     const isWalkable = (pos: THREE.Vector3): boolean => {
       const testCapsule = new Capsule(
         new THREE.Vector3(pos.x, 0.5, pos.z),
-        new THREE.Vector3(pos.x, 1.5, pos.z),
-        0.4
+        new THREE.Vector3(pos.x, 4, pos.z),
+        1.2 // Larger radius for bigger models
       );
       return !worldOctree.capsuleIntersect(testCapsule);
     };
     
-    // Find a clear path around obstacles - simple pathfinding
+    // Find a clear path around obstacles - improved pathfinding
     const findClearDirection = (from: THREE.Vector3, to: THREE.Vector3, bot: Bot): THREE.Vector3 | null => {
       const directDir = to.clone().sub(from).normalize();
       
-      // First, try direct path
-      const testDist = 2;
-      const testPos = from.clone().add(directDir.clone().multiplyScalar(testDist));
-      if (isWalkable(testPos)) {
-        return directDir;
+      // Check multiple distances - start close, then farther
+      const testDistances = [1, 1.5, 2, 3];
+      
+      for (const testDist of testDistances) {
+        // First, try direct path
+        const testPos = from.clone().add(directDir.clone().multiplyScalar(testDist));
+        if (isWalkable(testPos)) {
+          return directDir;
+        }
       }
       
-      // Try various angles to find a clear path
-      const angles = [30, -30, 60, -60, 90, -90, 120, -120, 150, -150];
-      for (const angleDeg of angles) {
-        const angle = (angleDeg * Math.PI) / 180;
-        const rotatedDir = new THREE.Vector3(
-          directDir.x * Math.cos(angle) - directDir.z * Math.sin(angle),
-          0,
-          directDir.x * Math.sin(angle) + directDir.z * Math.cos(angle)
-        );
-        const testPosRot = from.clone().add(rotatedDir.multiplyScalar(testDist));
-        if (isWalkable(testPosRot)) {
-          return rotatedDir.normalize();
+      // Direct path blocked - try various angles with multiple distances
+      const angles = [15, -15, 30, -30, 45, -45, 60, -60, 75, -75, 90, -90, 120, -120, 150, -150, 180];
+      
+      for (const testDist of [1.5, 2, 3]) {
+        for (const angleDeg of angles) {
+          const angle = (angleDeg * Math.PI) / 180;
+          const rotatedDir = new THREE.Vector3(
+            directDir.x * Math.cos(angle) - directDir.z * Math.sin(angle),
+            0,
+            directDir.x * Math.sin(angle) + directDir.z * Math.cos(angle)
+          );
+          const testPosRot = from.clone().add(rotatedDir.multiplyScalar(testDist));
+          if (isWalkable(testPosRot)) {
+            return rotatedDir.normalize();
+          }
         }
       }
       
@@ -1067,10 +1077,10 @@ export default function CSBetting() {
 
         // Movement with smart obstacle avoidance
         if (bot.targetPosition && !bot.isPlanting) {
-          const speed = 8;
+          const speed = 10; // Slightly faster for bigger map feel
           
           // Get a clear direction toward target, avoiding walls
-          const moveDir = findClearDirection(botPos.clone().setY(1), bot.targetPosition.clone().setY(1), bot);
+          const moveDir = findClearDirection(botPos.clone().setY(2), bot.targetPosition.clone().setY(2), bot);
           
           if (moveDir) {
             bot.facingDirection.copy(moveDir);
@@ -1079,11 +1089,11 @@ export default function CSBetting() {
             const newX = bot.capsule.start.x + moveDir.x * speed * deltaTime;
             const newZ = bot.capsule.start.z + moveDir.z * speed * deltaTime;
             
-            // Create test capsule at new position
+            // Create test capsule at new position (larger for bigger models)
             const testCapsule = new Capsule(
               new THREE.Vector3(newX, 0.5, newZ),
-              new THREE.Vector3(newX, 1.7, newZ),
-              0.35
+              new THREE.Vector3(newX, 4.5, newZ),
+              1.0
             );
             
             // Check collision with world
@@ -1110,8 +1120,8 @@ export default function CSBetting() {
                 
                 const testSlide = new Capsule(
                   new THREE.Vector3(slideX, 0.5, slideZ),
-                  new THREE.Vector3(slideX, 1.7, slideZ),
-                  0.35
+                  new THREE.Vector3(slideX, 4.5, slideZ),
+                  1.0
                 );
                 
                 if (!worldOctree.capsuleIntersect(testSlide)) {
