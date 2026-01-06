@@ -204,6 +204,22 @@ export default function SweetBonanza() {
     }, 500);
   }, [isSpinning, isTumbling, balance, betAmount, isFreeSpinMode, freeSpins, currentMultipliers]);
 
+  const buyBonus = () => {
+    const cost = betAmount * 100;
+    if (balance < cost) {
+      setMessage(`Insufficient balance! Need $${cost.toFixed(2)}`);
+      return;
+    }
+    if (isSpinning || isTumbling || isFreeSpinMode) return;
+    
+    setBalance(balance - cost);
+    setMessage(`🎁 Bonus Bought for $${cost.toFixed(2)}! 10 Free Spins!`);
+    setIsFreeSpinMode(true);
+    setFreeSpins(10);
+    setCurrentMultipliers([]);
+    setTotalWin(0);
+  };
+
   const checkWins = (currentGrid: Symbol[][], currentTumble: number, multipliers: number[], accumulatedWin: number) => {
     // Flatten grid to count symbols
     const allSymbols = currentGrid.flat();
@@ -564,6 +580,16 @@ export default function SweetBonanza() {
               } disabled:opacity-50`}
             >
               {autoPlay ? '⏹️ Stop Auto' : '▶️ Auto'}
+            </button>
+
+            {/* Buy Bonus Button */}
+            <button
+              onClick={buyBonus}
+              disabled={isSpinning || isTumbling || isFreeSpinMode || balance < betAmount * 100}
+              className="px-4 py-2 rounded-xl font-bold transition-all bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black disabled:opacity-50"
+              title={`Cost: $${(betAmount * 100).toFixed(2)}`}
+            >
+              🎁 Buy Bonus (100x)
             </button>
           </div>
         </div>
