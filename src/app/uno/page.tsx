@@ -241,36 +241,46 @@ export default function UnoGame() {
   const drawCard = () => {
     if (currentPlayerIndex !== 0) return;
 
-    if (deck.length === 0) {
-      // Reshuffle discard pile
-      const topCard = discardPile[discardPile.length - 1];
-      setDeck(shuffleDeck(discardPile.slice(0, -1)));
-      setDiscardPile([topCard]);
-    }
-
+    let currentDeck = [...deck];
+    let currentDiscardPile = [...discardPile];
     const newPlayers = [...players];
-    const drawnCard = deck[deck.length - 1];
-    newPlayers[0].cards.push(drawnCard);
-    setDeck(deck.slice(0, -1));
-    setPlayers(newPlayers);
+    const topCard = currentDiscardPile[currentDiscardPile.length - 1];
+    let drawnCard: UnoCard | null = null;
+    let cardsDrawn = 0;
 
-    const topCard = discardPile[discardPile.length - 1];
-    if (canPlayCard(drawnCard, topCard)) {
-      setMessage('Drew a card! You can play it or pass.');
-    } else {
-      setMessage('Drew a card. Passing turn...');
-      setTimeout(() => {
-        const nextPlayer = (currentPlayerIndex + direction + players.length) % players.length;
-        setCurrentPlayerIndex(nextPlayer);
-      }, 1000);
+    // Keep drawing until we find a playable card
+    while (true) {
+      if (currentDeck.length === 0) {
+        // Reshuffle discard pile
+        const top = currentDiscardPile[currentDiscardPile.length - 1];
+        currentDeck = shuffleDeck(currentDiscardPile.slice(0, -1));
+        currentDiscardPile = [top];
+      }
+
+      if (currentDeck.length === 0) {
+        // No cards left anywhere, pass turn
+        setMessage('No cards left! Passing turn...');
+        setTimeout(() => {
+          const nextPlayer = (currentPlayerIndex + direction + players.length) % players.length;
+          setCurrentPlayerIndex(nextPlayer);
+        }, 1000);
+        return;
+      }
+
+      drawnCard = currentDeck.pop()!;
+      newPlayers[0].cards.push(drawnCard);
+      cardsDrawn++;
+
+      if (canPlayCard(drawnCard, topCard)) {
+        // Found a playable card
+        break;
+      }
     }
-  };
 
-  const passTurn = () => {
-    if (currentPlayerIndex !== 0) return;
-    const nextPlayer = (currentPlayerIndex + direction + players.length) % players.length;
-    setCurrentPlayerIndex(nextPlayer);
-    setMessage('Turn passed.');
+    setDeck(currentDeck);
+    setDiscardPile(currentDiscardPile);
+    setPlayers(newPlayers);
+    setMessage(`Drew ${cardsDrawn} card${cardsDrawn > 1 ? 's' : ''}! You can now play the ${drawnCard.color} ${drawnCard.value}.`);
   };
 
   const chooseBotColor = (cards: UnoCard[]): CardColor => {
@@ -488,12 +498,9 @@ export default function UnoGame() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-2xl font-bold text-white">Your Hand {currentPlayerIndex === 0 ? '(Your Turn!)' : ''}</h3>
               {currentPlayerIndex === 0 && !gameOver && (
-                <button
-                  onClick={passTurn}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg text-white font-semibold transition-all"
-                >
-                  Pass Turn
-                </button>
+                <div className="text-white/70 text-sm">
+                  Click deck to draw until you can play
+                </div>
               )}
             </div>
             <div className="flex gap-3 flex-wrap justify-center">
