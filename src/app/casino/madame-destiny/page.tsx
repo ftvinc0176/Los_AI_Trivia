@@ -125,6 +125,8 @@ export default function MadameDestinyMegaways() {
   const [anteBet, setAnteBet] = useState(false);
   const [showBonusWheel, setShowBonusWheel] = useState(false);
   const [bonusWheelSpinning, setBonusWheelSpinning] = useState(false);
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [wheelResult, setWheelResult] = useState<{ spins: number; multiplier: number } | null>(null);
   const [totalBonusWin, setTotalBonusWin] = useState(0);
   const [showHugeWin, setShowHugeWin] = useState(false);
   const [totalWays, setTotalWays] = useState(0);
@@ -462,46 +464,59 @@ export default function MadameDestinyMegaways() {
     checkAndReload();
   };
 
+  // Wheel segments - each has spins + multiplier combo
+  const wheelSegments = [
+    { spins: 5, multiplier: 2, color: '#e74c3c' },
+    { spins: 8, multiplier: 3, color: '#9b59b6' },
+    { spins: 6, multiplier: 5, color: '#3498db' },
+    { spins: 10, multiplier: 2, color: '#e67e22' },
+    { spins: 7, multiplier: 7, color: '#1abc9c' },
+    { spins: 12, multiplier: 3, color: '#f39c12' },
+    { spins: 8, multiplier: 10, color: '#2ecc71' },
+    { spins: 5, multiplier: 15, color: '#e91e63' },
+    { spins: 10, multiplier: 5, color: '#00bcd4' },
+    { spins: 6, multiplier: 20, color: '#ff5722' },
+    { spins: 12, multiplier: 10, color: '#673ab7' },
+    { spins: 8, multiplier: 25, color: '#ffd700' },
+  ];
+
   const spinBonusWheel = () => {
+    if (bonusWheelSpinning) return;
     setBonusWheelSpinning(true);
+    setWheelResult(null);
     
-    // Determine free spins (5-12)
-    const spinsOptions = [5, 6, 7, 8, 9, 10, 11, 12];
-    const spins = spinsOptions[Math.floor(Math.random() * spinsOptions.length)];
+    // Pick random segment
+    const selectedIndex = Math.floor(Math.random() * wheelSegments.length);
+    const segment = wheelSegments[selectedIndex];
     
-    // Determine multiplier (2x-25x) with weights
-    const multiplierOptions = [
-      { value: 2, weight: 25 },
-      { value: 3, weight: 20 },
-      { value: 5, weight: 15 },
-      { value: 7, weight: 12 },
-      { value: 10, weight: 10 },
-      { value: 15, weight: 8 },
-      { value: 20, weight: 6 },
-      { value: 25, weight: 4 }
-    ];
+    // Calculate rotation: multiple full spins + land on selected segment
+    // Each segment is 360/12 = 30 degrees
+    // The pointer is at the top (0 degrees), so we need to rotate so the segment is at top
+    const segmentAngle = 30; // 360 / 12 segments
+    const segmentCenter = selectedIndex * segmentAngle + (segmentAngle / 2);
+    // We want this segment to end up at the top (0 degrees)
+    // So we rotate (360 - segmentCenter) to bring it to top, plus extra full rotations
+    const fullRotations = 5 + Math.floor(Math.random() * 3); // 5-7 full spins
+    const finalRotation = (fullRotations * 360) + (360 - segmentCenter);
     
-    const totalWeight = multiplierOptions.reduce((sum, opt) => sum + opt.weight, 0);
-    let rand = Math.random() * totalWeight;
-    let selectedMultiplier = 2;
+    setWheelRotation(prev => prev + finalRotation);
     
-    for (const opt of multiplierOptions) {
-      rand -= opt.weight;
-      if (rand <= 0) {
-        selectedMultiplier = opt.value;
-        break;
-      }
-    }
+    // After spin animation completes, show result and start bonus
+    setTimeout(() => {
+      setWheelResult(segment);
+    }, 4000); // Wheel spin animation takes 4 seconds
     
     setTimeout(() => {
       setBonusWheelSpinning(false);
       setShowBonusWheel(false);
-      setFreeSpins(spins);
-      setFreeSpinMultiplier(selectedMultiplier);
+      setWheelRotation(0);
+      setWheelResult(null);
+      setFreeSpins(segment.spins);
+      setFreeSpinMultiplier(segment.multiplier);
       setIsFreeSpinMode(true);
       setTotalBonusWin(0);
-      setMessage(`🎉 ${spins} Free Spins with ${selectedMultiplier}x Multiplier! 🎉`);
-    }, 2000);
+      setMessage(`🎉 ${segment.spins} Free Spins with ${segment.multiplier}x Multiplier! 🎉`);
+    }, 6000); // Wait for result display then start
   };
 
   const buyBonus = () => {
@@ -612,21 +627,93 @@ export default function MadameDestinyMegaways() {
 
       {/* Bonus Wheel Modal */}
       {showBonusWheel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-          <div className="bg-gradient-to-br from-purple-800 to-indigo-900 p-8 rounded-3xl border-4 border-yellow-400 shadow-2xl">
-            <h2 className="text-3xl font-bold text-white text-center mb-6">🔮 Bonus Wheel 🔮</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+          <div className="bg-gradient-to-br from-purple-900 to-indigo-950 p-8 rounded-3xl border-4 border-yellow-400 shadow-2xl max-w-lg">
+            <h2 className="text-3xl font-bold text-white text-center mb-6">🔮 Wheel of Destiny 🔮</h2>
             
-            {bonusWheelSpinning ? (
+            {/* The Wheel */}
+            <div className="relative w-80 h-80 mx-auto mb-6">
+              {/* Pointer at top */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-20">
+                <div className="w-0 h-0 border-l-[15px] border-r-[15px] border-t-[25px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" />
+              </div>
+              
+              {/* Spinning wheel */}
+              <div 
+                className="w-full h-full rounded-full border-8 border-yellow-500 shadow-2xl overflow-hidden relative"
+                style={{
+                  transform: `rotate(${wheelRotation}deg)`,
+                  transition: bonusWheelSpinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
+                }}
+              >
+                {/* SVG Wheel */}
+                <svg viewBox="0 0 200 200" className="w-full h-full">
+                  {wheelSegments.map((seg, i) => {
+                    const angle = 360 / wheelSegments.length;
+                    const startAngle = i * angle - 90; // Start from top
+                    const endAngle = startAngle + angle;
+                    const startRad = (startAngle * Math.PI) / 180;
+                    const endRad = (endAngle * Math.PI) / 180;
+                    const x1 = 100 + 100 * Math.cos(startRad);
+                    const y1 = 100 + 100 * Math.sin(startRad);
+                    const x2 = 100 + 100 * Math.cos(endRad);
+                    const y2 = 100 + 100 * Math.sin(endRad);
+                    const largeArc = angle > 180 ? 1 : 0;
+                    const textAngle = startAngle + angle / 2;
+                    const textRad = (textAngle * Math.PI) / 180;
+                    const textX = 100 + 60 * Math.cos(textRad);
+                    const textY = 100 + 60 * Math.sin(textRad);
+                    
+                    return (
+                      <g key={i}>
+                        <path
+                          d={`M 100 100 L ${x1} ${y1} A 100 100 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                          fill={seg.color}
+                          stroke="#1a1a2e"
+                          strokeWidth="1"
+                        />
+                        <text
+                          x={textX}
+                          y={textY}
+                          fill="white"
+                          fontSize="8"
+                          fontWeight="bold"
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          transform={`rotate(${textAngle + 90}, ${textX}, ${textY})`}
+                        >
+                          <tspan x={textX} dy="-4">{seg.spins}FS</tspan>
+                          <tspan x={textX} dy="10">{seg.multiplier}x</tspan>
+                        </text>
+                      </g>
+                    );
+                  })}
+                  {/* Center circle */}
+                  <circle cx="100" cy="100" r="20" fill="#1a1a2e" stroke="#ffd700" strokeWidth="3" />
+                  <text x="100" y="100" fill="#ffd700" fontSize="10" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">🔮</text>
+                </svg>
+              </div>
+            </div>
+            
+            {/* Result or Spin Button */}
+            {wheelResult ? (
+              <div className="text-center animate-pulse">
+                <p className="text-2xl font-bold text-yellow-400 mb-2">🎉 YOU WON! 🎉</p>
+                <p className="text-3xl font-bold text-white">
+                  {wheelResult.spins} Free Spins @ {wheelResult.multiplier}x!
+                </p>
+                <p className="text-white/60 mt-2">Starting bonus...</p>
+              </div>
+            ) : bonusWheelSpinning ? (
               <div className="text-center">
-                <div className="text-8xl animate-spin mb-4">🎡</div>
-                <p className="text-white text-xl">The wheel of destiny spins...</p>
+                <p className="text-xl text-white animate-pulse">🔮 The wheel of destiny spins... 🔮</p>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-white/80 mb-6">Spin to reveal your Free Spins and Multiplier!</p>
+                <p className="text-white/80 mb-4">Spin to reveal your Free Spins and Multiplier!</p>
                 <button
                   onClick={spinBonusWheel}
-                  className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-bold text-xl rounded-2xl transition-all transform hover:scale-105"
+                  className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-bold text-xl rounded-2xl transition-all transform hover:scale-105 shadow-lg"
                 >
                   🎡 SPIN THE WHEEL
                 </button>
