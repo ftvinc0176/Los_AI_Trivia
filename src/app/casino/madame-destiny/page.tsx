@@ -128,6 +128,7 @@ export default function MadameDestinyMegaways() {
   const [totalBonusWin, setTotalBonusWin] = useState(0);
   const [showHugeWin, setShowHugeWin] = useState(false);
   const [totalWays, setTotalWays] = useState(0);
+  const [revealedReels, setRevealedReels] = useState<number>(6); // Track how many reels are revealed (6 = all shown)
 
   // Initialize grid
   useEffect(() => {
@@ -213,23 +214,39 @@ export default function MadameDestinyMegaways() {
     const ways = newReelSizes.reduce((a, b) => a * b, 1);
     setTotalWays(ways);
     
-    // Animate spin
-    setTimeout(() => {
-      const newGrid: Symbol[][] = [];
-      for (let col = 0; col < 6; col++) {
-        const column: Symbol[] = [];
-        for (let row = 0; row < newReelSizes[col]; row++) {
-          column.push(generateRandomSymbol());
-        }
-        newGrid.push(column);
+    // Generate new grid
+    const newGrid: Symbol[][] = [];
+    for (let col = 0; col < 6; col++) {
+      const column: Symbol[] = [];
+      for (let row = 0; row < newReelSizes[col]; row++) {
+        column.push(generateRandomSymbol());
       }
-      setGrid(newGrid);
-      
-      // Check for wins after spin
-      setTimeout(() => {
-        checkWins(newGrid, 0, 0);
-      }, 300);
-    }, 500);
+      newGrid.push(column);
+    }
+    
+    // Reset revealed reels and start sequential reveal
+    setRevealedReels(0);
+    setGrid(newGrid);
+    
+    // Reveal reels one at a time with 400ms delay
+    const revealReel = (reelIndex: number) => {
+      if (reelIndex <= 6) {
+        setRevealedReels(reelIndex);
+        if (reelIndex < 6) {
+          setTimeout(() => revealReel(reelIndex + 1), 350);
+        } else {
+          // All reels revealed, check for wins
+          setTimeout(() => {
+            checkWins(newGrid, 0, 0);
+          }, 300);
+        }
+      }
+    };
+    
+    // Start revealing after initial spin animation
+    setTimeout(() => {
+      revealReel(1);
+    }, 300);
   }, [isSpinning, isTumbling, balance, betAmount, isFreeSpinMode, freeSpins, freeSpinMultiplier, anteBet]);
 
   const checkWins = (currentGrid: Symbol[][], currentTumble: number, accumulatedWin: number) => {
@@ -508,6 +525,7 @@ export default function MadameDestinyMegaways() {
   const renderSymbol = (symbol: Symbol, colIdx: number, rowIdx: number, reelSize: number) => {
     const config = SYMBOLS[symbol.type];
     const size = reelSize > 5 ? 'w-10 h-10 text-xl' : reelSize > 4 ? 'w-12 h-12 text-2xl' : 'w-14 h-14 text-3xl';
+    const isReelSpinning = isSpinning && colIdx >= revealedReels;
     
     return (
       <div
@@ -520,11 +538,11 @@ export default function MadameDestinyMegaways() {
           transition-all duration-300
           ${symbol.isWinning ? 'animate-pulse scale-110 ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/50' : ''}
           ${symbol.isNew ? 'animate-bounce' : ''}
-          ${isSpinning ? 'animate-spin opacity-50' : ''}
+          ${isReelSpinning ? 'animate-spin opacity-50' : ''}
           ${symbol.type === 'madame' ? 'ring-2 ring-purple-400' : ''}
         `}
       >
-        <span className="drop-shadow-lg">{config.emoji}</span>
+        <span className="drop-shadow-lg">{isReelSpinning ? '❓' : config.emoji}</span>
       </div>
     );
   };
