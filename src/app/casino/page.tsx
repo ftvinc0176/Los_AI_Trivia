@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCasino } from './CasinoContext';
 
-type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'horse-racing' | 'baccarat' | 'craps' | null;
+type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'ultimate-holdem' | 'horse-racing' | 'baccarat' | 'craps' | null;
 
 export default function Casino() {
   const router = useRouter();
@@ -227,27 +227,40 @@ export default function Casino() {
               </div>
             </div>
 
-            {/* Texas Hold'em */}
+            {/* Ultimate Texas Hold'em */}
+            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🎲</div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Ultimate Texas Hold&apos;em</h2>
+                  <p className="text-white/70">Beat the dealer - casino table game</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                <button
+                  onClick={() => router.push('/casino/ultimate-holdem')}
+                  className="py-3 bg-blue-500/30 hover:bg-blue-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  🎮 Play Now
+                </button>
+              </div>
+            </div>
+
+            {/* Texas Hold'em Multiplayer */}
             <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
               <div className="flex items-center gap-4 mb-4">
                 <div className="text-5xl">🃏</div>
                 <div>
-                  <h2 className="text-3xl font-bold text-white">Texas Hold&apos;em</h2>
-                  <p className="text-white/70">No-limit poker action</p>
+                  <h2 className="text-3xl font-bold text-white">Texas Hold&apos;em Multiplayer</h2>
+                  <p className="text-white/70">Play poker with other players online</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => handleGameSelect('texas-holdem', 'single')}
-                  className="py-3 bg-green-500/30 hover:bg-green-500/50 text-white rounded-xl font-bold transition-all"
-                >
-                  🎮 Single Player
-                </button>
+              <div className="grid grid-cols-1 gap-4">
                 <button
                   onClick={() => handleGameSelect('texas-holdem', 'multiplayer')}
-                  className="py-3 bg-emerald-500/30 hover:bg-emerald-500/50 text-white rounded-xl font-bold transition-all"
+                  className="py-3 bg-green-500/30 hover:bg-green-500/50 text-white rounded-xl font-bold transition-all"
                 >
-                  👥 Multiplayer
+                  👥 Join Table
                 </button>
               </div>
             </div>
