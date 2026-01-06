@@ -415,11 +415,13 @@ export default function CSBetting() {
       const aliveCT = cur.filter(b => b.team === 'CT' && b.alive);
       
       // Win conditions
-      if (aliveT.length === 0) {
-        // All T dead - CT wins (if bomb planted, they defuse by default)
+      if (aliveT.length === 0 && !bombRef.current) {
+        // All T dead and bomb NOT planted - CT wins
         endRound('CT', false);
         return;
       }
+      // Note: If all T dead but bomb IS planted, round continues - CTs must defuse or bomb explodes
+      
       if (aliveCT.length === 0) {
         // All CT dead - T wins (bomb planted or elimination)
         endRound('T', bombRef.current);
