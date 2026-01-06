@@ -388,17 +388,39 @@ function TexasHoldemGameContent() {
       return;
     }
 
+    // If only one active player remains (others are all-in or folded)
+    if (activePlayers.length === 1) {
+      // Check if that player has acted and matches the current bet
+      const lastActive = activePlayers[0];
+      if (lastActive.hasActed && (lastActive.currentBet === currentBet || lastActive.balance === 0)) {
+        proceedToNextPhase(currentPlayers, currentPot);
+        return;
+      }
+    }
+
     // Check if betting round complete
-    const allActed = activePlayers.every(p => p.hasActed && p.currentBet === currentBet);
-    if (allActed) {
+    const allActed = activePlayers.every(p => p.hasActed && (p.currentBet === currentBet || p.balance === 0));
+    if (allActed && activePlayers.length > 0) {
       proceedToNextPhase(currentPlayers, currentPot);
       return;
     }
 
-    // Find next active player
+    // Find next active player with safety check
     let nextIndex = (activePlayerIndex + 1) % currentPlayers.length;
-    while (currentPlayers[nextIndex].hasFolded || currentPlayers[nextIndex].isAllIn) {
+    let attempts = 0;
+    while ((currentPlayers[nextIndex].hasFolded || currentPlayers[nextIndex].isAllIn) && attempts < currentPlayers.length) {
       nextIndex = (nextIndex + 1) % currentPlayers.length;
+      attempts++;
+    }
+
+    // Safety check - if we couldn't find an active player, end the round
+    if (attempts >= currentPlayers.length) {
+      if (nonFoldedPlayers.length > 1) {
+        dealAllRemainingCards(currentPlayers, currentPot);
+      } else {
+        endHand(currentPlayers, currentPot);
+      }
+      return;
     }
 
     setActivePlayerIndex(nextIndex);
