@@ -95,10 +95,10 @@ function TexasHoldemGame() {
 
   // Update casino context when balance changes in single player
   useEffect(() => {
-    if (mode === 'single' && (gameState === 'showdown' || gameState === 'results')) {
+    if (mode === 'single') {
       setCasinoBalance(balance);
     }
-  }, [balance, mode, gameState, setCasinoBalance]);
+  }, [balance, mode, setCasinoBalance]);
 
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];

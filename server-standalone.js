@@ -2709,6 +2709,268 @@ function startHorseRace(roomId) {
   }, 100);
 }
 
+// ==================== BACCARAT GAME ====================
+const BACCARAT_SUITS = ['♠', '♥', '♦', '♣'];
+const BACCARAT_VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+function createBaccaratDeck() {
+  const deck = [];
+  for (let d = 0; d < 8; d++) {
+    for (const suit of BACCARAT_SUITS) {
+      for (let i = 0; i < BACCARAT_VALUES.length; i++) {
+        const value = BACCARAT_VALUES[i];
+        let numValue;
+        if (value === 'A') numValue = 1;
+        else if (['10', 'J', 'Q', 'K'].includes(value)) numValue = 0;
+        else numValue = parseInt(value);
+        deck.push({ suit, value, numValue });
+      }
+    }
+  }
+  // Shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function calculateBaccaratTotal(hand) {
+  return hand.reduce((acc, card) => acc + card.numValue, 0) % 10;
+}
+
+io.on('connection', (socket) => {
+  
+  socket.on('baccaratCreateLobby', ({ playerName, isPublic }) => {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      bet: null,
+      winnings: 0
+    };
+
+    rooms.set(`baccarat_${roomId}`, {
+      players: [player],
+      state: 'lobby',
+      isPublic,
+      deck: createBaccaratDeck(),
+      playerHand: [],
+      bankerHand: [],
+      winner: null,
+      hostId: socket.id
+    });
+
+    socket.join(`baccarat_${roomId}`);
+    socket.emit('baccaratLobbyCreated', { roomId, players: [player] });
+    console.log(`Baccarat lobby created: ${roomId}`);
+  });
+
+  socket.on('baccaratGetPublicLobbies', () => {
+    const publicLobbies = [];
+    rooms.forEach((room, key) => {
+      if (key.startsWith('baccarat_') && room.isPublic && room.players.length < 8 && room.state === 'lobby') {
+        const roomId = key.replace('baccarat_', '');
+        publicLobbies.push({ roomId, playerCount: room.players.length, maxPlayers: 8 });
+      }
+    });
+    socket.emit('baccaratPublicLobbies', { lobbies: publicLobbies });
+  });
+
+  socket.on('baccaratJoinLobby', ({ roomId, playerName }) => {
+    const room = rooms.get(`baccarat_${roomId}`);
+    if (!room) {
+      socket.emit('baccaratError', { message: 'Room not found' });
+      return;
+    }
+
+    if (room.players.length >= 8) {
+      socket.emit('baccaratError', { message: 'Room is full' });
+      return;
+    }
+
+    const player = {
+      id: socket.id,
+      name: playerName,
+      balance: 25000,
+      bet: null,
+      winnings: 0
+    };
+
+    room.players.push(player);
+    socket.join(`baccarat_${roomId}`);
+    
+    io.to(`baccarat_${roomId}`).emit('baccaratPlayerJoined', { players: room.players });
+    socket.emit('baccaratLobbyCreated', { roomId, players: room.players });
+  });
+
+  socket.on('baccaratStartGame', ({ roomId }) => {
+    const room = rooms.get(`baccarat_${roomId}`);
+    if (!room) return;
+
+    room.state = 'betting';
+    room.deck = createBaccaratDeck();
+    room.playerHand = [];
+    room.bankerHand = [];
+    room.winner = null;
+    room.players.forEach(p => {
+      p.bet = null;
+      p.winnings = 0;
+    });
+
+    io.to(`baccarat_${roomId}`).emit('baccaratGameStarted');
+  });
+
+  socket.on('baccaratPlaceBet', ({ roomId, betType, amount }) => {
+    const room = rooms.get(`baccarat_${roomId}`);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || amount > player.balance) return;
+
+    player.balance -= amount;
+    player.bet = { type: betType, amount };
+    
+    io.to(`baccarat_${roomId}`).emit('baccaratBetPlaced', { players: room.players });
+
+    // Check if all players have bet
+    const allBet = room.players.every(p => p.bet !== null);
+    if (allBet) {
+      startBaccaratDeal(roomId);
+    }
+  });
+});
+
+async function startBaccaratDeal(roomId) {
+  const room = rooms.get(`baccarat_${roomId}`);
+  if (!room) return;
+
+  room.state = 'dealing';
+  const deck = room.deck;
+
+  // Deal initial cards
+  const playerHand = [deck.pop(), deck.pop()];
+  const bankerHand = [deck.pop(), deck.pop()];
+
+  room.playerHand = playerHand;
+  room.bankerHand = bankerHand;
+
+  // Send dealing phases with delays
+  io.to(`baccarat_${roomId}`).emit('baccaratDealing', { 
+    playerHand: [playerHand[0]], 
+    bankerHand: [], 
+    phase: 1 
+  });
+  await new Promise(r => setTimeout(r, 800));
+
+  io.to(`baccarat_${roomId}`).emit('baccaratDealing', { 
+    playerHand: [playerHand[0]], 
+    bankerHand: [bankerHand[0]], 
+    phase: 2 
+  });
+  await new Promise(r => setTimeout(r, 800));
+
+  io.to(`baccarat_${roomId}`).emit('baccaratDealing', { 
+    playerHand, 
+    bankerHand: [bankerHand[0]], 
+    phase: 3 
+  });
+  await new Promise(r => setTimeout(r, 800));
+
+  io.to(`baccarat_${roomId}`).emit('baccaratDealing', { 
+    playerHand, 
+    bankerHand, 
+    phase: 4 
+  });
+  await new Promise(r => setTimeout(r, 800));
+
+  let pTotal = calculateBaccaratTotal(playerHand);
+  let bTotal = calculateBaccaratTotal(bankerHand);
+
+  // Check for naturals
+  const playerNatural = pTotal >= 8;
+  const bankerNatural = bTotal >= 8;
+
+  if (!playerNatural && !bankerNatural) {
+    // Player third card rule
+    let playerThirdCard = null;
+    if (pTotal <= 5) {
+      playerThirdCard = deck.pop();
+      playerHand.push(playerThirdCard);
+      room.playerHand = playerHand;
+      pTotal = calculateBaccaratTotal(playerHand);
+      
+      io.to(`baccarat_${roomId}`).emit('baccaratDealing', { 
+        playerHand, 
+        bankerHand, 
+        phase: 5 
+      });
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    // Banker third card rule
+    let bankerDraws = false;
+    if (playerThirdCard === null) {
+      bankerDraws = bTotal <= 5;
+    } else {
+      const p3 = playerThirdCard.numValue;
+      if (bTotal <= 2) bankerDraws = true;
+      else if (bTotal === 3) bankerDraws = p3 !== 8;
+      else if (bTotal === 4) bankerDraws = p3 >= 2 && p3 <= 7;
+      else if (bTotal === 5) bankerDraws = p3 >= 4 && p3 <= 7;
+      else if (bTotal === 6) bankerDraws = p3 === 6 || p3 === 7;
+    }
+
+    if (bankerDraws) {
+      bankerHand.push(deck.pop());
+      room.bankerHand = bankerHand;
+      bTotal = calculateBaccaratTotal(bankerHand);
+      
+      io.to(`baccarat_${roomId}`).emit('baccaratDealing', { 
+        playerHand, 
+        bankerHand, 
+        phase: 6 
+      });
+      await new Promise(r => setTimeout(r, 800));
+    }
+  }
+
+  // Determine winner
+  let winner;
+  if (pTotal > bTotal) winner = 'player';
+  else if (bTotal > pTotal) winner = 'banker';
+  else winner = 'tie';
+
+  room.winner = winner;
+  room.state = 'results';
+
+  // Calculate winnings
+  room.players.forEach(player => {
+    if (player.bet && player.bet.type === winner) {
+      if (winner === 'player') {
+        player.winnings = player.bet.amount * 2;
+      } else if (winner === 'banker') {
+        player.winnings = Math.floor(player.bet.amount * 1.95);
+      } else {
+        player.winnings = player.bet.amount * 9;
+      }
+      player.balance += player.winnings;
+    }
+  });
+
+  await new Promise(r => setTimeout(r, 500));
+
+  io.to(`baccarat_${roomId}`).emit('baccaratResult', {
+    playerHand,
+    bankerHand,
+    winner,
+    players: room.players
+  });
+  
+  console.log(`Baccarat game ended in ${roomId}, winner: ${winner}`);
+}
+
 // ==================== FPS ARENA GAME ====================
 let fpsPlayers = {};
 let fpsTeamCounts = { T: 0, CT: 0 };

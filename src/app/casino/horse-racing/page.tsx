@@ -72,10 +72,10 @@ function HorseRacingGame() {
 
   // Update casino context when balance changes in single player
   useEffect(() => {
-    if (mode === 'single' && gameState === 'results') {
+    if (mode === 'single') {
       setCasinoBalance(balance);
     }
-  }, [balance, mode, gameState, setCasinoBalance]);
+  }, [balance, mode, setCasinoBalance]);
 
   const generateHorses = (): Horse[] => {
     return Array.from({ length: 8 }, (_, i) => ({

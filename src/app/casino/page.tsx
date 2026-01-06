@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCasino } from './CasinoContext';
 
-type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'horse-racing' | null;
+type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'horse-racing' | 'baccarat' | null;
 
 export default function Casino() {
   const router = useRouter();
@@ -213,6 +213,31 @@ export default function Casino() {
                 </button>
                 <button
                   onClick={() => handleGameSelect('horse-racing', 'multiplayer')}
+                  className="py-3 bg-yellow-500/30 hover:bg-yellow-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  👥 Multiplayer
+                </button>
+              </div>
+            </div>
+
+            {/* Baccarat */}
+            <div className="bg-gradient-to-br from-red-500/10 to-yellow-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🎴</div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Baccarat</h2>
+                  <p className="text-white/70">Classic high-stakes card game</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleGameSelect('baccarat', 'single')}
+                  className="py-3 bg-red-500/30 hover:bg-red-500/50 text-white rounded-xl font-bold transition-all"
+                >
+                  🎮 Single Player
+                </button>
+                <button
+                  onClick={() => handleGameSelect('baccarat', 'multiplayer')}
                   className="py-3 bg-yellow-500/30 hover:bg-yellow-500/50 text-white rounded-xl font-bold transition-all"
                 >
                   👥 Multiplayer
