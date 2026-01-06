@@ -99,7 +99,7 @@ export default function CSBetting() {
     if(w==='T')setTScore(s=>s+1);else setCTScore(s=>s+1);
     if(betOn!==null&&bet>0){
       const won=betOn===planted;
-      if(won)setBalance(b=>b+bet*2);
+      if(won)setBalance((b: number)=>b+bet*2);
       setBetResult({won,amt:bet});
     }
     const newT=w==='T'?tScore+1:tScore,newCT=w==='CT'?ctScore+1:ctScore;
