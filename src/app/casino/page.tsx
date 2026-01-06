@@ -8,7 +8,7 @@ type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'horse-racing' | 
 
 export default function Casino() {
   const router = useRouter();
-  const { playerName, setPlayerName, balance, isLoggedIn, logout, highestBalances, biggestWins } = useCasino();
+  const { playerName, setPlayerName, balance, setBalance, isLoggedIn, logout, highestBalances, biggestWins, checkAndReload } = useCasino();
   const [selectedGame, setSelectedGame] = useState<GameType>(null);
   const [showMultiplayerOptions, setShowMultiplayerOptions] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -103,10 +103,27 @@ export default function Casino() {
               <div className="text-white/60 text-sm">Casino Member</div>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-white/60 text-sm">Balance</div>
-            <div className={`text-2xl font-bold ${balance >= 25000 ? 'text-green-400' : balance > 10000 ? 'text-yellow-400' : 'text-red-400'}`}>
-              ${balance.toLocaleString()}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (checkAndReload()) {
+                  setBalance(25000);
+                }
+              }}
+              disabled={balance >= 1000}
+              className={`px-3 py-1 sm:px-4 sm:py-2 text-white rounded-lg transition-colors font-bold text-sm sm:text-base ${
+                balance >= 1000 
+                  ? 'bg-gray-600 cursor-not-allowed opacity-50' 
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              💵 Reload
+            </button>
+            <div className="text-right">
+              <div className="text-white/60 text-sm">Balance</div>
+              <div className={`text-2xl font-bold ${balance >= 25000 ? 'text-green-400' : balance > 10000 ? 'text-yellow-400' : 'text-red-400'}`}>
+                ${balance.toLocaleString()}
+              </div>
             </div>
           </div>
         </div>
