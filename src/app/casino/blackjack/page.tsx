@@ -902,13 +902,20 @@ function BlackjackGame() {
     const totalBet = parseInt(betInput || '0') + sideBets.perfectPairs + sideBets.twentyOnePlus3;
     
     return (
-      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
-        <div className="max-w-6xl w-full">
-          {/* Balance Display */}
-          <div className="text-center mb-3 sm:mb-6">
-            <p className="text-yellow-300 text-xl sm:text-3xl font-bold">{balance} LosBucks</p>
-          </div>
+      <div className="min-h-screen p-2 sm:p-4 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+        {/* Header with Exit and Balance */}
+        <div className="flex justify-between items-center mb-4 max-w-6xl mx-auto px-2 sm:px-4">
+          <button
+            onClick={() => router.push('/casino')}
+            className="text-white/60 hover:text-white transition-colors"
+          >
+            ← Exit
+          </button>
+          <div className="text-xl sm:text-2xl font-bold text-white">♠️ Blackjack ♥️</div>
+          <div className="text-lg sm:text-xl font-bold text-green-400">${balance.toLocaleString()}</div>
+        </div>
 
+        <div className="max-w-6xl w-full mx-auto">
           {/* Betting Table */}
           <div className="relative bg-green-800 rounded-[60px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-3 sm:p-8 md:p-12 shadow-2xl overflow-hidden">
             <div className="absolute inset-0 rounded-[60px] sm:rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
@@ -1062,8 +1069,20 @@ function BlackjackGame() {
   // Playing State
   if (gameState === 'playing') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
-        <div className="max-w-6xl w-full px-2 sm:px-0">
+      <div className="min-h-screen p-2 sm:p-4 overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #0d5520 0%, #08350f 100%)' }}>
+        {/* Header with Exit and Balance */}
+        <div className="flex justify-between items-center mb-4 max-w-6xl mx-auto px-2 sm:px-4">
+          <button
+            onClick={() => router.push('/casino')}
+            className="text-white/60 hover:text-white transition-colors"
+          >
+            ← Exit
+          </button>
+          <div className="text-xl sm:text-2xl font-bold text-white">♠️ Blackjack ♥️</div>
+          <div className="text-lg sm:text-xl font-bold text-green-400">${balance.toLocaleString()}</div>
+        </div>
+
+        <div className="max-w-6xl w-full mx-auto px-2 sm:px-0">
           {/* Turn Indicator for Multiplayer */}
           {socket && (
             <div className="text-center mb-2 sm:mb-4">
@@ -1079,11 +1098,6 @@ function BlackjackGame() {
             </div>
           )}
           
-          {/* Balance Display */}
-          <div className="text-center mb-3 sm:mb-6">
-            <p className="text-yellow-300 text-xl sm:text-2xl font-bold">{balance} LosBucks</p>
-          </div>
-
           {/* Game Table */}
           <div className="relative bg-green-800 rounded-[60px] sm:rounded-[200px] border-4 sm:border-8 border-yellow-900 p-4 sm:p-8 md:p-12 shadow-2xl min-h-[400px] sm:min-h-[600px] overflow-hidden">
             <div className="absolute inset-0 rounded-[60px] sm:rounded-[200px] bg-gradient-to-br from-green-700 to-green-900 opacity-50"></div>
