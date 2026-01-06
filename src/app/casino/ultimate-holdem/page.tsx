@@ -84,7 +84,7 @@ export default function UltimateTexasHoldem() {
     setWinAmount(0);
   };
 
-  const handlePlay = (multiplier: number) => {
+  const handlePlay = async (multiplier: number) => {
     const playAmount = anteBet * multiplier;
     
     if (balance < playAmount) {
@@ -95,33 +95,60 @@ export default function UltimateTexasHoldem() {
     setBalance(balance - playAmount);
     setPlayBet(playAmount);
 
+    // Disable all betting actions
+    setCanPlay4x(false);
+    setCanPlay2x(false);
+    setCanPlay1x(false);
+
     if (multiplier === 3 || multiplier === 4) {
-      // Went 3x or 4x preflop, deal all community cards
-      dealAllCommunity();
+      // Went 3x or 4x preflop, deal all community cards one at a time
+      await dealAllCommunityAnimated();
     } else if (multiplier === 2) {
       // Went 2x on flop, deal turn and river
-      dealRiver();
+      await dealRemainingCardsAnimated();
     } else if (multiplier === 1) {
-      // Went 1x on river
-      dealRiver();
+      // Went 1x on river, all cards already dealt
+      await revealDealerAndResolve();
     }
   };
 
-  const handleCheck = () => {
+  const handleCheck = async () => {
     if (phase === 'preflop') {
       // Check preflop, deal flop
       const gameDeck = [...deck];
       gameDeck.pop(); // Burn
       const flop = [gameDeck.pop()!, gameDeck.pop()!, gameDeck.pop()!];
-      setCommunityCards(flop);
+      
+      // Deal flop cards one at a time
+      for (let i = 0; i < flop.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setCommunityCards(prev => [...prev, flop[i]]);
+      }
+      
       setDeck(gameDeck);
       setPhase('flop');
       setCanPlay4x(false);
       setCanPlay2x(true);
+      setCanPlay1x(false);
       setMessage('Flop dealt! Bet 2x now or check to see turn and river.');
     } else if (phase === 'flop') {
       // Check flop, deal turn and river
-      dealRiver();
+      const gameDeck = [...deck];
+      const currentCommunity = [...communityCards];
+      
+      // Deal turn
+      gameDeck.pop(); // Burn
+      const turn = gameDeck.pop()!;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setCommunityCards([...currentCommunity, turn]);
+      
+      // Deal river
+      gameDeck.pop(); // Burn
+      const river = gameDeck.pop()!;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setCommunityCards([...currentCommunity, turn, river]);
+      
+      setDeck(gameDeck);
       setPhase('river');
       setCanPlay2x(false);
       setCanPlay1x(true);
@@ -129,36 +156,61 @@ export default function UltimateTexasHoldem() {
     }
   };
 
-  const dealAllCommunity = () => {
+  const dealAllCommunityAnimated = async () => {
     const gameDeck = [...deck];
     gameDeck.pop(); // Burn
-    const community = [
-      gameDeck.pop()!,
-      gameDeck.pop()!,
-      gameDeck.pop()!,
-      gameDeck.pop()!,
-      gameDeck.pop()!
-    ];
-    setCommunityCards(community);
+    const community: Card[] = [];
+    
+    for (let i = 0; i < 5; i++) {
+      community.push(gameDeck.pop()!);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setCommunityCards([...community]);
+    }
+    
     setDeck(gameDeck);
-    resolveHand(community);
+    await revealDealerAndResolve();
   };
 
-  const dealRiver = () => {
+  const dealRemainingCardsAnimated = async () => {
     const gameDeck = [...deck];
     const currentCommunity = [...communityCards];
     
-    while (currentCommunity.length < 5) {
-      if (currentCommunity.length === 3) gameDeck.pop(); // Burn before turn
-      currentCommunity.push(gameDeck.pop()!);
+    // Deal turn
+    if (currentCommunity.length === 3) {
+      gameDeck.pop(); // Burn
+      const turn = gameDeck.pop()!;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      currentCommunity.push(turn);
+      setCommunityCards([...currentCommunity]);
     }
     
-    setCommunityCards(currentCommunity);
+    // Deal river
+    gameDeck.pop(); // Burn
+    const river = gameDeck.pop()!;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    currentCommunity.push(river);
+    setCommunityCards([...currentCommunity]);
+    
     setDeck(gameDeck);
+    await revealDealerAndResolve();
+  };
+
+  const revealDealerAndResolve = async () => {
+    setMessage('Revealing dealer cards...');
     
-    if (phase === 'river' || canPlay1x) {
-      resolveHand(currentCommunity);
+    // Pause before revealing dealer cards
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Reveal dealer cards one at a time
+    const currentDealerCards = [...dealerCards];
+    for (let i = 0; i < currentDealerCards.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Force re-render by updating phase
+      if (i === 0) setMessage('Dealer first card...');
+      if (i === 1) setMessage('Dealer second card...');
     }
+    
+    resolveHand(communityCards);
   };
 
   const handleFold = () => {
