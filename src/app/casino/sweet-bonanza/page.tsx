@@ -102,7 +102,7 @@ export default function SweetBonanza() {
   const { balance, setBalance, recordWin, checkAndReload } = useCasino();
   
   const [grid, setGrid] = useState<Symbol[][]>([]);
-  const [betAmount, setBetAmount] = useState(1);
+  const [betAmount, setBetAmount] = useState(20);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isTumbling, setIsTumbling] = useState(false);
   const [message, setMessage] = useState('Place your bet and spin!');
@@ -116,6 +116,7 @@ export default function SweetBonanza() {
   const [autoPlay, setAutoPlay] = useState(false);
   const [spinHistory, setSpinHistory] = useState<{ win: number; bet: number }[]>([]);
   const [totalBonusWin, setTotalBonusWin] = useState(0);
+  const [showHugeWin, setShowHugeWin] = useState(false);
 
   // Initialize grid
   useEffect(() => {
@@ -375,6 +376,12 @@ export default function SweetBonanza() {
         setTotalBonusWin(prev => prev + finalWin);
       }
       
+      // Show huge win popup for 20x+ wins
+      if (finalWin >= betAmount * 20) {
+        setShowHugeWin(true);
+        setTimeout(() => setShowHugeWin(false), 3000);
+      }
+      
       const tumbleText = tumbles > 1 ? ` (${tumbles} tumbles!)` : '';
       const multiplierText = totalMultiplier > 1 ? ` ${totalMultiplier}x!` : '';
       setMessage(`Total Win: $${finalWin.toFixed(2)}${tumbleText}${multiplierText}`);
@@ -407,7 +414,7 @@ export default function SweetBonanza() {
   };
 
   const adjustBet = (amount: number) => {
-    const newBet = Math.max(0.20, Math.min(125, betAmount + amount));
+    const newBet = Math.max(20, Math.min(500, betAmount + amount));
     setBetAmount(Math.round(newBet * 100) / 100);
   };
 
@@ -442,6 +449,26 @@ export default function SweetBonanza() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-500 via-purple-600 to-indigo-800 p-2 md:p-4">
+      {/* Huge Win Popup */}
+      {showHugeWin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600 p-8 rounded-3xl border-4 border-white shadow-2xl animate-bounce">
+            <div className="text-center">
+              <div className="text-6xl mb-4">🎉💰🎉</div>
+              <h2 className="text-4xl md:text-6xl font-black text-white drop-shadow-lg animate-pulse">
+                HUGE WIN LIL BRO
+              </h2>
+              <div className="text-3xl md:text-5xl font-bold text-yellow-300 mt-4">
+                ${lastWin.toFixed(2)}
+              </div>
+              <div className="text-xl text-white/80 mt-2">
+                {(lastWin / betAmount).toFixed(1)}x your bet!
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Candy Background Decorations */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-10 left-10 text-6xl opacity-20 animate-bounce">🍬</div>
@@ -534,7 +561,7 @@ export default function SweetBonanza() {
             {/* Bet Controls */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => adjustBet(-1)}
+                onClick={() => adjustBet(-20)}
                 disabled={isSpinning || isTumbling || isFreeSpinMode}
                 className="w-10 h-10 bg-red-500 hover:bg-red-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
               >
@@ -545,7 +572,7 @@ export default function SweetBonanza() {
                 <div className="text-white font-bold text-lg">${betAmount.toFixed(2)}</div>
               </div>
               <button
-                onClick={() => adjustBet(1)}
+                onClick={() => adjustBet(20)}
                 disabled={isSpinning || isTumbling || isFreeSpinMode}
                 className="w-10 h-10 bg-green-500 hover:bg-green-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
               >
@@ -555,7 +582,7 @@ export default function SweetBonanza() {
 
             {/* Quick Bet Buttons */}
             <div className="flex gap-2">
-              {[1, 5, 10, 25].map(amount => (
+              {[20, 50, 100, 200].map(amount => (
                 <button
                   key={amount}
                   onClick={() => setBetAmount(amount)}
