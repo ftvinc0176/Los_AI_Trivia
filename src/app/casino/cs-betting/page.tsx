@@ -336,23 +336,23 @@ export default function CSBetting() {
     addFloor(tSpawnFloor);
 
     // === T APARTMENTS ===
-    buildRoom(-20, -55, 10, 15, [
-      { side: 's', pos: 0, width: 5 },
-      { side: 'n', pos: 0, width: 4 },
+    buildRoom(-20, -55, 12, 18, [
+      { side: 's', pos: 0, width: 10 },
+      { side: 'n', pos: 0, width: 10 },
     ]);
 
     // === B APARTMENTS CORRIDOR ===
-    buildRoom(-30, -35, 12, 25, [
-      { side: 's', pos: 0, width: 4 },
-      { side: 'n', pos: 0, width: 5 },
-      { side: 'e', pos: 5, width: 4 },
+    buildRoom(-30, -35, 15, 28, [
+      { side: 's', pos: 0, width: 10 },
+      { side: 'n', pos: 0, width: 10 },
+      { side: 'e', pos: 5, width: 10 },
     ]);
 
     // === B SITE ===
-    buildRoom(-40, -5, 25, 25, [
-      { side: 's', pos: 5, width: 5 },
-      { side: 'e', pos: 0, width: 6 },
-      { side: 'e', pos: -8, width: 4 },
+    buildRoom(-40, -5, 30, 30, [
+      { side: 's', pos: 5, width: 12 },
+      { side: 'e', pos: 0, width: 12 },
+      { side: 'e', pos: -10, width: 10 },
     ], false);
 
     const bBox = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
@@ -363,19 +363,19 @@ export default function CSBetting() {
     addMesh(bBox2);
 
     // === UNDERPASS ===
-    buildRoom(-18, -25, 10, 20, [
-      { side: 'w', pos: 5, width: 4 },
-      { side: 'n', pos: 0, width: 4 },
-      { side: 'e', pos: -5, width: 4 },
+    buildRoom(-18, -25, 14, 22, [
+      { side: 'w', pos: 5, width: 10 },
+      { side: 'n', pos: 0, width: 10 },
+      { side: 'e', pos: -5, width: 10 },
     ]);
 
     // === MID ===
-    buildRoom(0, -35, 15, 40, [
-      { side: 's', pos: 0, width: 5 },
-      { side: 'n', pos: 0, width: 6 },
-      { side: 'w', pos: 5, width: 4 },
-      { side: 'e', pos: -10, width: 4 },
-      { side: 'e', pos: 10, width: 4 },
+    buildRoom(0, -35, 20, 45, [
+      { side: 's', pos: 0, width: 12 },
+      { side: 'n', pos: 0, width: 12 },
+      { side: 'w', pos: 5, width: 10 },
+      { side: 'e', pos: -12, width: 10 },
+      { side: 'e', pos: 12, width: 10 },
     ], false);
 
     const midBox = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 4), woodMat);
@@ -383,47 +383,47 @@ export default function CSBetting() {
     addMesh(midBox);
 
     // === WINDOW ROOM ===
-    buildRoom(20, -45, 12, 12, [
-      { side: 'w', pos: 0, width: 4 },
-      { side: 'e', pos: 0, width: 4 },
+    buildRoom(20, -45, 14, 14, [
+      { side: 'w', pos: 0, width: 10 },
+      { side: 'e', pos: 0, width: 10 },
     ]);
 
     // === A SHORT ===
-    buildRoom(20, -20, 12, 15, [
-      { side: 'w', pos: 0, width: 4 },
-      { side: 'e', pos: 0, width: 5 },
+    buildRoom(20, -20, 15, 18, [
+      { side: 'w', pos: 0, width: 10 },
+      { side: 'e', pos: 0, width: 12 },
     ]);
 
     // === CONNECTOR ===
-    buildRoom(0, -5, 15, 20, [
-      { side: 's', pos: 0, width: 6 },
-      { side: 'n', pos: 0, width: 6 },
+    buildRoom(0, -5, 18, 22, [
+      { side: 's', pos: 0, width: 12 },
+      { side: 'n', pos: 0, width: 12 },
     ]);
 
     // === T RAMP ===
-    buildRoom(20, -60, 10, 20, [
-      { side: 's', pos: 0, width: 4 },
-      { side: 'n', pos: 0, width: 4 },
+    buildRoom(20, -60, 14, 22, [
+      { side: 's', pos: 0, width: 10 },
+      { side: 'n', pos: 0, width: 10 },
     ]);
 
     // === PALACE ===
-    buildRoom(35, -45, 15, 15, [
-      { side: 's', pos: 0, width: 4 },
-      { side: 'e', pos: 0, width: 5 },
-      { side: 'n', pos: 3, width: 4 },
+    buildRoom(35, -45, 18, 18, [
+      { side: 's', pos: 0, width: 10 },
+      { side: 'e', pos: 0, width: 10 },
+      { side: 'n', pos: 3, width: 10 },
     ]);
 
-    buildRoom(35, -30, 12, 12, [
-      { side: 's', pos: 3, width: 4 },
-      { side: 'e', pos: 0, width: 4 },
+    buildRoom(35, -30, 14, 14, [
+      { side: 's', pos: 3, width: 10 },
+      { side: 'e', pos: 0, width: 10 },
     ]);
 
     // === A SITE ===
-    buildRoom(50, -20, 30, 35, [
-      { side: 'w', pos: 5, width: 5 },
-      { side: 'w', pos: -8, width: 5 },
-      { side: 's', pos: 0, width: 4 },
-      { side: 'n', pos: 5, width: 6 },
+    buildRoom(50, -20, 35, 40, [
+      { side: 'w', pos: 5, width: 12 },
+      { side: 'w', pos: -10, width: 12 },
+      { side: 's', pos: 0, width: 10 },
+      { side: 'n', pos: 5, width: 12 },
     ], false);
 
     const aDefault = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), woodMat);
@@ -434,16 +434,16 @@ export default function CSBetting() {
     addMesh(aTriple);
 
     // === CT SPAWN ===
-    buildRoom(25, 15, 40, 20, [
-      { side: 's', pos: -12, width: 6 },
-      { side: 's', pos: 12, width: 6 },
-      { side: 'w', pos: 0, width: 5 },
+    buildRoom(25, 15, 45, 25, [
+      { side: 's', pos: -14, width: 12 },
+      { side: 's', pos: 14, width: 12 },
+      { side: 'w', pos: 0, width: 12 },
     ], false);
 
     // === MARKET ===
-    buildRoom(-10, 10, 15, 15, [
-      { side: 'e', pos: 0, width: 5 },
-      { side: 'w', pos: 0, width: 5 },
+    buildRoom(-10, 10, 18, 18, [
+      { side: 'e', pos: 0, width: 12 },
+      { side: 'w', pos: 0, width: 12 },
     ]);
 
     // === BOUNDARY WALLS ===
@@ -589,7 +589,7 @@ export default function CSBetting() {
           capsule: new Capsule(
             new THREE.Vector3(xOffset, 0.5, -70),
             new THREE.Vector3(xOffset, 4.5, -70),
-            1.0 // Larger radius for bigger model
+            0.6 // Smaller radius for easier navigation
           ),
           velocity: new THREE.Vector3(),
           health: 100,
@@ -617,7 +617,7 @@ export default function CSBetting() {
           capsule: new Capsule(
             new THREE.Vector3(xOffset, 0.5, 15),
             new THREE.Vector3(xOffset, 4.5, 15),
-            1.0 // Larger radius for bigger model
+            0.6 // Smaller radius for easier navigation
           ),
           velocity: new THREE.Vector3(),
           health: 100,
@@ -799,7 +799,7 @@ export default function CSBetting() {
       const testCapsule = new Capsule(
         new THREE.Vector3(pos.x, 0.5, pos.z),
         new THREE.Vector3(pos.x, 4, pos.z),
-        1.2 // Larger radius for bigger models
+        0.8 // Check with slightly larger radius for safety margin
       );
       return !worldOctree.capsuleIntersect(testCapsule);
     };
@@ -1077,23 +1077,29 @@ export default function CSBetting() {
 
         // Movement with smart obstacle avoidance
         if (bot.targetPosition && !bot.isPlanting) {
-          const speed = 10; // Slightly faster for bigger map feel
+          const speed = 12; // Fast movement
           
           // Get a clear direction toward target, avoiding walls
-          const moveDir = findClearDirection(botPos.clone().setY(2), bot.targetPosition.clone().setY(2), bot);
+          let moveDir = findClearDirection(botPos.clone().setY(2), bot.targetPosition.clone().setY(2), bot);
           
-          if (moveDir) {
+          // If no clear direction found, try moving directly anyway (will slide on walls)
+          if (!moveDir) {
+            moveDir = bot.targetPosition.clone().sub(botPos).normalize();
+            moveDir.y = 0;
+          }
+          
+          if (moveDir && moveDir.length() > 0.01) {
             bot.facingDirection.copy(moveDir);
             
             // Calculate new position
             const newX = bot.capsule.start.x + moveDir.x * speed * deltaTime;
             const newZ = bot.capsule.start.z + moveDir.z * speed * deltaTime;
             
-            // Create test capsule at new position (larger for bigger models)
+            // Create test capsule at new position (sized for model)
             const testCapsule = new Capsule(
               new THREE.Vector3(newX, 0.5, newZ),
               new THREE.Vector3(newX, 4.5, newZ),
-              1.0
+              0.6
             );
             
             // Check collision with world
@@ -1121,7 +1127,7 @@ export default function CSBetting() {
                 const testSlide = new Capsule(
                   new THREE.Vector3(slideX, 0.5, slideZ),
                   new THREE.Vector3(slideX, 4.5, slideZ),
-                  1.0
+                  0.6
                 );
                 
                 if (!worldOctree.capsuleIntersect(testSlide)) {
