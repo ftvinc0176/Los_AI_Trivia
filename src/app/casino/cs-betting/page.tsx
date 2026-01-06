@@ -56,15 +56,15 @@ const WALLS: {x:number,y:number,w:number,h:number}[] = [
 ];
 
 // Bomb sites - top of map
-const SITE_A = {x:180,y:100,r:70};
-const SITE_B = {x:1020,y:100,r:70};
+const SITE_A = {x:180,y:150,r:70};
+const SITE_B = {x:1020,y:150,r:70};
 
-// Spawn points - VERY far apart (800px vertical distance!)
+// Spawn points - well inside map boundaries
 const T_SPAWNS = [
-  {x:500,y:850},{x:560,y:850},{x:620,y:850},{x:680,y:850},{x:600,y:820}
+  {x:500,y:800},{x:560,y:800},{x:620,y:800},{x:680,y:800},{x:600,y:770}
 ];
 const CT_SPAWNS = [
-  {x:400,y:50},{x:500,y:50},{x:600,y:50},{x:700,y:50},{x:800,y:50}
+  {x:400,y:180},{x:500,y:180},{x:600,y:180},{x:700,y:180},{x:800,y:180}
 ];
 
 type TeamType = 'T' | 'CT';
@@ -592,8 +592,8 @@ export default function CSBetting() {
               if (wpDist < 25) {
                 bot.pathIndex++;
               } else {
-                // Speed varies by skill and team - more balanced
-                const baseSpeed = 110 + bot.skill * 20; // 88-132 base
+                // Speed varies by skill
+                const baseSpeed = 100 + bot.skill * 30;
                 const speed = baseSpeed * dt;
                 const nx = bot.x + (dx / wpDist) * speed;
                 const ny = bot.y + (dy / wpDist) * speed;
@@ -615,6 +615,25 @@ export default function CSBetting() {
                       bot.stuck = 0;
                     }
                   }
+                }
+              }
+            } else {
+              // No path found - try direct movement
+              const dx = goalX - bot.x;
+              const dy = goalY - bot.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist > 0) {
+                const speed = 100 * dt;
+                const nx = bot.x + (dx / dist) * speed;
+                const ny = bot.y + (dy / dist) * speed;
+                if (!inWall(nx, ny)) {
+                  bot.x = nx;
+                  bot.y = ny;
+                  bot.angle = Math.atan2(dy, dx);
+                } else if (!inWall(nx, bot.y)) {
+                  bot.x = nx;
+                } else if (!inWall(bot.x, ny)) {
+                  bot.y = ny;
                 }
               }
             }
