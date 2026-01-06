@@ -33,7 +33,7 @@ function AndarBaharGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordBet } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'dealing' | 'results'>('lobby');
@@ -264,6 +264,7 @@ function AndarBaharGame() {
       setCurrentBet(bet);
       setBetSide(side);
       setBalance(balance - bet);
+      recordBet(bet); // Track wager for leaderboard
       
       if (socket) {
         socket.emit('andarBaharPlaceBet', { roomId, bet, side });
@@ -349,7 +350,6 @@ function AndarBaharGame() {
       const profit = payout - bet;
       setBalance(prev => prev + payout);
       setResultMessage(`🎉 ${winner.toUpperCase()} wins! You won $${profit}!`);
-      recordWin(profit); // Record win for leaderboard
     } else {
       setResultMessage(`${winner?.toUpperCase()} wins. You lost $${bet}.`);
     }

@@ -14,7 +14,7 @@ type GamePhase = 'betting' | 'preflop' | 'flop' | 'river' | 'showdown';
 
 export default function UltimateTexasHoldem() {
   const router = useRouter();
-  const { balance, setBalance, recordWin, checkAndReload } = useCasino();
+  const { balance, setBalance, recordBet, checkAndReload } = useCasino();
 
   const [phase, setPhase] = useState<GamePhase>('betting');
   const [deck, setDeck] = useState<Card[]>([]);
@@ -64,7 +64,9 @@ export default function UltimateTexasHoldem() {
       return;
     }
 
-    setBalance(balance - (anteBet + blindBet + tripsBet));
+    const totalBet = anteBet + blindBet + tripsBet;
+    setBalance(balance - totalBet);
+    recordBet(totalBet); // Track wager for leaderboard
 
     const gameDeck = createDeck();
     const player = [gameDeck.pop()!, gameDeck.pop()!];
@@ -318,9 +320,8 @@ export default function UltimateTexasHoldem() {
     setMessage(resultMsg);
     setBalance(balance + totalWin);
     
-    if (profit > 0) {
-      recordWin(profit);
-    }
+    // Check and reload if needed
+    setTimeout(() => checkAndReload(), 100);
   };
 
   const getTripsMultiplier = (rank: number): number => {

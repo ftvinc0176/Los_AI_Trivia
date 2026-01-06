@@ -26,7 +26,7 @@ function BaccaratGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordBet } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'dealing' | 'results'>('lobby');
@@ -204,6 +204,7 @@ function BaccaratGame() {
     if (isNaN(amount) || amount <= 0 || amount > balance) return;
 
     setBalance(prev => prev - amount);
+    recordBet(amount); // Track wager for leaderboard
     setMyBet({ type: selectedBet, amount });
     
     // Start dealing
@@ -328,7 +329,6 @@ function BaccaratGame() {
       const profit = win - betAmt;
       setBalance(prev => prev + win);
       setWinnings(win);
-      recordWin(profit); // Record win for leaderboard
     }
   };
 

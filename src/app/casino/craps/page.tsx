@@ -26,7 +26,7 @@ interface Die {
 
 export default function Craps() {
   const router = useRouter();
-  const { balance, setBalance, recordWin, checkAndReload } = useCasino();
+  const { balance, setBalance, recordBet, checkAndReload } = useCasino();
 
   const [dice, setDice] = useState<Die[]>([
     { value: 1, rolling: false },
@@ -259,10 +259,6 @@ export default function Craps() {
     }
     setMessage(msg);
 
-    if (winnings > losses) {
-      recordWin(netChange);
-    }
-
     // Check if reload needed
     setTimeout(() => checkAndReload(), 100);
   };
@@ -364,6 +360,7 @@ export default function Craps() {
     }
     
     setBalance(balance - betAmount);
+    recordBet(betAmount); // Track wager for leaderboard
     setMessage(`$${betAmount} on ${formatBetName(type)}`);
   };
 

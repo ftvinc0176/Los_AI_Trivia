@@ -106,7 +106,7 @@ const REEL_MAX_ROWS = [7, 8, 8, 8, 8, 7]; // Max symbols per reel (Megaways styl
 
 export default function MadameDestinyMegaways() {
   const router = useRouter();
-  const { balance, setBalance, recordWin, checkAndReload } = useCasino();
+  const { balance, setBalance, recordBet, checkAndReload } = useCasino();
   
   const [grid, setGrid] = useState<Symbol[][]>([]);
   const [reelSizes, setReelSizes] = useState<number[]>([4, 4, 4, 4, 4, 4]);
@@ -199,6 +199,7 @@ export default function MadameDestinyMegaways() {
         return;
       }
       setBalance(balance - effectiveBet);
+      recordBet(effectiveBet); // Track wager for leaderboard
     } else {
       setFreeSpins(prev => prev - 1);
     }
@@ -423,7 +424,6 @@ export default function MadameDestinyMegaways() {
     
     if (accumulatedWin > 0) {
       setBalance(balance + accumulatedWin);
-      recordWin(accumulatedWin);
       
       if (isFreeSpinMode) {
         setTotalBonusWin(prev => prev + accumulatedWin);

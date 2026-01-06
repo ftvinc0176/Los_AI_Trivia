@@ -99,7 +99,7 @@ const BOMB_MULTIPLIERS = [2, 3, 5, 8, 10, 15, 20, 25, 50, 100];
 
 export default function SweetBonanza() {
   const router = useRouter();
-  const { balance, setBalance, recordWin, checkAndReload } = useCasino();
+  const { balance, setBalance, recordBet, checkAndReload } = useCasino();
   
   const [grid, setGrid] = useState<Symbol[][]>([]);
   const [betAmount, setBetAmount] = useState(20);
@@ -175,6 +175,7 @@ export default function SweetBonanza() {
         return;
       }
       setBalance(balance - betAmount);
+      recordBet(betAmount); // Track wager for leaderboard
     } else {
       setFreeSpins(prev => prev - 1);
     }
@@ -372,7 +373,6 @@ export default function SweetBonanza() {
     // Pay out the total win
     if (finalWin > 0) {
       setBalance(balance + finalWin);
-      recordWin(finalWin);
       setSpinHistory(prev => [...prev.slice(-9), { win: finalWin, bet: betAmount }]);
       
       // Track total bonus winnings across all free spins

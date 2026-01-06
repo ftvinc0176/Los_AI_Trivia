@@ -8,14 +8,14 @@ type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'ultimate-holdem'
 
 export default function Casino() {
   const router = useRouter();
-  const { playerName, setPlayerName, balance, setBalance, isLoggedIn, logout, highestBalances, biggestWins, checkAndReload } = useCasino();
+  const { playerName, balance, setBalance, isLoggedIn, logout, highestBalances, mostWagered, checkAndReload, loginWithUsername } = useCasino();
   const [selectedGame, setSelectedGame] = useState<GameType>(null);
   const [showMultiplayerOptions, setShowMultiplayerOptions] = useState(false);
   const [nameInput, setNameInput] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (nameInput.trim()) {
-      setPlayerName(nameInput.trim());
+      await loginWithUsername(nameInput.trim());
     }
   };
 
@@ -435,16 +435,16 @@ export default function Casino() {
         )}
           </div>
 
-          {/* Right Leaderboard - Biggest Wins */}
+          {/* Right Leaderboard - Most Wagered */}
           <div className="lg:w-64 flex-shrink-0">
             <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-lg rounded-2xl p-4 border border-green-500/30 sticky top-4">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">💰</span>
-                <h3 className="text-lg font-bold text-green-400">Biggest Wins</h3>
+                <span className="text-2xl">🎲</span>
+                <h3 className="text-lg font-bold text-green-400">Most Wagered</h3>
               </div>
-              {biggestWins.length > 0 ? (
+              {mostWagered.length > 0 ? (
                 <div className="space-y-2">
-                  {biggestWins.map((entry, i) => (
+                  {mostWagered.map((entry, i) => (
                     <div 
                       key={i} 
                       className={`flex items-center justify-between p-2 rounded-lg ${
@@ -459,13 +459,13 @@ export default function Casino() {
                         </span>
                         <span className="text-white font-medium text-sm truncate max-w-20">{entry.name}</span>
                       </div>
-                      <span className="text-green-400 font-bold text-sm">+${entry.amount.toLocaleString()}</span>
+                      <span className="text-green-400 font-bold text-sm">${entry.amount.toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-white/40 text-center text-sm py-4">
-                  No big wins yet!<br/>Win big to get listed
+                  No wagers yet!<br/>Place bets to get listed
                 </div>
               )}
             </div>

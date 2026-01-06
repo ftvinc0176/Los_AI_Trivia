@@ -36,7 +36,7 @@ interface Bullet {
 
 export default function CSBetting() {
   const router = useRouter();
-  const { balance, setBalance, recordWin, checkAndReload } = useCasino();
+  const { balance, setBalance, recordBet, checkAndReload } = useCasino();
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Game state
@@ -72,6 +72,7 @@ export default function CSBetting() {
     if (currentBet <= 0 || currentBet > balance) return;
     setBetOnPlant(onPlant);
     setBalance(balance - currentBet);
+    recordBet(currentBet); // Track wager for leaderboard
     setRoundPhase('playing');
     roundPhaseRef.current = 'playing';
   };
@@ -1335,7 +1336,6 @@ export default function CSBetting() {
       if (won) {
         const winAmount = currentBet * 2;
         setBalance(balance + winAmount);
-        recordWin(currentBet); // Record profit only
         setBetResult({ won: true, amount: currentBet });
       } else {
         setBetResult({ won: false, amount: currentBet });

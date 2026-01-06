@@ -31,7 +31,7 @@ function BlackjackGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
-  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordWin, checkAndReload } = useCasino();
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance, recordBet, checkAndReload } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'playing' | 'results'>('lobby');
@@ -294,6 +294,7 @@ function BlackjackGame() {
       
       setBetAmount(bet);
       setBalance(balance - totalBet);
+      recordBet(totalBet); // Track total wagered
       
       if (socket) {
         console.log('Emitting casinoPlaceBet with:', { roomId, bet, sideBets });
@@ -417,7 +418,6 @@ function BlackjackGame() {
     } else if (playerValue === 21) {
       message = 'Blackjack! You win!';
       winAmount = bet + Math.floor(bet * 1.5); // Blackjack pays 3:2
-      recordWin(Math.floor(bet * 1.5)); // Record the profit
     } else if (dealerValue === 21) {
       message = 'Dealer Blackjack. You lose.';
       winAmount = 0;
@@ -845,11 +845,6 @@ function BlackjackGame() {
         results.push(message);
       }
       
-      const profit = totalWinnings - (splitBets[0] + splitBets[1]);
-      if (profit > 0) {
-        recordWin(profit);
-      }
-      
       setBalance(balance + totalWinnings);
       setResultMessage(results.join(' | '));
       setRoundResults({ 'single': results.join(' | ') });
@@ -879,12 +874,6 @@ function BlackjackGame() {
     } else {
       message = 'Push! Bet returned.';
       winAmount = finalBet;
-    }
-    
-    // Record the win for leaderboard (profit, not total return)
-    const profit = winAmount - finalBet;
-    if (profit > 0) {
-      recordWin(profit);
     }
     
     setBalance(balance + winAmount);

@@ -14,7 +14,7 @@ type GamePhase = 'betting' | 'preflop' | 'flop' | 'turn' | 'showdown' | 'result'
 
 function UltimateTexasHoldemContent() {
   const router = useRouter();
-  const { balance, setBalance, recordWin, checkAndReload } = useCasino();
+  const { balance, setBalance, recordBet, checkAndReload } = useCasino();
 
   const [gamePhase, setGamePhase] = useState<GamePhase>('betting');
   const [deck, setDeck] = useState<Card[]>([]);
@@ -237,11 +237,6 @@ function UltimateTexasHoldemContent() {
     setBalance(balance + winnings);
     setPayouts(payoutDetails);
     setGamePhase('result');
-
-    const profit = winnings - (anteAmount + blindAmount + tripsAmount + playBet);
-    if (profit > 0) {
-      recordWin(profit);
-    }
   };
 
   const getTripsPayout = (rank: number): number => {
@@ -376,6 +371,7 @@ function UltimateTexasHoldemContent() {
     }
 
     setBalance(balance - betAmount);
+    recordBet(betAmount); // Track wager for leaderboard
 
     if (type === 'ante') {
       setAnteAmount(anteAmount + betAmount);
