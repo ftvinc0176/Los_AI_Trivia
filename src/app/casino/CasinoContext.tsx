@@ -55,6 +55,20 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
     if (savedName) {
       setPlayerName(savedName);
       setIsLoggedIn(true);
+      
+      // If there's an existing peak balance, submit it to leaderboard
+      const peakToSubmit = savedPeak ? parseInt(savedPeak) : (savedBalance ? parseInt(savedBalance) : 25000);
+      if (peakToSubmit > 25000) {
+        fetch('/api/leaderboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'balance',
+            name: savedName,
+            amount: peakToSubmit
+          })
+        }).catch(err => console.error('Failed to sync peak balance:', err));
+      }
     }
     if (savedBalance) {
       setBalance(parseInt(savedBalance));
