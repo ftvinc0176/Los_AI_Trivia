@@ -141,42 +141,42 @@ function TexasHoldemGameContent() {
     let workingPot = currentPot;
     let workingBet = currentBetAmount;
     let index = startIndex;
+    let cycleCount = 0;
+    const maxCycles = 50; // Safety limit
 
-    while (true) {
-      const activePlayers = workingPlayers.filter(p => !p.hasFolded && !p.isAllIn);
+    while (cycleCount < maxCycles) {
+      cycleCount++;
       
-      // Check if betting round is complete
-      if (activePlayers.length === 0 || 
-          (activePlayers.length === 1 && activePlayers[0].id === 'player')) {
-        // Move to next phase or showdown
-        const nonFoldedPlayers = workingPlayers.filter(p => !p.hasFolded);
-        if (nonFoldedPlayers.length === 1 || phase === 'river' || activePlayers.length === 0) {
-          await resolveShowdown(workingPlayers, workingPot, currentDeck, currentCommunity);
-          setIsProcessing(false);
-          return;
-        } else {
-          await advancePhase(workingPlayers, workingPot, currentDeck, currentCommunity);
-          setIsProcessing(false);
-          return;
-        }
+      const activePlayers = workingPlayers.filter(p => !p.hasFolded && !p.isAllIn);
+      const nonFoldedPlayers = workingPlayers.filter(p => !p.hasFolded);
+      
+      // If only one player left, they win
+      if (nonFoldedPlayers.length === 1) {
+        await resolveShowdown(workingPlayers, workingPot, currentDeck, currentCommunity);
+        setIsProcessing(false);
+        return;
+      }
+      
+      // If no active players left (all all-in or folded), go to showdown
+      if (activePlayers.length === 0) {
+        await resolveShowdown(workingPlayers, workingPot, currentDeck, currentCommunity);
+        setIsProcessing(false);
+        return;
       }
 
-      // Check if all active players have matching bets
+      // Check if all active players have matching bets (betting round complete)
       const maxBet = Math.max(...workingPlayers.map(p => p.currentBet));
       const allMatched = activePlayers.every(p => p.currentBet === maxBet);
       
       if (allMatched) {
         // Betting round complete, advance phase
-        const nonFoldedPlayers = workingPlayers.filter(p => !p.hasFolded);
-        if (nonFoldedPlayers.length === 1 || phase === 'river') {
+        if (phase === 'river') {
           await resolveShowdown(workingPlayers, workingPot, currentDeck, currentCommunity);
-          setIsProcessing(false);
-          return;
         } else {
           await advancePhase(workingPlayers, workingPot, currentDeck, currentCommunity);
-          setIsProcessing(false);
-          return;
         }
+        setIsProcessing(false);
+        return;
       }
 
       const currentPlayer = workingPlayers[index];
@@ -198,9 +198,11 @@ function TexasHoldemGameContent() {
       }
 
       // AI's turn
+      console.log(`AI ${currentPlayer.name} acting, currentBet: ${workingBet}, playerBet: ${currentPlayer.currentBet}`);
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const action = getAIAction(currentPlayer, workingBet, currentCommunity);
+      console.log(`AI ${currentPlayer.name} chose action: ${action.type}`);
       
       if (action.type === 'fold') {
         currentPlayer.hasFolded = true;
@@ -338,18 +340,25 @@ function TexasHoldemGameContent() {
     
     // Find first non-folded, non-all-in player after dealer
     let nextPlayerIndex = (dealerIndex + 1) % 4;
-    while (workingPlayers[nextPlayerIndex].hasFolded || workingPlayers[nextPlayerIndex].isAllIn) {
+    let searchCount = 0;
+    while ((workingPlayers[nextPlayerIndex].hasFolded || workingPlayers[nextPlayerIndex].isAllIn) && searchCount < 4) {
       nextPlayerIndex = (nextPlayerIndex + 1) % 4;
-      if (nextPlayerIndex === dealerIndex) break;
+      searchCount++;
     }
 
     setActivePlayerIndex(nextPlayerIndex);
     setPlayers(workingPlayers);
     setPot(workingPot);
+    setIsProcessing(false); // Important: reset processing flag
 
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    if (workingPlayers[nextPlayerIndex].id !== 'player') {
+    // Check if there are any active players left
+    const activePlayersRemaining = workingPlayers.filter(p => !p.hasFolded && !p.isAllIn);
+    if (activePlayersRemaining.length === 0) {
+      // Everyone is all-in or folded except one, go to showdown
+      resolveShowdown(workingPlayers, workingPot, gameDeck, newCommunity);
+    } else if (workingPlayers[nextPlayerIndex].id !== 'player') {
       processAITurns(workingPlayers, workingPot, 0, nextPlayerIndex, gameDeck, newCommunity);
     }
   };
@@ -463,7 +472,14 @@ function TexasHoldemGameContent() {
   };
 
   const handlePlayerAction = (action: 'fold' | 'call' | 'raise' | 'check' | 'allin', raiseTotal?: number) => {
-    if (activePlayerIndex < 0 || players[activePlayerIndex]?.id !== 'player' || isProcessing) return;
+    if (activePlayerIndex < 0 || players[activePlayerIndex]?.id !== 'player') {
+      console.log('Cannot act: not player turn', { activePlayerIndex, playerId: players[activePlayerIndex]?.id });
+      return;
+    }
+    if (isProcessing) {
+      console.log('Cannot act: already processing');
+      return;
+    }
 
     const workingPlayers = [...players];
     const player = workingPlayers[activePlayerIndex];
@@ -663,7 +679,7 @@ function TexasHoldemGameContent() {
             {showdown && winner && (
               <div className="text-center">
                 <div className="text-2xl font-bold text-yellow-400 mb-2">{winner.name} wins!</div>
-                <div className="text-xl text-white mb-2">{winner.rankName}</div>
+                <div className="text-xl text-white mb-2">{winner.handRank}</div>
                 <div className="text-lg text-green-400">${winner.winAmount.toLocaleString()}</div>
                 <button
                   onClick={dealNewHand}
