@@ -4,54 +4,67 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCasino } from '../CasinoContext';
 
-// Simple open map - Dust2 style with wide lanes
-const MAP_W = 800;
-const MAP_H = 600;
+// LARGER MAP - More space for tactical gameplay
+const MAP_W = 1200;
+const MAP_H = 900;
 
-// Grid for pathfinding (20x20 tiles)
+// Grid for pathfinding (30x22.5 tiles)
 const TILE = 40;
 const GRID_W = MAP_W / TILE;
 const GRID_H = MAP_H / TILE;
 
-// Simple wall layout - wide corridors, no tight spaces
+// Wall layout - open with cover, sites at top
 const WALLS: {x:number,y:number,w:number,h:number}[] = [
   // Outer walls
   {x:0,y:0,w:MAP_W,h:10},{x:0,y:MAP_H-10,w:MAP_W,h:10},
   {x:0,y:0,w:10,h:MAP_H},{x:MAP_W-10,y:0,w:10,h:MAP_H},
   
-  // Center divider with gaps
-  {x:350,y:10,w:20,h:150},
-  {x:350,y:250,w:20,h:100},
-  {x:350,y:450,w:20,h:140},
+  // === TOP AREA (CT side / Sites) ===
+  // A site area (left side)
+  {x:100,y:120,w:80,h:30},
+  {x:250,y:80,w:30,h:60},
   
-  // A site cover boxes
-  {x:150,y:80,w:60,h:40},
-  {x:250,y:150,w:40,h:50},
+  // B site area (right side)
+  {x:1000,y:120,w:80,h:30},
+  {x:920,y:80,w:30,h:60},
   
-  // B site cover boxes  
-  {x:550,y:80,w:60,h:40},
-  {x:650,y:150,w:40,h:50},
+  // === MID SECTION ===
+  // Left corridor walls
+  {x:180,y:280,w:100,h:20},
+  {x:180,y:380,w:20,h:100},
   
-  // Mid cover
-  {x:380,y:280,w:40,h:40},
+  // Center structure
+  {x:550,y:300,w:100,h:20},
+  {x:550,y:380,w:100,h:20},
+  {x:550,y:300,w:20,h:100},
+  {x:630,y:300,w:20,h:100},
   
-  // Lower area obstacles
-  {x:100,y:400,w:80,h:30},
-  {x:250,y:480,w:60,h:30},
-  {x:500,y:400,w:80,h:30},
-  {x:620,y:480,w:60,h:30},
+  // Right corridor walls
+  {x:920,y:280,w:100,h:20},
+  {x:1000,y:380,w:20,h:100},
+  
+  // === LOWER MID ===
+  {x:300,y:520,w:80,h:30},
+  {x:820,y:520,w:80,h:30},
+  {x:550,y:550,w:100,h:30},
+  
+  // === T SPAWN AREA (bottom) ===
+  {x:200,y:700,w:100,h:25},
+  {x:500,y:720,w:60,h:25},
+  {x:640,y:720,w:60,h:25},
+  {x:900,y:700,w:100,h:25},
 ];
 
-// Bomb sites - large open areas
-const SITE_A = {x:180,y:120,r:60};
-const SITE_B = {x:620,y:120,r:60};
+// Bomb sites - top of map
+const SITE_A = {x:180,y:100,r:70};
+const SITE_B = {x:1020,y:100,r:70};
 
-// Spawn points - far apart
+// Spawn points - VERY far apart (800px vertical distance!)
 const T_SPAWNS = [
-  {x:100,y:550},{x:150,y:550},{x:200,y:550},{x:250,y:550},{x:300,y:550}
+  {x:500,y:850},{x:560,y:850},{x:620,y:850},{x:680,y:850},{x:600,y:820}
 ];
 const CT_SPAWNS = [
-  {x:500,y:50},{x:550,y:50},{x:600,y:50},{x:650,y:50},{x:700,y:50}
+  {x:400,y:50},{x:500,y:50},{x:600,y:50},{x:700,y:50},{x:800,y:50}
 ];
 
 type TeamType = 'T' | 'CT';
@@ -73,10 +86,11 @@ interface Bot {
   stuck: number;
   lastX: number;
   lastY: number;
+  rushDelay: number; // CT waits before moving
 }
 
 // Check if point is inside any wall
-const inWall = (x: number, y: number, pad = 12): boolean => {
+const inWall = (x: number, y: number, pad = 15): boolean => {
   for (const w of WALLS) {
     if (x >= w.x - pad && x <= w.x + w.w + pad && y >= w.y - pad && y <= w.y + w.h + pad) {
       return true;
@@ -104,7 +118,7 @@ const buildGrid = (): boolean[][] => {
     for (let x = 0; x < GRID_W; x++) {
       const wx = x * TILE + TILE / 2;
       const wy = y * TILE + TILE / 2;
-      grid[y][x] = !inWall(wx, wy, 15);
+      grid[y][x] = !inWall(wx, wy, 18);
     }
   }
   return grid;
@@ -121,23 +135,24 @@ const findPath = (
   let ex = Math.floor(endX / TILE);
   let ey = Math.floor(endY / TILE);
   
-  // Clamp
   const clamp = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
   const sxc = clamp(sx, GRID_W), syc = clamp(sy, GRID_H);
   let exc = clamp(ex, GRID_W), eyc = clamp(ey, GRID_H);
   
   // If end is blocked, find nearby open
   if (!grid[eyc]?.[exc]) {
-    for (let r = 1; r <= 3; r++) {
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
+    for (let r = 1; r <= 5; r++) {
+      let found = false;
+      for (let dy = -r; dy <= r && !found; dy++) {
+        for (let dx = -r; dx <= r && !found; dx++) {
           const ny = eyc + dy, nx = exc + dx;
           if (ny >= 0 && ny < GRID_H && nx >= 0 && nx < GRID_W && grid[ny][nx]) {
             exc = nx; eyc = ny;
-            break;
+            found = true;
           }
         }
       }
+      if (found) break;
     }
   }
   
@@ -151,14 +166,16 @@ const findPath = (
     {dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0},
     {dx:-1,dy:-1},{dx:1,dy:-1},{dx:-1,dy:1},{dx:1,dy:1}
   ];
+
+  let iterations = 0;
+  const maxIterations = 1000;
   
-  while (openSet.length > 0) {
-    // Get lowest f
+  while (openSet.length > 0 && iterations < maxIterations) {
+    iterations++;
     openSet.sort((a, b) => a.f - b.f);
     const current = openSet.shift()!;
     
     if (current.x === exc && current.y === eyc) {
-      // Reconstruct path
       const path: {x:number,y:number}[] = [];
       let node: Node | null = current;
       while (node) {
@@ -178,7 +195,6 @@ const findPath = (
       if (!grid[ny][nx]) continue;
       if (closedSet.has(key(nx, ny))) continue;
       
-      // Diagonal: check both adjacent cells are walkable
       if (dir.dx !== 0 && dir.dy !== 0) {
         if (!grid[current.y][nx] || !grid[ny][current.x]) continue;
       }
@@ -200,7 +216,7 @@ const findPath = (
     }
   }
   
-  return []; // No path
+  return [];
 };
 
 export default function CSBetting() {
@@ -216,9 +232,9 @@ export default function CSBetting() {
   const [round, setRound] = useState(1);
   const [tScore, setTScore] = useState(0);
   const [ctScore, setCTScore] = useState(0);
-  const [time, setTime] = useState(90);
+  const [time, setTime] = useState(120);
   const [bombPlanted, setBombPlanted] = useState(false);
-  const [bombTimer, setBombTimer] = useState(40);
+  const [bombTimer, setBombTimer] = useState(45);
   const [bombPos, setBombPos] = useState<{x:number,y:number} | null>(null);
   const [result, setResult] = useState('');
   const [betResult, setBetResult] = useState<{won:boolean,amt:number} | null>(null);
@@ -234,14 +250,15 @@ export default function CSBetting() {
   const animRef = useRef(0);
   const tScoreRef = useRef(0);
   const ctScoreRef = useRef(0);
+  const gameTimeRef = useRef(0);
 
-  // Init grid once
   useEffect(() => {
     gridRef.current = buildGrid();
   }, []);
 
   const createBots = useCallback((): Bot[] => {
     const b: Bot[] = [];
+    // T side - spawns at bottom, moves immediately
     for (let i = 0; i < 5; i++) {
       b.push({
         id: `T${i+1}`, team: 'T',
@@ -249,9 +266,11 @@ export default function CSBetting() {
         health: 100, alive: true, hasBomb: i === 0,
         plantProg: 0, defuseProg: 0, angle: -Math.PI/2,
         path: [], pathIndex: 0, lastShot: 0,
-        stuck: 0, lastX: T_SPAWNS[i].x, lastY: T_SPAWNS[i].y
+        stuck: 0, lastX: T_SPAWNS[i].x, lastY: T_SPAWNS[i].y,
+        rushDelay: 0 // T moves immediately
       });
     }
+    // CT side - spawns at top, waits 2-4 seconds before pushing
     for (let i = 0; i < 5; i++) {
       b.push({
         id: `CT${i+1}`, team: 'CT',
@@ -259,7 +278,8 @@ export default function CSBetting() {
         health: 100, alive: true, hasBomb: false,
         plantProg: 0, defuseProg: 0, angle: Math.PI/2,
         path: [], pathIndex: 0, lastShot: 0,
-        stuck: 0, lastX: CT_SPAWNS[i].x, lastY: CT_SPAWNS[i].y
+        stuck: 0, lastX: CT_SPAWNS[i].x, lastY: CT_SPAWNS[i].y,
+        rushDelay: 2 + Math.random() * 2 // CT waits 2-4 seconds
       });
     }
     return b;
@@ -280,13 +300,14 @@ export default function CSBetting() {
     bombRef.current = false;
     setBombPos(null);
     bombPosRef.current = null;
-    setTime(90);
-    setBombTimer(40);
+    setTime(120);
+    setBombTimer(45);
     setKills([]);
     setResult('');
     setBetResult(null);
     setPhase('play');
     phaseRef.current = 'play';
+    gameTimeRef.current = 0;
   }, [balance, setBalance, recordBet, createBots]);
 
   const endRound = useCallback((w: TeamType, planted: boolean) => {
@@ -331,10 +352,11 @@ export default function CSBetting() {
     const loop = (now: number) => {
       const dt = (now - lastTime) / 1000;
       lastTime = now;
+      gameTimeRef.current += dt;
       
       if (phaseRef.current !== 'play') return;
 
-      // Timers
+      // Round timer
       timeAcc += dt;
       if (timeAcc >= 1) {
         timeAcc = 0;
@@ -347,6 +369,7 @@ export default function CSBetting() {
         });
       }
       
+      // Bomb timer
       if (bombRef.current) {
         bombAcc += dt;
         if (bombAcc >= 1) {
@@ -379,30 +402,36 @@ export default function CSBetting() {
       for (const bot of cur) {
         if (!bot.alive) continue;
         
+        // CT rush delay - they wait before moving
+        if (bot.team === 'CT' && bot.rushDelay > 0) {
+          bot.rushDelay -= dt;
+          continue;
+        }
+        
         const enemies = bot.team === 'T' ? aliveCT : aliveT;
         
-        // Find visible enemy
+        // Find visible enemy (reduced range for bigger map)
         let target: Bot | null = null;
         let minDist = Infinity;
         for (const e of enemies) {
           const d = Math.hypot(e.x - bot.x, e.y - bot.y);
-          if (d < 300 && hasLOS(bot.x, bot.y, e.x, e.y) && d < minDist) {
+          if (d < 350 && hasLOS(bot.x, bot.y, e.x, e.y) && d < minDist) {
             minDist = d;
             target = e;
           }
         }
 
         if (target) {
-          // Combat
+          // Combat mode
           bot.angle = Math.atan2(target.y - bot.y, target.x - bot.x);
           bot.plantProg = 0;
           bot.defuseProg = 0;
           
-          if (now - bot.lastShot > 300) {
+          if (now - bot.lastShot > 280) {
             bot.lastShot = now;
-            const acc = Math.max(0.4, 1 - minDist / 350);
+            const acc = Math.max(0.35, 1 - minDist / 400);
             if (Math.random() < acc) {
-              target.health -= 20 + Math.random() * 15;
+              target.health -= 18 + Math.random() * 14;
               if (target.health <= 0) {
                 target.health = 0;
                 target.alive = false;
@@ -421,46 +450,56 @@ export default function CSBetting() {
           
           if (bot.team === 'T') {
             if (bot.hasBomb && !bombRef.current) {
+              // Bomber goes to site A or B (randomly picked at start, but prefer A)
               goalX = SITE_A.x;
               goalY = SITE_A.y;
             } else if (bombRef.current && bombPosRef.current) {
-              goalX = bombPosRef.current.x + (Math.random() - 0.5) * 60;
-              goalY = bombPosRef.current.y + (Math.random() - 0.5) * 60;
+              // Guard the bomb
+              goalX = bombPosRef.current.x + (Math.random() - 0.5) * 80;
+              goalY = bombPosRef.current.y + (Math.random() - 0.5) * 80;
             } else {
+              // Follow bomber
               const bomber = cur.find(b => b.hasBomb && b.alive);
               if (bomber && bomber.id !== bot.id) {
-                goalX = bomber.x + (Math.random() - 0.5) * 40;
-                goalY = bomber.y + (Math.random() - 0.5) * 40;
+                goalX = bomber.x + (Math.random() - 0.5) * 50;
+                goalY = bomber.y + (Math.random() - 0.5) * 50;
               } else {
                 goalX = SITE_A.x;
                 goalY = SITE_A.y;
               }
             }
           } else {
+            // CT behavior
             if (bombRef.current && bombPosRef.current) {
+              // Rush to defuse
               goalX = bombPosRef.current.x;
               goalY = bombPosRef.current.y;
             } else {
-              // Spread between sites
+              // Position at sites to defend
               const idx = parseInt(bot.id.slice(2)) - 1;
               if (idx < 3) {
-                goalX = SITE_A.x + (idx - 1) * 40;
-                goalY = SITE_A.y + 30;
+                // A site defense
+                goalX = SITE_A.x + (idx - 1) * 60;
+                goalY = SITE_A.y + 40;
               } else {
-                goalX = SITE_B.x + (idx - 3) * 40;
-                goalY = SITE_B.y + 30;
+                // B site defense
+                goalX = SITE_B.x + (idx - 3.5) * 60;
+                goalY = SITE_B.y + 40;
               }
             }
           }
 
           const distToGoal = Math.hypot(goalX - bot.x, goalY - bot.y);
 
-          // Planting
+          // Planting logic
           if (bot.team === 'T' && bot.hasBomb && !bombRef.current) {
             const distToA = Math.hypot(SITE_A.x - bot.x, SITE_A.y - bot.y);
-            if (distToA < 50) {
+            const distToB = Math.hypot(SITE_B.x - bot.x, SITE_B.y - bot.y);
+            const minSiteDist = Math.min(distToA, distToB);
+            
+            if (minSiteDist < 60) {
               bot.plantProg += dt;
-              if (bot.plantProg >= 3) {
+              if (bot.plantProg >= 3.5) {
                 bombRef.current = true;
                 setBombPlanted(true);
                 bombPosRef.current = { x: bot.x, y: bot.y };
@@ -468,42 +507,43 @@ export default function CSBetting() {
                 bot.hasBomb = false;
                 bot.plantProg = 0;
               }
-              continue; // Don't move while planting
+              continue;
             }
           }
 
-          // Defusing
+          // Defusing logic
           if (bot.team === 'CT' && bombRef.current && bombPosRef.current) {
             const distToBomb = Math.hypot(bombPosRef.current.x - bot.x, bombPosRef.current.y - bot.y);
-            if (distToBomb < 30) {
+            if (distToBomb < 35) {
               bot.defuseProg += dt;
               if (bot.defuseProg >= 5) {
                 endRound('CT', true);
                 return;
               }
-              continue; // Don't move while defusing
+              continue;
             }
           }
 
-          // Move towards goal
-          if (distToGoal > 25) {
-            // Need new path?
-            if (bot.path.length === 0 || bot.pathIndex >= bot.path.length || Math.random() < 0.01) {
+          // Movement
+          if (distToGoal > 30) {
+            // Recalculate path if needed
+            if (bot.path.length === 0 || bot.pathIndex >= bot.path.length || Math.random() < 0.005) {
               bot.path = findPath(grid, bot.x, bot.y, goalX, goalY);
               bot.pathIndex = 0;
             }
 
-            // Follow path
             if (bot.path.length > 0 && bot.pathIndex < bot.path.length) {
               const wp = bot.path[bot.pathIndex];
               const dx = wp.x - bot.x;
               const dy = wp.y - bot.y;
               const wpDist = Math.hypot(dx, dy);
 
-              if (wpDist < 20) {
+              if (wpDist < 25) {
                 bot.pathIndex++;
               } else {
-                const speed = 100 * dt;
+                // T side slightly faster to give head start
+                const baseSpeed = bot.team === 'T' ? 130 : 115;
+                const speed = baseSpeed * dt;
                 const nx = bot.x + (dx / wpDist) * speed;
                 const ny = bot.y + (dy / wpDist) * speed;
                 
@@ -512,15 +552,14 @@ export default function CSBetting() {
                   bot.y = ny;
                   bot.angle = Math.atan2(dy, dx);
                 } else {
-                  // Try sliding along wall
+                  // Wall sliding
                   if (!inWall(nx, bot.y)) {
                     bot.x = nx;
                   } else if (!inWall(bot.x, ny)) {
                     bot.y = ny;
                   } else {
-                    // Stuck - get new path
                     bot.stuck++;
-                    if (bot.stuck > 10) {
+                    if (bot.stuck > 15) {
                       bot.path = [];
                       bot.stuck = 0;
                     }
@@ -530,15 +569,14 @@ export default function CSBetting() {
             }
 
             // Stuck detection
-            if (Math.hypot(bot.x - bot.lastX, bot.y - bot.lastY) < 1) {
+            if (Math.hypot(bot.x - bot.lastX, bot.y - bot.lastY) < 0.5) {
               bot.stuck++;
-              if (bot.stuck > 30) {
+              if (bot.stuck > 40) {
                 bot.path = [];
                 bot.stuck = 0;
-                // Random nudge
                 const angle = Math.random() * Math.PI * 2;
-                const nx = bot.x + Math.cos(angle) * 20;
-                const ny = bot.y + Math.sin(angle) * 20;
+                const nx = bot.x + Math.cos(angle) * 25;
+                const ny = bot.y + Math.sin(angle) * 25;
                 if (!inWall(nx, ny)) {
                   bot.x = nx;
                   bot.y = ny;
@@ -562,21 +600,21 @@ export default function CSBetting() {
     return () => cancelAnimationFrame(animRef.current);
   }, [phase, endRound]);
 
-  // Render
+  // Canvas rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const render = () => {
-      // Background
-      ctx.fillStyle = '#1e293b';
+    const draw = () => {
+      // Dark background
+      ctx.fillStyle = '#1a1f2e';
       ctx.fillRect(0, 0, MAP_W, MAP_H);
 
-      // Grid lines (subtle)
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 0.5;
+      // Draw grid lines (subtle)
+      ctx.strokeStyle = '#252a3a';
+      ctx.lineWidth = 1;
       for (let x = 0; x <= MAP_W; x += TILE) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -590,15 +628,18 @@ export default function CSBetting() {
         ctx.stroke();
       }
 
-      // Walls
-      ctx.fillStyle = '#475569';
+      // Draw walls
+      ctx.fillStyle = '#4a5568';
+      ctx.strokeStyle = '#718096';
+      ctx.lineWidth = 2;
       for (const w of WALLS) {
         ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
       }
 
-      // Bomb sites
+      // Draw bomb sites
       ctx.globalAlpha = 0.3;
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = '#c53030';
       ctx.beginPath();
       ctx.arc(SITE_A.x, SITE_A.y, SITE_A.r, 0, Math.PI * 2);
       ctx.fill();
@@ -609,331 +650,319 @@ export default function CSBetting() {
 
       // Site labels
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 24px Arial';
+      ctx.font = 'bold 32px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('A', SITE_A.x, SITE_A.y + 8);
-      ctx.fillText('B', SITE_B.x, SITE_B.y + 8);
+      ctx.fillText('A', SITE_A.x, SITE_A.y + 10);
+      ctx.fillText('B', SITE_B.x, SITE_B.y + 10);
 
-      // Planted bomb
+      // Draw spawn zone indicators
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = '#f6ad55';
+      ctx.fillRect(450, 800, 300, 80);
+      ctx.fillStyle = '#63b3ed';
+      ctx.fillRect(350, 30, 500, 50);
+      ctx.globalAlpha = 1;
+
+      // Draw planted bomb
       if (bombPos) {
-        const pulse = 0.7 + Math.sin(Date.now() / 100) * 0.3;
-        ctx.fillStyle = `rgba(255, 100, 0, ${pulse})`;
+        ctx.fillStyle = '#f56565';
         ctx.beginPath();
-        ctx.arc(bombPos.x, bombPos.y, 15, 0, Math.PI * 2);
+        ctx.arc(bombPos.x, bombPos.y, 12, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.font = '12px Arial';
-        ctx.fillText('💣', bombPos.x, bombPos.y + 4);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText('💣', bombPos.x - 8, bombPos.y + 5);
       }
 
-      // Bots
+      // Draw bots
       for (const bot of bots) {
         if (!bot.alive) continue;
         
-        ctx.save();
-        ctx.translate(bot.x, bot.y);
-
+        const color = bot.team === 'T' ? '#f6ad55' : '#63b3ed';
+        const darkColor = bot.team === 'T' ? '#c05621' : '#2b6cb0';
+        
         // Body
-        const color = bot.team === 'T' ? '#eab308' : '#3b82f6';
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.arc(bot.x, bot.y, 14, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = bot.team === 'T' ? '#a16207' : '#1d4ed8';
+        ctx.strokeStyle = darkColor;
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Direction
-        ctx.rotate(bot.angle);
-        ctx.fillStyle = '#fff';
+        // Direction indicator
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.moveTo(14, 0);
-        ctx.lineTo(8, -5);
-        ctx.lineTo(8, 5);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.restore();
-
-        // Health bar
-        const hp = bot.health / 100;
-        const barW = 28;
-        ctx.fillStyle = '#1f2937';
-        ctx.fillRect(bot.x - barW/2, bot.y - 22, barW, 5);
-        ctx.fillStyle = hp > 0.6 ? '#22c55e' : hp > 0.3 ? '#f59e0b' : '#ef4444';
-        ctx.fillRect(bot.x - barW/2, bot.y - 22, barW * hp, 5);
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(bot.x - barW/2, bot.y - 22, barW, 5);
+        ctx.moveTo(bot.x, bot.y);
+        ctx.lineTo(bot.x + Math.cos(bot.angle) * 20, bot.y + Math.sin(bot.angle) * 20);
+        ctx.stroke();
 
         // Bomb indicator
         if (bot.hasBomb) {
-          ctx.fillStyle = '#ef4444';
-          ctx.font = '10px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText('💣', bot.x, bot.y - 28);
+          ctx.fillStyle = '#f56565';
+          ctx.beginPath();
+          ctx.arc(bot.x + 10, bot.y - 10, 6, 0, Math.PI * 2);
+          ctx.fill();
         }
 
-        // Plant/defuse progress
+        // Health bar
+        const hbW = 30;
+        const hbH = 5;
+        const hbX = bot.x - hbW / 2;
+        const hbY = bot.y - 25;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(hbX, hbY, hbW, hbH);
+        const hpPct = bot.health / 100;
+        ctx.fillStyle = hpPct > 0.6 ? '#48bb78' : hpPct > 0.3 ? '#ecc94b' : '#f56565';
+        ctx.fillRect(hbX, hbY, hbW * hpPct, hbH);
+
+        // Planting/Defusing progress
         if (bot.plantProg > 0) {
-          ctx.fillStyle = '#1f2937';
-          ctx.fillRect(bot.x - 15, bot.y + 16, 30, 4);
-          ctx.fillStyle = '#f97316';
-          ctx.fillRect(bot.x - 15, bot.y + 16, 30 * (bot.plantProg / 3), 4);
+          ctx.fillStyle = '#f56565';
+          ctx.fillRect(bot.x - 15, bot.y + 20, 30 * (bot.plantProg / 3.5), 4);
+          ctx.strokeStyle = '#fff';
+          ctx.strokeRect(bot.x - 15, bot.y + 20, 30, 4);
         }
         if (bot.defuseProg > 0) {
-          ctx.fillStyle = '#1f2937';
-          ctx.fillRect(bot.x - 15, bot.y + 16, 30, 4);
-          ctx.fillStyle = '#06b6d4';
-          ctx.fillRect(bot.x - 15, bot.y + 16, 30 * (bot.defuseProg / 5), 4);
+          ctx.fillStyle = '#4299e1';
+          ctx.fillRect(bot.x - 15, bot.y + 20, 30 * (bot.defuseProg / 5), 4);
+          ctx.strokeStyle = '#fff';
+          ctx.strokeRect(bot.x - 15, bot.y + 20, 30, 4);
         }
+
+        // Bot ID
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(bot.id, bot.x, bot.y + 4);
       }
 
-      requestAnimationFrame(render);
-    };
+      // Draw dead bot markers
+      for (const bot of bots) {
+        if (bot.alive) continue;
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = bot.team === 'T' ? '#c05621' : '#2b6cb0';
+        ctx.beginPath();
+        ctx.moveTo(bot.x - 8, bot.y - 8);
+        ctx.lineTo(bot.x + 8, bot.y + 8);
+        ctx.moveTo(bot.x + 8, bot.y - 8);
+        ctx.lineTo(bot.x - 8, bot.y + 8);
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
 
-    render();
+      // Legend
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(10, MAP_H - 60, 160, 50);
+      ctx.fillStyle = '#f6ad55';
+      ctx.beginPath();
+      ctx.arc(30, MAP_H - 40, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Terrorists', 45, MAP_H - 36);
+      ctx.fillStyle = '#63b3ed';
+      ctx.beginPath();
+      ctx.arc(30, MAP_H - 22, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillText('Counter-Terrorists', 45, MAP_H - 18);
+
+      requestAnimationFrame(draw);
+    };
+    draw();
   }, [bots, bombPos]);
+
+  const nextRound = () => {
+    if (matchOver) {
+      setRound(1);
+      setTScore(0);
+      setCTScore(0);
+      tScoreRef.current = 0;
+      ctScoreRef.current = 0;
+      setMatchOver(false);
+      setWinner(null);
+    } else {
+      setRound(r => r + 1);
+    }
+    setPhase('bet');
+    phaseRef.current = 'bet';
+    setBetResult(null);
+  };
 
   if (!started) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-white mb-4">CS:GO Betting</h1>
-          <p className="text-gray-400 mb-8">Watch bots play & bet on bomb plant!</p>
-          <button
-            onClick={() => setStarted(true)}
-            className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold text-xl rounded-lg hover:from-yellow-400 hover:to-orange-400"
-          >
-            Start Game
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 p-4">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => { checkAndReload(); router.push('/casino'); }} 
+            className="text-gray-400 hover:text-white mb-6 flex items-center gap-2">
+            ← Back
           </button>
-          <button
-            onClick={() => router.push('/casino')}
-            className="block mx-auto mt-4 text-gray-400 hover:text-white"
-          >
-            ← Back to Casino
-          </button>
+          
+          <div className="bg-gray-800/90 rounded-2xl p-8 border border-gray-700">
+            <h1 className="text-4xl font-bold text-center mb-4 bg-gradient-to-r from-orange-400 to-blue-400 bg-clip-text text-transparent">
+              CS2 Betting
+            </h1>
+            <p className="text-gray-400 text-center mb-6">
+              Watch AI bots play and bet on whether the bomb gets planted!
+            </p>
+            
+            <div className="bg-gray-700/50 rounded-xl p-4 mb-6">
+              <h3 className="text-white font-semibold mb-2">How it works:</h3>
+              <ul className="text-gray-300 text-sm space-y-1">
+                <li>• 5v5 T vs CT bot match</li>
+                <li>• Bet on bomb plant (T wins) or defuse/elimination (CT wins)</li>
+                <li>• First to 13 rounds wins the match</li>
+                <li>• 2x payout on correct bets</li>
+              </ul>
+            </div>
+            
+            <div className="text-center text-2xl font-bold text-green-400 mb-6">
+              Balance: ${balance.toLocaleString()}
+            </div>
+            
+            <button onClick={() => setStarted(true)}
+              className="w-full py-4 bg-gradient-to-r from-orange-500 to-blue-500 rounded-xl text-white font-bold text-xl hover:opacity-90 transition">
+              Start Watching
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
-      {/* Header */}
-      <div className="bg-slate-800 border-b border-slate-700 p-3 flex justify-between items-center">
-        <button onClick={() => router.push('/casino')} className="text-gray-400 hover:text-white">
-          ← Back
-        </button>
-        <div className="flex gap-6 items-center">
-          <span className="text-yellow-500 font-bold text-xl">T {tScore}</span>
-          <span className="text-gray-500">:</span>
-          <span className="text-blue-500 font-bold text-xl">{ctScore} CT</span>
-          <span className="text-gray-400">Round {round}</span>
-          <span className={`font-mono text-lg ${bombPlanted ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-            {bombPlanted ? `💣 ${bombTimer}s` : `⏱️ ${time}s`}
-          </span>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 p-2">
+      <div className="max-w-[1400px] mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-2">
+          <button onClick={() => { checkAndReload(); router.push('/casino'); }} 
+            className="text-gray-400 hover:text-white text-sm">
+            ← Back
+          </button>
+          <div className="flex items-center gap-6 text-xl font-bold">
+            <span className="text-orange-400">T {tScore}</span>
+            <span className="text-gray-500">:</span>
+            <span className="text-blue-400">{ctScore} CT</span>
+            <span className="text-gray-400 text-sm">Round {round}</span>
+            <span className="text-white flex items-center gap-1">
+              {bombPlanted ? '💣' : '⏱️'} {bombPlanted ? bombTimer : time}s
+            </span>
+          </div>
+          <div className="text-green-400 font-bold">${balance.toLocaleString()}</div>
         </div>
-        <span className="text-green-400 font-bold">${balance.toLocaleString()}</span>
-      </div>
 
-      <div className="flex-1 flex">
-        {/* Canvas */}
-        <div className="flex-1 flex items-center justify-center p-4">
+        <div className="flex gap-4">
+          {/* Game Canvas */}
           <div className="relative">
-            <canvas
-              ref={canvasRef}
-              width={MAP_W}
-              height={MAP_H}
-              className="border-2 border-slate-700 rounded-lg shadow-xl"
-            />
-            {/* Killfeed */}
-            <div className="absolute top-2 right-2">
-              {kills.slice(-5).map((k, i) => (
-                <div key={i} className="text-xs text-white bg-black/70 px-2 py-1 rounded mb-1">
+            <canvas ref={canvasRef} width={MAP_W} height={MAP_H}
+              className="rounded-xl border-2 border-gray-700 bg-gray-900" />
+            
+            {/* Kill feed */}
+            <div className="absolute top-2 right-2 text-right">
+              {kills.map((k, i) => (
+                <div key={i} className="bg-black/70 px-2 py-1 rounded text-sm text-white mb-1">
                   {k}
                 </div>
               ))}
             </div>
-            {/* Legend */}
-            <div className="absolute bottom-2 left-2 bg-black/70 p-2 rounded text-xs">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <span className="text-yellow-400">Terrorists</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span className="text-blue-400">Counter-Terrorists</span>
-              </div>
-            </div>
           </div>
-        </div>
 
-        {/* Side panel */}
-        <div className="w-72 bg-slate-800 border-l border-slate-700 p-4">
-          {phase === 'bet' && !matchOver && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-bold text-white">Place Your Bet</h2>
-              <p className="text-gray-400 text-sm">Will the bomb be planted?</p>
-              
-              <input
-                type="number"
-                value={bet}
-                onChange={e => setBet(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full bg-slate-700 text-white px-3 py-2 rounded"
-                min={0}
-                max={balance}
-              />
-              
-              <div className="flex gap-2">
-                {[500, 1000, 5000, 10000].map(a => (
-                  <button
-                    key={a}
-                    onClick={() => setBet(Math.min(a, balance))}
-                    className="flex-1 bg-slate-700 text-white py-1 rounded text-sm hover:bg-slate-600"
-                  >
-                    ${a >= 1000 ? `${a/1000}k` : a}
+          {/* Betting Panel */}
+          <div className="w-72 flex-shrink-0">
+            {phase === 'bet' && (
+              <div className="bg-gray-800/90 rounded-xl p-4 border border-gray-700">
+                <h2 className="text-xl font-bold text-white mb-4 text-center">Place Bet</h2>
+                
+                <div className="mb-4">
+                  <label className="text-gray-400 text-sm">Bet Amount</label>
+                  <select value={bet} onChange={(e) => setBet(Number(e.target.value))}
+                    className="w-full bg-gray-700 text-white rounded-lg p-2 mt-1">
+                    {[500, 1000, 2500, 5000, 10000, 25000].map(v => (
+                      <option key={v} value={v} disabled={v > balance}>${v.toLocaleString()}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <button onClick={() => startRound(true, bet)}
+                    disabled={bet > balance}
+                    className="w-full py-3 bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg text-white font-bold hover:opacity-90 disabled:opacity-50 transition">
+                    🔥 Bet T Wins (Plant)
                   </button>
-                ))}
-              </div>
+                  <button onClick={() => startRound(false, bet)}
+                    disabled={bet > balance}
+                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg text-white font-bold hover:opacity-90 disabled:opacity-50 transition">
+                    🛡️ Bet CT Wins
+                  </button>
+                </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => startRound(true, bet)}
-                  disabled={bet <= 0 || bet > balance}
-                  className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded font-bold disabled:opacity-50"
-                >
-                  💣 PLANTED
-                  <div className="text-xs opacity-80">2x Payout</div>
-                </button>
-                <button
-                  onClick={() => startRound(false, bet)}
-                  disabled={bet <= 0 || bet > balance}
-                  className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-3 rounded font-bold disabled:opacity-50"
-                >
-                  🛡️ NOT PLANTED
-                  <div className="text-xs opacity-80">2x Payout</div>
+                <button onClick={() => startRound(null, 0)}
+                  className="w-full py-2 bg-gray-700 rounded-lg text-gray-300 hover:bg-gray-600 transition">
+                  Just Watch
                 </button>
               </div>
+            )}
 
-              <button
-                onClick={() => startRound(null, 0)}
-                className="w-full bg-slate-700 text-gray-300 py-2 rounded hover:bg-slate-600"
-              >
-                Watch Only
-              </button>
-            </div>
-          )}
-
-          {phase === 'play' && (
-            <div className="space-y-3">
-              <h2 className="text-lg font-bold text-white">Round In Progress</h2>
-              
-              {betOn !== null && (
-                <div className="bg-slate-700 p-2 rounded text-white text-sm">
-                  ${bet} on {betOn ? '💣 Planted' : '🛡️ Not Planted'}
-                </div>
-              )}
-
-              <div className="bg-slate-700 p-3 rounded">
-                <div className="flex justify-between mb-2">
-                  <span className="text-yellow-400 font-bold">Terrorists</span>
-                  <span className="text-white">{bots.filter(b => b.team === 'T' && b.alive).length}/5</span>
-                </div>
-                <div className="flex gap-1">
-                  {bots.filter(b => b.team === 'T').map(bot => (
-                    <div
-                      key={bot.id}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                        bot.alive ? 'bg-yellow-500' : 'bg-gray-600'
-                      }`}
-                    >
-                      {bot.hasBomb ? '💣' : ''}
+            {phase === 'play' && (
+              <div className="bg-gray-800/90 rounded-xl p-4 border border-gray-700">
+                <h2 className="text-xl font-bold text-white mb-2 text-center">Round in Progress</h2>
+                {betOn !== null && (
+                  <div className="text-center">
+                    <p className="text-gray-400">Your bet:</p>
+                    <p className={`text-xl font-bold ${betOn ? 'text-orange-400' : 'text-blue-400'}`}>
+                      ${bet.toLocaleString()} on {betOn ? 'T (Plant)' : 'CT'}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="mt-4 space-y-2">
+                  <div className="text-sm text-gray-400">
+                    T Alive: {bots.filter(b => b.team === 'T' && b.alive).length}/5
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    CT Alive: {bots.filter(b => b.team === 'CT' && b.alive).length}/5
+                  </div>
+                  {bombPlanted && (
+                    <div className="text-red-400 font-bold animate-pulse">
+                      💣 BOMB PLANTED! {bombTimer}s
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
+            )}
 
-              <div className="bg-slate-700 p-3 rounded">
-                <div className="flex justify-between mb-2">
-                  <span className="text-blue-400 font-bold">Counter-Terrorists</span>
-                  <span className="text-white">{bots.filter(b => b.team === 'CT' && b.alive).length}/5</span>
-                </div>
-                <div className="flex gap-1">
-                  {bots.filter(b => b.team === 'CT').map(bot => (
-                    <div
-                      key={bot.id}
-                      className={`w-6 h-6 rounded-full ${bot.alive ? 'bg-blue-500' : 'bg-gray-600'}`}
-                    />
-                  ))}
-                </div>
+            {phase === 'end' && (
+              <div className="bg-gray-800/90 rounded-xl p-4 border border-gray-700">
+                <h2 className="text-xl font-bold text-white mb-2 text-center">Round Over</h2>
+                <p className="text-center text-lg mb-4">{result}</p>
+                
+                {betResult && (
+                  <div className={`text-center text-2xl font-bold mb-4 ${betResult.won ? 'text-green-400' : 'text-red-400'}`}>
+                    {betResult.won ? `+$${(betResult.amt * 2).toLocaleString()}` : `-$${betResult.amt.toLocaleString()}`}
+                  </div>
+                )}
+
+                {matchOver ? (
+                  <div className="text-center mb-4">
+                    <p className="text-2xl font-bold text-yellow-400">
+                      🏆 {winner === 'T' ? 'TERRORISTS' : 'COUNTER-TERRORISTS'} WIN!
+                    </p>
+                    <p className="text-gray-400">Final: {tScore} - {ctScore}</p>
+                  </div>
+                ) : null}
+
+                <button onClick={nextRound}
+                  className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-white font-bold hover:opacity-90 transition">
+                  {matchOver ? 'New Match' : 'Next Round →'}
+                </button>
               </div>
-
-              {bombPlanted && (
-                <div className="bg-red-900/50 border border-red-500 p-3 rounded text-center animate-pulse">
-                  <div className="text-red-400 font-bold">💣 BOMB PLANTED!</div>
-                  <div className="text-red-300 text-sm">{bombTimer} seconds remaining</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {phase === 'end' && !matchOver && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-bold text-white">Round Over</h2>
-              <div className="bg-slate-700 p-3 rounded text-center text-white">{result}</div>
-              
-              {betResult && (
-                <div className={`p-3 rounded text-center font-bold ${
-                  betResult.won ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
-                }`}>
-                  {betResult.won ? `+$${betResult.amt}` : `-$${betResult.amt}`}
-                </div>
-              )}
-
-              <button
-                onClick={() => {
-                  setRound(r => r + 1);
-                  setPhase('bet');
-                  phaseRef.current = 'bet';
-                  setBetOn(null);
-                  setBetResult(null);
-                }}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded font-bold"
-              >
-                Next Round →
-              </button>
-            </div>
-          )}
-
-          {matchOver && (
-            <div className="space-y-4 text-center">
-              <h2 className="text-xl font-bold text-white">Match Over!</h2>
-              <div className={`p-4 rounded ${
-                winner === 'T' ? 'bg-yellow-900/50 text-yellow-400' : 'bg-blue-900/50 text-blue-400'
-              }`}>
-                <div className="text-xl font-bold">{winner === 'T' ? 'TERRORISTS' : 'COUNTER-TERRORISTS'} WIN!</div>
-                <div className="text-lg mt-2">{tScore} - {ctScore}</div>
-              </div>
-              <button
-                onClick={() => {
-                  setTScore(0);
-                  setCTScore(0);
-                  tScoreRef.current = 0;
-                  ctScoreRef.current = 0;
-                  setRound(1);
-                  setMatchOver(false);
-                  setWinner(null);
-                  setPhase('bet');
-                  phaseRef.current = 'bet';
-                  checkAndReload();
-                }}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded font-bold"
-              >
-                New Match
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
