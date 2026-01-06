@@ -27,56 +27,56 @@ const SYMBOLS: Record<SymbolType, SymbolConfig> = {
   banana: {
     emoji: '🍌',
     name: 'Banana',
-    payouts: { 8: 0.5, 10: 1, 12: 2 },
+    payouts: { 8: 0.25, 10: 0.5, 12: 1 },
     color: 'from-yellow-400 to-yellow-600'
   },
   apple: {
     emoji: '🍎',
     name: 'Apple',
-    payouts: { 8: 0.5, 10: 1, 12: 2 },
+    payouts: { 8: 0.25, 10: 0.5, 12: 1 },
     color: 'from-red-400 to-red-600'
   },
   watermelon: {
     emoji: '🍉',
     name: 'Watermelon',
-    payouts: { 8: 0.6, 10: 1.2, 12: 2.5 },
+    payouts: { 8: 0.3, 10: 0.6, 12: 1.2 },
     color: 'from-green-400 to-red-500'
   },
   plum: {
     emoji: '🍇',
     name: 'Plum',
-    payouts: { 8: 0.8, 10: 1.5, 12: 3 },
+    payouts: { 8: 0.4, 10: 0.8, 12: 1.5 },
     color: 'from-purple-400 to-purple-600'
   },
   grapes: {
     emoji: '🫐',
     name: 'Grapes',
-    payouts: { 8: 1, 10: 2, 12: 4 },
+    payouts: { 8: 0.5, 10: 1, 12: 2 },
     color: 'from-blue-400 to-purple-600'
   },
   // High paying - Candies
   blue: {
     emoji: '💎',
     name: 'Blue Candy',
-    payouts: { 8: 1.5, 10: 3, 12: 6 },
+    payouts: { 8: 0.8, 10: 1.5, 12: 3 },
     color: 'from-cyan-400 to-blue-600'
   },
   green: {
     emoji: '💚',
     name: 'Green Candy',
-    payouts: { 8: 2, 10: 4, 12: 8 },
+    payouts: { 8: 1, 10: 2, 12: 4 },
     color: 'from-emerald-400 to-green-600'
   },
   purple: {
     emoji: '💜',
     name: 'Purple Candy',
-    payouts: { 8: 3, 10: 6, 12: 12 },
+    payouts: { 8: 1.5, 10: 3, 12: 6 },
     color: 'from-violet-400 to-purple-600'
   },
   heart: {
     emoji: '❤️',
     name: 'Red Heart',
-    payouts: { 8: 5, 10: 10, 12: 25 },
+    payouts: { 8: 2.5, 10: 5, 12: 12 },
     color: 'from-red-500 to-pink-600'
   },
   // Special
@@ -95,7 +95,28 @@ const SYMBOLS: Record<SymbolType, SymbolConfig> = {
 };
 
 const REGULAR_SYMBOLS: SymbolType[] = ['banana', 'apple', 'watermelon', 'plum', 'grapes', 'blue', 'green', 'purple', 'heart'];
-const BOMB_MULTIPLIERS = [2, 3, 5, 8, 10, 15, 20, 25, 50, 100];
+// Weighted bomb multipliers - high values are much rarer
+const BOMB_MULTIPLIERS = [
+  { value: 2, weight: 35 },
+  { value: 3, weight: 25 },
+  { value: 5, weight: 15 },
+  { value: 8, weight: 10 },
+  { value: 10, weight: 6 },
+  { value: 15, weight: 4 },
+  { value: 25, weight: 2.5 },
+  { value: 50, weight: 1.5 },
+  { value: 100, weight: 1 }
+];
+
+const getRandomBombMultiplier = (): number => {
+  const totalWeight = BOMB_MULTIPLIERS.reduce((sum, m) => sum + m.weight, 0);
+  let random = Math.random() * totalWeight;
+  for (const m of BOMB_MULTIPLIERS) {
+    random -= m.weight;
+    if (random <= 0) return m.value;
+  }
+  return 2;
+};
 
 export default function SweetBonanza() {
   const router = useRouter();
@@ -145,9 +166,9 @@ export default function SweetBonanza() {
       return { type: 'scatter', id: crypto.randomUUID() };
     }
     
-    // Bombs only during free spins
-    if (includeBombs && rand < 0.08) {
-      const multiplier = BOMB_MULTIPLIERS[Math.floor(Math.random() * BOMB_MULTIPLIERS.length)];
+    // Bombs only during free spins - reduced rate
+    if (includeBombs && rand < 0.04) {
+      const multiplier = getRandomBombMultiplier();
       return { type: 'bomb', id: crypto.randomUUID(), multiplier };
     }
     
