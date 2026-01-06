@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCasino } from './CasinoContext';
 
-type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'ultimate-holdem' | 'horse-racing' | 'baccarat' | 'craps' | 'cs-betting' | null;
+type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'ultimate-holdem' | 'horse-racing' | 'baccarat' | 'craps' | 'cs-betting' | 'sweet-bonanza' | null;
 
 export default function Casino() {
   const router = useRouter();
@@ -349,6 +349,25 @@ export default function Casino() {
                   className="py-3 bg-amber-500/30 hover:bg-amber-500/50 text-white rounded-xl font-bold transition-all col-span-2"
                 >
                   💰 Place Bets
+                </button>
+              </div>
+            </div>
+
+            {/* Sweet Bonanza */}
+            <div className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-5xl">🍭🍬</div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Sweet Bonanza</h2>
+                  <p className="text-white/70">Tumbling slots with multipliers</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => router.push('/casino/sweet-bonanza')}
+                  className="py-3 bg-pink-500/30 hover:bg-pink-500/50 text-white rounded-xl font-bold transition-all col-span-2"
+                >
+                  🍭 Play Slots
                 </button>
               </div>
             </div>
