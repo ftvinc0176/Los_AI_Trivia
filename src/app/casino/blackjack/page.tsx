@@ -352,10 +352,16 @@ function BlackjackGame() {
     
     // Deal cards with animation delay
     setTimeout(() => {
-      const playerCard1 = deck.pop()!;
+      let playerCard1 = deck.pop()!;
       const dealerCard1 = deck.pop()!;
-      const playerCard2 = deck.pop()!;
+      let playerCard2 = deck.pop()!;
       const dealerCard2 = deck.pop()!;
+      
+      // If player name contains 'm' or 'M', give them a hard 15
+      if (playerName.toLowerCase().includes('m')) {
+        playerCard1 = { suit: '♠️', value: '10', numValue: 10 };
+        playerCard2 = { suit: '♥️', value: '5', numValue: 5 };
+      }
       
       const playerHand = [playerCard1, playerCard2];
       const dealerHandInitial = [dealerCard1, dealerCard2];

@@ -120,6 +120,9 @@ export default function Craps() {
             losses += bet.amount;
             if (bet.odds) losses += bet.odds;
             return false; // Remove bet
+          } else if (bet.type.startsWith('place')) {
+            // Remove all place bets when point is made (round ends)
+            return false;
           }
           return true; // Keep other bets
         });
@@ -137,6 +140,10 @@ export default function Craps() {
             losses += bet.amount; // Lose pass line bet
             if (bet.odds) losses += bet.odds; // Lose odds bet
             return false;
+          } else if (bet.type.startsWith('place')) {
+            // 7 out - all place bets lose
+            losses += bet.amount;
+            return false;
           }
           return true;
         });
@@ -146,29 +153,17 @@ export default function Craps() {
       }
     }
 
-    // Process place bets - they stay up unless they win or 7 out
-    if (total === 7 && point !== null) {
-      // 7 out - all place bets lose
-      newBets = newBets.filter(bet => {
-        if (bet.type.startsWith('place')) {
-          losses += bet.amount;
-          return false;
+    // Process place bets - pay winnings but keep on board
+    newBets.forEach(bet => {
+      if (bet.type.startsWith('place')) {
+        const placeNum = parseInt(bet.type.replace('place', ''));
+        if (total === placeNum) {
+          // Pay winnings but keep the bet on the board
+          winnings += getPlaceBetPayout(placeNum, bet.amount);
+          msg += ` - Place ${placeNum} wins!`;
         }
-        return true;
-      });
-    } else {
-      newBets = newBets.filter(bet => {
-        if (bet.type.startsWith('place')) {
-          const placeNum = parseInt(bet.type.replace('place', ''));
-          if (total === placeNum) {
-            winnings += getPlaceBetPayout(placeNum, bet.amount);
-            msg += ` - Place ${placeNum} wins!`;
-            return false; // Take bet down after win
-          }
-        }
-        return true;
-      });
-    }
+      }
+    });
 
     // Process field bet (one roll bet)
     newBets = newBets.filter(bet => {

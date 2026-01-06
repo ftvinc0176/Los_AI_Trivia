@@ -408,17 +408,22 @@ export default function UltimateTexasHoldem() {
   const placeBet = (type: 'ante' | 'blind' | 'trips') => {
     if (phase !== 'betting') return;
     
-    if (balance < chipValue) {
+    // For ante/blind, need double the chip value since both get updated
+    const requiredBalance = (type === 'ante' || type === 'blind') ? chipValue * 2 : chipValue;
+    
+    if (balance < requiredBalance) {
       setMessage('Insufficient balance!');
       return;
     }
 
     if (type === 'ante') {
       setAnteBet(anteBet + chipValue);
-      setMessage(`Ante bet: $${anteBet + chipValue}`);
+      setBlindBet(blindBet + chipValue); // Match blind to ante
+      setMessage(`Ante & Blind bet: $${anteBet + chipValue}`);
     } else if (type === 'blind') {
       setBlindBet(blindBet + chipValue);
-      setMessage(`Blind bet: $${blindBet + chipValue}`);
+      setAnteBet(anteBet + chipValue); // Match ante to blind
+      setMessage(`Ante & Blind bet: $${blindBet + chipValue}`);
     } else if (type === 'trips') {
       setTripsBet(tripsBet + chipValue);
       setMessage(`Trips bet: $${tripsBet + chipValue}`);
