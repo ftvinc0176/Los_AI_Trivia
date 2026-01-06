@@ -40,6 +40,7 @@ export default function Craps() {
   const [message, setMessage] = useState('Place your bets!');
   const [history, setHistory] = useState<number[]>([]);
   const [showPayoutTable, setShowPayoutTable] = useState(false);
+  const [lastRollResult, setLastRollResult] = useState<{ winnings: number; losses: number } | null>(null);
 
   const rollDice = () => {
     if (rolling || bets.length === 0) return;
@@ -268,6 +269,14 @@ export default function Craps() {
     const netChange = winnings - losses;
     setBalance(balance + netChange);
     setBets(newBets);
+    setLastRollResult({ winnings, losses });
+    
+    // Enhanced message with winnings/losses
+    if (netChange > 0) {
+      msg += ` | Won: $${netChange.toLocaleString()}`;
+    } else if (netChange < 0) {
+      msg += ` | Lost: $${Math.abs(netChange).toLocaleString()}`;
+    }
     setMessage(msg);
 
     if (winnings > losses) {
@@ -569,12 +578,33 @@ export default function Craps() {
         </div>
 
         {/* Dice Display */}
-        <div className="bg-green-800 rounded-lg p-3 sm:p-6 mb-2 flex justify-center items-center gap-2 sm:gap-4">
-          {renderDie(dice[0])}
-          {renderDie(dice[1])}
-          <div className="text-2xl sm:text-4xl font-bold text-white ml-2 sm:ml-4">
-            = {dice[0].value + dice[1].value}
+        <div className="bg-green-800 rounded-lg p-3 sm:p-6 mb-2">
+          <div className="flex justify-center items-center gap-2 sm:gap-4">
+            {renderDie(dice[0])}
+            {renderDie(dice[1])}
+            <div className="text-2xl sm:text-4xl font-bold text-white ml-2 sm:ml-4">
+              = {dice[0].value + dice[1].value}
+            </div>
           </div>
+          
+          {/* Show last roll result */}
+          {lastRollResult && (lastRollResult.winnings > 0 || lastRollResult.losses > 0) && (
+            <div className="text-center mt-3 pt-3 border-t border-white/20">
+              {lastRollResult.winnings > lastRollResult.losses ? (
+                <div className="text-green-400 font-bold text-lg sm:text-2xl">
+                  ✓ Won: ${(lastRollResult.winnings - lastRollResult.losses).toLocaleString()}
+                </div>
+              ) : lastRollResult.losses > lastRollResult.winnings ? (
+                <div className="text-red-400 font-bold text-lg sm:text-2xl">
+                  ✗ Lost: ${(lastRollResult.losses - lastRollResult.winnings).toLocaleString()}
+                </div>
+              ) : (
+                <div className="text-yellow-400 font-bold text-lg sm:text-2xl">
+                  Push
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Craps Table - Redesigned for mobile */}

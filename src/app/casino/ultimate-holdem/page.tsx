@@ -429,7 +429,7 @@ export default function UltimateTexasHoldem() {
         </div>
 
         <div className="text-center mb-4">
-          <h1 className="text-4xl font-bold text-yellow-400 mb-2">Ultimate Texas Hold'em</h1>
+          <h1 className="text-4xl font-bold text-yellow-400 mb-2">Ultimate Texas Hold&apos;em</h1>
           <div className="text-white text-lg">{message}</div>
         </div>
 
