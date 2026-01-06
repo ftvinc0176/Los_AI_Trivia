@@ -86,7 +86,7 @@ export default function Craps() {
         msg = '7 - Winner! Pass Line wins!';
         newBets = newBets.filter(bet => {
           if (bet.type === 'pass') {
-            winnings += bet.amount * 2; // Return bet + winnings
+            winnings += bet.amount * 2; // 1:1 payout (return bet + equal winnings)
             return false; // Remove bet
           } else if (bet.type === 'dontPass') {
             losses += bet.amount; // Lose the bet
@@ -97,7 +97,8 @@ export default function Craps() {
       } else {
         // All other numbers (2,3,4,5,6,8,9,10,11,12) become the point
         setPoint(total);
-        msg = `Point is ${total}`;
+        msg = `Point is ${total}. Pass Line stays up, you can add odds!`;
+        // Pass line bet stays on the table
       }
     } 
     // Point is established
@@ -106,10 +107,12 @@ export default function Craps() {
         msg = `${total} - Winner! Point made!`;
         newBets = newBets.filter(bet => {
           if (bet.type === 'pass') {
-            winnings += bet.amount * 2; // 1:1 on pass line
+            winnings += bet.amount * 2; // 1:1 on pass line (return bet + equal winnings)
             if (bet.odds) {
-              // Odds payouts based on point number
-              winnings += bet.odds + (bet.odds * (getOddsMultiplier(point) - 1));
+              // Odds pay true odds based on point number
+              const oddsMultiplier = getOddsMultiplier(point);
+              winnings += bet.odds; // Return the odds bet
+              winnings += bet.odds * oddsMultiplier; // Add true odds winnings
             }
             return false; // Remove bet
           } else if (bet.type === 'dontPass') {
@@ -121,7 +124,7 @@ export default function Craps() {
         });
         setPoint(null);
       } else if (total === 7) {
-        msg = '7 out! Don&apos;t Pass wins!';
+        msg = '7 out! Pass Line loses!';
         newBets = newBets.filter(bet => {
           if (bet.type === 'dontPass') {
             winnings += bet.amount * 2; // 1:1 payout
@@ -130,8 +133,8 @@ export default function Craps() {
             }
             return false;
           } else if (bet.type === 'pass') {
-            losses += bet.amount;
-            if (bet.odds) losses += bet.odds;
+            losses += bet.amount; // Lose pass line bet
+            if (bet.odds) losses += bet.odds; // Lose odds bet
             return false;
           }
           return true;
@@ -355,6 +358,12 @@ export default function Craps() {
       return;
     }
 
+    // Pass line can only be bet on come-out roll
+    if (type === 'pass' && point !== null) {
+      setMessage('Cannot bet Pass Line after point is set! Use odds instead.');
+      return;
+    }
+
     // Check if bet already exists, add to it
     const existingBetIndex = bets.findIndex(bet => bet.type === type);
     if (existingBetIndex >= 0) {
@@ -367,6 +376,42 @@ export default function Craps() {
     
     setBalance(balance - betAmount);
     setMessage(`$${betAmount} on ${formatBetName(type)}`);
+  };
+
+  const placeOddsBet = () => {
+    if (point === null) {
+      setMessage('Can only place odds after point is set!');
+      return;
+    }
+
+    const passLineBet = bets.find(bet => bet.type === 'pass');
+    if (!passLineBet) {
+      setMessage('Need a Pass Line bet to add odds!');
+      return;
+    }
+
+    const currentOdds = passLineBet.odds || 0;
+    const maxOdds = passLineBet.amount * 4; // 4x the pass line bet
+    
+    if (currentOdds >= maxOdds) {
+      setMessage(`Maximum odds (4x = $${maxOdds}) already placed!`);
+      return;
+    }
+
+    const remainingOddsAllowed = maxOdds - currentOdds;
+    const oddsToAdd = Math.min(betAmount, remainingOddsAllowed);
+
+    if (balance < oddsToAdd) {
+      setMessage('Insufficient balance!');
+      return;
+    }
+
+    const newBets = [...bets];
+    const betIndex = newBets.findIndex(bet => bet.type === 'pass');
+    newBets[betIndex].odds = (newBets[betIndex].odds || 0) + oddsToAdd;
+    setBets(newBets);
+    setBalance(balance - oddsToAdd);
+    setMessage(`Added $${oddsToAdd} odds (Total odds: $${newBets[betIndex].odds})`);
   };
 
   const clearBets = () => {
@@ -411,7 +456,17 @@ export default function Craps() {
   const getBetTotal = (type: BetType): number => {
     return bets
       .filter(bet => bet.type === type)
-      .reduce((sum, bet) => sum + bet.amount, 0);
+      .reduce((sum, bet) => sum + bet.amount + (bet.odds || 0), 0);
+  };
+
+  const getPassLineBetAmount = (): number => {
+    const passLineBet = bets.find(bet => bet.type === 'pass');
+    return passLineBet ? passLineBet.amount : 0;
+  };
+
+  const getPassLineOdds = (): number => {
+    const passLineBet = bets.find(bet => bet.type === 'pass');
+    return passLineBet?.odds || 0;
   };
 
   const renderDie = (die: Die) => {
@@ -614,17 +669,48 @@ export default function Craps() {
               </button>
 
               {/* Pass Line */}
-              <button
-                onClick={() => placeBet('pass')}
-                className="relative w-full bg-white border-4 border-yellow-500 rounded p-2 sm:p-4 hover:bg-yellow-100 transition-colors"
-              >
-                <div className="text-center font-bold text-black text-base sm:text-2xl">PASS LINE</div>
-                {getBetTotal('pass') > 0 && (
-                  <div className="absolute top-1 right-1 bg-red-600 text-white px-2 py-1 rounded-full text-xs sm:text-sm font-bold">
-                    ${getBetTotal('pass')}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => placeBet('pass')}
+                  disabled={point !== null}
+                  className={`relative w-full bg-white border-4 border-yellow-500 rounded p-2 sm:p-4 hover:bg-yellow-100 transition-colors ${
+                    point !== null ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  <div className="text-center font-bold text-black text-sm sm:text-xl">PASS LINE</div>
+                  {getPassLineBetAmount() > 0 && (
+                    <div className="absolute top-1 right-1 bg-red-600 text-white px-2 py-1 rounded-full text-[8px] sm:text-xs font-bold">
+                      ${getPassLineBetAmount()}
+                    </div>
+                  )}
+                  {point !== null && (
+                    <div className="text-center text-[8px] sm:text-xs text-gray-600 mt-1">Point is {point}</div>
+                  )}
+                </button>
+                
+                {point !== null && getPassLineBetAmount() > 0 && (
+                  <button
+                    onClick={placeOddsBet}
+                    className="relative w-full bg-blue-400 border-4 border-blue-600 rounded p-2 sm:p-4 hover:bg-blue-300 transition-colors"
+                  >
+                    <div className="text-center font-bold text-white text-sm sm:text-xl">ADD ODDS</div>
+                    <div className="text-center text-[8px] sm:text-xs text-white">Max: ${getPassLineBetAmount() * 4}</div>
+                    {getPassLineOdds() > 0 && (
+                      <div className="absolute top-1 right-1 bg-green-600 text-white px-2 py-1 rounded-full text-[8px] sm:text-xs font-bold">
+                        ${getPassLineOdds()}
+                      </div>
+                    )}
+                  </button>
+                )}
+                
+                {(point === null || getPassLineBetAmount() === 0) && (
+                  <div className="flex items-center justify-center bg-gray-700 rounded border-2 border-gray-600 p-2">
+                    <div className="text-center text-white text-[8px] sm:text-xs">
+                      {point === null ? 'Bet Pass Line first' : 'Odds available after point'}
+                    </div>
                   </div>
                 )}
-              </button>
+              </div>
             </div>
           </div>
 
