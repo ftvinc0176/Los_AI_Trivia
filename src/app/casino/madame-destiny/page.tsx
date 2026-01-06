@@ -228,17 +228,17 @@ export default function MadameDestinyMegaways() {
     setRevealedReels(0);
     setGrid(newGrid);
     
-    // Reveal reels one at a time with 400ms delay
+    // Reveal reels one at a time with 500ms delay
     const revealReel = (reelIndex: number) => {
       if (reelIndex <= 6) {
         setRevealedReels(reelIndex);
         if (reelIndex < 6) {
-          setTimeout(() => revealReel(reelIndex + 1), 350);
+          setTimeout(() => revealReel(reelIndex + 1), 500);
         } else {
           // All reels revealed, check for wins
           setTimeout(() => {
             checkWins(newGrid, 0, 0);
-          }, 300);
+          }, 400);
         }
       }
     };
@@ -549,8 +549,8 @@ export default function MadameDestinyMegaways() {
       <div
         key={symbol.id}
         style={{
-          animation: isReelJustRevealed ? `dropIn 0.4s ease-out` : undefined,
-          animationDelay: isReelJustRevealed ? `${rowIdx * 50}ms` : undefined,
+          animation: isReelJustRevealed ? `dropIn 0.6s ease-out` : undefined,
+          animationDelay: isReelJustRevealed ? `${rowIdx * 80}ms` : undefined,
           animationFillMode: 'both'
         }}
         className={`
@@ -575,11 +575,14 @@ export default function MadameDestinyMegaways() {
       <style jsx>{`
         @keyframes dropIn {
           0% {
-            transform: translateY(-100px);
+            transform: translateY(-120px);
             opacity: 0;
           }
-          60% {
-            transform: translateY(10px);
+          50% {
+            opacity: 1;
+          }
+          70% {
+            transform: translateY(8px);
           }
           100% {
             transform: translateY(0);
