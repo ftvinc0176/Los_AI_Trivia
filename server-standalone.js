@@ -2669,8 +2669,9 @@ function startHorseRace(roomId) {
     room.horses = room.horses.map(horse => {
       if (horse.position >= 100) return horse;
       
-      const baseSpeed = 0.5 + Math.random() * 2;
-      const oddsBonus = (10 - horse.odds) / 20;
+      // Slowed down for more exciting races
+      const baseSpeed = 0.25 + Math.random() * 1;
+      const oddsBonus = (10 - horse.odds) / 30;
       const newPosition = Math.min(100, horse.position + baseSpeed + oddsBonus);
       
       if (newPosition >= 100 && !winningHorse) {
@@ -2705,7 +2706,7 @@ function startHorseRace(roomId) {
         console.log(`Horse Race ended in ${roomId}, winner: ${winningHorse.name}`);
       }, 500);
     }
-  }, 50);
+  }, 100);
 }
 
 // ==================== FPS ARENA GAME ====================

@@ -2,13 +2,22 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useCasino } from './CasinoContext';
 
 type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'horse-racing' | null;
 
 export default function Casino() {
   const router = useRouter();
+  const { playerName, setPlayerName, balance, isLoggedIn, logout } = useCasino();
   const [selectedGame, setSelectedGame] = useState<GameType>(null);
   const [showMultiplayerOptions, setShowMultiplayerOptions] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+
+  const handleLogin = () => {
+    if (nameInput.trim()) {
+      setPlayerName(nameInput.trim());
+    }
+  };
 
   const handleGameSelect = (game: GameType, mode: 'single' | 'multiplayer') => {
     if (mode === 'single') {
@@ -26,14 +35,87 @@ export default function Casino() {
     }
   };
 
+  const handleLeave = () => {
+    logout();
+    router.push('/');
+  };
+
+  // Login screen
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-black/60 backdrop-blur-xl rounded-3xl p-8 border border-white/20">
+          <h1 className="text-5xl font-bold text-center mb-4 bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 bg-clip-text text-transparent">
+            🎰 The Casino 🎰
+          </h1>
+          <p className="text-white/70 text-center mb-8">
+            Enter your name to start playing
+          </p>
+          
+          <div className="space-y-4">
+            <input
+              type="text"
+              placeholder="Enter your name"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              className="w-full px-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white text-center text-xl placeholder-white/50"
+            />
+            
+            <button
+              onClick={handleLogin}
+              disabled={!nameInput.trim()}
+              className="w-full py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:opacity-50 text-white rounded-xl font-bold text-xl transition-all"
+            >
+              Enter Casino
+            </button>
+            
+            <div className="text-center">
+              <div className="text-white/60 text-sm mb-1">Starting Balance</div>
+              <div className="text-3xl font-bold text-green-400">$25,000</div>
+            </div>
+          </div>
+          
+          <div className="text-center mt-6">
+            <button
+              onClick={() => router.push('/')}
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              ← Back to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-5xl w-full">
+        {/* Header with player info */}
+        <div className="flex items-center justify-between mb-6 bg-black/40 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xl">
+              {playerName[0]?.toUpperCase()}
+            </div>
+            <div>
+              <div className="text-white font-bold text-lg">{playerName}</div>
+              <div className="text-white/60 text-sm">Casino Member</div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-white/60 text-sm">Balance</div>
+            <div className={`text-2xl font-bold ${balance >= 25000 ? 'text-green-400' : balance > 10000 ? 'text-yellow-400' : 'text-red-400'}`}>
+              ${balance.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
         <h1 className="text-6xl font-bold text-center mb-4 bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 bg-clip-text text-transparent">
           🎰 The Casino 🎰
         </h1>
-        <p className="text-white/80 text-center mb-12 text-xl">
-          Start with 1000 LosBucks • Premium Gaming Experience
+        <p className="text-white/80 text-center mb-8 text-xl">
+          Your balance carries across all games!
         </p>
 
         {!showMultiplayerOptions ? (
@@ -181,12 +263,12 @@ export default function Casino() {
         )}
 
         {/* Back to Home */}
-        <div className="text-center mt-8">
+        <div className="text-center mt-8 space-x-4">
           <button
-            onClick={() => router.push('/')}
-            className="text-white/60 hover:text-white transition-colors"
+            onClick={handleLeave}
+            className="text-red-400 hover:text-red-300 transition-colors"
           >
-            ← Back to Home
+            🚪 Leave Casino
           </button>
         </div>
 

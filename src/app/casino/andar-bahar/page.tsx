@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
+import { useCasino } from '../CasinoContext';
 
 interface Card {
   suit: string;
@@ -32,15 +33,16 @@ function AndarBaharGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'dealing' | 'results'>('lobby');
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(casinoName || '');
   const [lobbyCode, setLobbyCode] = useState('');
   const [roomId, setRoomId] = useState('');
   const [players, setPlayers] = useState<Player[]>([]);
   const [myPlayerId, setMyPlayerId] = useState('');
-  const [balance, setBalance] = useState(25000);
+  const [balance, setBalance] = useState(casinoBalance);
   const [currentBet, setCurrentBet] = useState(0);
   const [betInput, setBetInput] = useState('');
   const [betSide, setBetSide] = useState<'andar' | 'bahar' | null>(null);
@@ -56,6 +58,21 @@ function AndarBaharGame() {
 
   // Single player deck
   const [deck, setDeck] = useState<Card[]>([]);
+
+  // Sync casino balance on mount for single player
+  useEffect(() => {
+    if (mode === 'single') {
+      setBalance(casinoBalance);
+      if (casinoName) setPlayerName(casinoName);
+    }
+  }, [mode, casinoBalance, casinoName]);
+
+  // Update casino context when balance changes in single player
+  useEffect(() => {
+    if (mode === 'single' && gameState === 'results') {
+      setCasinoBalance(balance);
+    }
+  }, [balance, mode, gameState, setCasinoBalance]);
 
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];

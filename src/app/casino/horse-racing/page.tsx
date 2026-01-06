@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
+import { useCasino } from '../CasinoContext';
 
 interface Horse {
   id: number;
@@ -40,15 +41,16 @@ function HorseRacingGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') || 'single';
+  const { playerName: casinoName, balance: casinoBalance, setBalance: setCasinoBalance } = useCasino();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<'lobby' | 'betting' | 'racing' | 'results'>('lobby');
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(casinoName || '');
   const [lobbyCode, setLobbyCode] = useState('');
   const [roomId, setRoomId] = useState('');
   const [players, setPlayers] = useState<Player[]>([]);
   const [myPlayerId, setMyPlayerId] = useState('');
-  const [balance, setBalance] = useState(25000);
+  const [balance, setBalance] = useState(casinoBalance);
   const [horses, setHorses] = useState<Horse[]>([]);
   const [selectedHorse, setSelectedHorse] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState('');
@@ -59,6 +61,21 @@ function HorseRacingGame() {
   const [raceInProgress, setRaceInProgress] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const raceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync casino balance on mount for single player
+  useEffect(() => {
+    if (mode === 'single') {
+      setBalance(casinoBalance);
+      if (casinoName) setPlayerName(casinoName);
+    }
+  }, [mode, casinoBalance, casinoName]);
+
+  // Update casino context when balance changes in single player
+  useEffect(() => {
+    if (mode === 'single' && gameState === 'results') {
+      setCasinoBalance(balance);
+    }
+  }, [balance, mode, gameState, setCasinoBalance]);
 
   const generateHorses = (): Horse[] => {
     return Array.from({ length: 8 }, (_, i) => ({
@@ -267,8 +284,9 @@ function HorseRacingGame() {
         if (horse.position >= 100) return horse;
         
         // Random speed based on odds (lower odds = slightly faster on average)
-        const baseSpeed = 0.5 + Math.random() * 2;
-        const oddsBonus = (10 - horse.odds) / 20; // Better odds = small bonus
+        // Slowed down for more exciting races
+        const baseSpeed = 0.25 + Math.random() * 1;
+        const oddsBonus = (10 - horse.odds) / 30; // Better odds = small bonus
         const newPosition = Math.min(100, horse.position + baseSpeed + oddsBonus);
         
         if (newPosition >= 100 && !winningHorse) {
@@ -298,7 +316,7 @@ function HorseRacingGame() {
           }
         }, 500);
       }
-    }, 50);
+    }, 100);
   };
 
   const confirmBetAndRace = () => {
