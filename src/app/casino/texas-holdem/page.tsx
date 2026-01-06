@@ -671,21 +671,7 @@ function TexasHoldemGameContent() {
           >
             ← Back to Casino
           </button>
-          <button
-            onClick={() => {
-              if (checkAndReload()) {
-                setPlayerBalance(25000);
-              }
-            }}
-            disabled={playerBalance >= 1000}
-            className={`px-4 py-2 text-white rounded-lg transition-colors font-bold ${
-              playerBalance >= 1000 
-                ? 'bg-gray-600 cursor-not-allowed opacity-50' 
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
-          >
-            💵 Reload $25k
-          </button>
+          <div className="text-2xl font-bold text-green-400">${playerBalance.toLocaleString()}</div>
         </div>
 
         {/* Community Cards */}
