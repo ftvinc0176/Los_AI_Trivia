@@ -90,8 +90,7 @@ export default function Craps() {
             winnings += bet.amount * 2; // 1:1 payout (return bet + equal winnings)
             return false; // Remove bet
           } else if (bet.type === 'dontPass') {
-            losses += bet.amount; // Lose the bet
-            return false; // Remove bet
+            return false; // Remove bet (money already taken when bet placed)
           }
           return true; // Keep other bets
         });
@@ -117,9 +116,7 @@ export default function Craps() {
             }
             return false; // Remove bet
           } else if (bet.type === 'dontPass') {
-            losses += bet.amount;
-            if (bet.odds) losses += bet.odds;
-            return false; // Remove bet
+            return false; // Remove bet (money already taken when bet placed)
           } else if (bet.type.startsWith('place')) {
             // Remove all place bets when point is made (round ends)
             return false;
@@ -137,12 +134,9 @@ export default function Craps() {
             }
             return false;
           } else if (bet.type === 'pass') {
-            losses += bet.amount; // Lose pass line bet
-            if (bet.odds) losses += bet.odds; // Lose odds bet
-            return false;
+            return false; // Remove bet (money already taken when bet placed)
           } else if (bet.type.startsWith('place')) {
             // 7 out - all place bets lose
-            losses += bet.amount;
             return false;
           }
           return true;
@@ -180,8 +174,7 @@ export default function Craps() {
             msg += ' - Field wins!';
           }
         } else {
-          // Field loses on 5,6,7,8
-          losses += bet.amount;
+          // Field loses on 5,6,7,8 (money already taken when bet placed)
           msg += ' - Field loses';
         }
         return false; // Always remove field bet after roll
@@ -205,8 +198,7 @@ export default function Craps() {
       if ([4, 6, 8, 10].includes(total)) {
         newBets = newBets.filter(bet => {
           if (bet.type === `hard${total}`) {
-            losses += bet.amount;
-            return false;
+            return false; // Remove bet (money already taken when bet placed)
           }
           return true;
         });
@@ -217,8 +209,7 @@ export default function Craps() {
     if (total === 7) {
       newBets = newBets.filter(bet => {
         if (bet.type.startsWith('hard')) {
-          losses += bet.amount;
-          return false;
+          return false; // Remove bet (money already taken when bet placed)
         }
         return true;
       });
@@ -230,20 +221,16 @@ export default function Craps() {
         if ([2, 3, 12].includes(total)) {
           winnings += bet.amount * 8; // 7:1 payout
           msg += ' - Any Craps wins!';
-        } else {
-          losses += bet.amount;
         }
-        return false;
+        return false; // Remove bet (money already taken when bet placed)
       }
       
       if (bet.type === 'any7') {
         if (total === 7) {
           winnings += bet.amount * 5; // 4:1 payout
           msg += ' - Any 7 wins!';
-        } else {
-          losses += bet.amount;
         }
-        return false;
+        return false; // Remove bet (money already taken when bet placed)
       }
 
       // Horn bets
@@ -252,10 +239,8 @@ export default function Craps() {
         if (total === hornNum) {
           winnings += getHornPayout(hornNum, bet.amount);
           msg += ` - Horn ${hornNum} wins!`;
-        } else {
-          losses += bet.amount;
         }
-        return false;
+        return false; // Remove bet (money already taken when bet placed)
       }
 
       return true;
