@@ -342,12 +342,16 @@ export default function SweetBonanza() {
     }
     
     setTimeout(() => {
-      setGrid(newGrid);
+      // Clear isNew flag after animation
+      const clearedGrid = newGrid.map(col => 
+        col.map(s => ({ ...s, isNew: false }))
+      );
+      setGrid(clearedGrid);
       setIsTumbling(false);
       
       // Check for more wins
       setTimeout(() => {
-        checkWins(newGrid, tumbleNum, multipliers, accumulatedWin);
+        checkWins(clearedGrid, tumbleNum, multipliers, accumulatedWin);
       }, 300);
     }, 400);
   };
