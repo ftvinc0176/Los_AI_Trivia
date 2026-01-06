@@ -264,6 +264,21 @@ function TexasHoldemGameContent() {
     const callAmount = currentBet - player.totalBetThisRound;
     const potOdds = callAmount / (pot + callAmount);
     
+    // If AI doesn't have enough to call, must fold or go all-in
+    if (callAmount > player.balance && player.balance > 0) {
+      // Evaluate hand strength
+      const fullHand = [...player.holeCards, ...communityCards];
+      const handEval = fullHand.length >= 5 ? evaluateHand(fullHand) : null;
+      const handStrength = handEval ? handEval.rank / 9 : 0;
+      
+      // Only go all-in with strong hands
+      if (handStrength > 0.6) {
+        return { action: 'allin' };
+      } else {
+        return { action: 'fold' };
+      }
+    }
+    
     // Evaluate hand strength
     const fullHand = [...player.holeCards, ...communityCards];
     const handEval = fullHand.length >= 5 ? evaluateHand(fullHand) : null;
@@ -428,6 +443,19 @@ function TexasHoldemGameContent() {
         });
         player.hasActed = true;
         setPhaseMessage(`${player.name} raises to $${aiAction.amount}`);
+      } else if (aiAction.action === 'allin') {
+        newPot += player.balance;
+        player.totalBetThisRound += player.balance;
+        if (player.totalBetThisRound > currentBet) {
+          setCurrentBet(player.totalBetThisRound);
+          updatedPlayers.forEach(p => {
+            if (p.id !== player.id) p.hasActed = false;
+          });
+        }
+        player.balance = 0;
+        player.isAllIn = true;
+        player.hasActed = true;
+        setPhaseMessage(`${player.name} goes all-in!`);
       }
 
       setPlayers(updatedPlayers);
