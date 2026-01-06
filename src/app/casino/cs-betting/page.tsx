@@ -215,6 +215,9 @@ export default function CSBetting() {
 
     const wallH = 6;
     const wallThick = 1;
+    
+    // Store all wall meshes for raycasting LOS checks
+    const wallMeshes: THREE.Mesh[] = [];
 
     // Helper to add mesh with collision (for walls)
     const addMesh = (mesh: THREE.Mesh) => {
@@ -222,6 +225,7 @@ export default function CSBetting() {
       mesh.receiveShadow = true;
       scene.add(mesh);
       worldOctree.fromGraphNode(mesh);
+      wallMeshes.push(mesh); // Track for raycasting
     };
 
     // Helper to add mesh WITHOUT collision (for floors)
@@ -649,43 +653,86 @@ export default function CSBetting() {
     const bombSiteB = new THREE.Vector3(-35, 0, -10);
     let targetSite = Math.random() > 0.5 ? bombSiteA : bombSiteB;
 
-    // Waypoints for navigation around the map
+    // Waypoints for navigation around the map - more granular for smooth pathfinding
     const waypoints = {
+      // T side spawns and areas
       tSpawn: new THREE.Vector3(0, 0, -70),
-      tAptsEntry: new THREE.Vector3(-20, 0, -55),
-      bApps: new THREE.Vector3(-30, 0, -35),
-      bSite: new THREE.Vector3(-35, 0, -10),
-      underpass: new THREE.Vector3(-18, 0, -25),
+      tSpawnLeft: new THREE.Vector3(-8, 0, -68),
+      tSpawnRight: new THREE.Vector3(8, 0, -68),
+      
+      // B route via apartments
+      tAptsEntry: new THREE.Vector3(-20, 0, -60),
+      tAptsInside: new THREE.Vector3(-20, 0, -50),
+      bAppsCorridor: new THREE.Vector3(-30, 0, -45),
+      bAppsExit: new THREE.Vector3(-30, 0, -25),
+      bSiteEntry: new THREE.Vector3(-35, 0, -18),
+      bSite: new THREE.Vector3(-40, 0, -5),
+      bSiteBox: new THREE.Vector3(-45, 0, 0),
+      
+      // Mid area
+      midEntry: new THREE.Vector3(0, 0, -50),
       mid: new THREE.Vector3(0, 0, -35),
-      midTop: new THREE.Vector3(0, 0, -15),
+      midTop: new THREE.Vector3(0, 0, -20),
+      
+      // Underpass connection
+      underpassEntry: new THREE.Vector3(-10, 0, -30),
+      underpass: new THREE.Vector3(-18, 0, -25),
+      underpassExit: new THREE.Vector3(-25, 0, -18),
+      
+      // Connector
       connector: new THREE.Vector3(0, 0, -5),
-      tRamp: new THREE.Vector3(20, 0, -60),
-      palace: new THREE.Vector3(35, 0, -45),
+      connectorToA: new THREE.Vector3(10, 0, -10),
+      
+      // A route via palace/ramp
+      tRamp: new THREE.Vector3(20, 0, -65),
+      tRampTop: new THREE.Vector3(20, 0, -55),
+      palace: new THREE.Vector3(35, 0, -50),
+      palaceMid: new THREE.Vector3(35, 0, -40),
       palaceTop: new THREE.Vector3(35, 0, -30),
-      aShort: new THREE.Vector3(20, 0, -20),
+      palaceExit: new THREE.Vector3(40, 0, -25),
+      
+      // A short route
+      aShortEntry: new THREE.Vector3(15, 0, -25),
+      aShort: new THREE.Vector3(25, 0, -20),
+      aShortExit: new THREE.Vector3(35, 0, -20),
+      
+      // A site
+      aSiteEntry: new THREE.Vector3(40, 0, -20),
       aSite: new THREE.Vector3(50, 0, -20),
+      aSiteDefault: new THREE.Vector3(50, 0, -15),
+      
+      // CT areas
       ctSpawn: new THREE.Vector3(25, 0, 15),
+      ctSpawnLeft: new THREE.Vector3(15, 0, 12),
+      ctSpawnRight: new THREE.Vector3(35, 0, 12),
+      ctToA: new THREE.Vector3(40, 0, 5),
+      ctToB: new THREE.Vector3(5, 0, 10),
+      
+      // Market
+      marketEntry: new THREE.Vector3(-5, 0, 5),
       market: new THREE.Vector3(-10, 0, 10),
+      marketExit: new THREE.Vector3(-20, 0, 5),
     };
 
-    // Routes from T spawn to bomb sites
+    // Routes from T spawn to bomb sites - more waypoints for smoother paths
     const routesToA = [
-      [waypoints.tSpawn, waypoints.mid, waypoints.aShort, waypoints.aSite],
-      [waypoints.tSpawn, waypoints.tRamp, waypoints.palace, waypoints.palaceTop, waypoints.aSite],
+      [waypoints.tSpawn, waypoints.midEntry, waypoints.mid, waypoints.midTop, waypoints.aShortEntry, waypoints.aShort, waypoints.aSiteEntry, waypoints.aSite],
+      [waypoints.tSpawn, waypoints.tRamp, waypoints.tRampTop, waypoints.palace, waypoints.palaceMid, waypoints.palaceTop, waypoints.palaceExit, waypoints.aSite],
+      [waypoints.tSpawn, waypoints.midEntry, waypoints.mid, waypoints.connector, waypoints.connectorToA, waypoints.aShort, waypoints.aSite],
     ];
     const routesToB = [
-      [waypoints.tSpawn, waypoints.tAptsEntry, waypoints.bApps, waypoints.bSite],
-      [waypoints.tSpawn, waypoints.mid, waypoints.underpass, waypoints.bSite],
+      [waypoints.tSpawn, waypoints.tSpawnLeft, waypoints.tAptsEntry, waypoints.tAptsInside, waypoints.bAppsCorridor, waypoints.bAppsExit, waypoints.bSiteEntry, waypoints.bSite],
+      [waypoints.tSpawn, waypoints.midEntry, waypoints.mid, waypoints.underpassEntry, waypoints.underpass, waypoints.underpassExit, waypoints.bSiteEntry, waypoints.bSite],
     ];
 
     // Routes from CT spawn to bomb sites
     const ctRoutesToA = [
-      [waypoints.ctSpawn, waypoints.aSite],
-      [waypoints.ctSpawn, waypoints.connector, waypoints.aShort, waypoints.aSite],
+      [waypoints.ctSpawn, waypoints.ctToA, waypoints.aSiteEntry, waypoints.aSite],
+      [waypoints.ctSpawn, waypoints.ctSpawnLeft, waypoints.connector, waypoints.connectorToA, waypoints.aShort, waypoints.aSiteEntry, waypoints.aSite],
     ];
     const ctRoutesToB = [
-      [waypoints.ctSpawn, waypoints.market, waypoints.bSite],
-      [waypoints.ctSpawn, waypoints.connector, waypoints.mid, waypoints.underpass, waypoints.bSite],
+      [waypoints.ctSpawn, waypoints.ctToB, waypoints.marketEntry, waypoints.market, waypoints.marketExit, waypoints.bSiteEntry, waypoints.bSite],
+      [waypoints.ctSpawn, waypoints.ctSpawnLeft, waypoints.connector, waypoints.underpassEntry, waypoints.underpass, waypoints.underpassExit, waypoints.bSiteEntry, waypoints.bSite],
     ];
 
     // Assign routes to bots
@@ -727,29 +774,60 @@ export default function CSBetting() {
     // Call after bots are initialized
     setTimeout(initializeBotRoutes, 100);
 
-    // Check line of sight between two positions
+    // Check line of sight between two positions using proper raycasting
     const checkLineOfSight = (from: THREE.Vector3, to: THREE.Vector3): boolean => {
+      const direction = to.clone().sub(from).normalize();
       const distance = from.distanceTo(to);
       
-      // Simple step-based collision check - check at chest height to avoid floor issues
-      const steps = Math.ceil(distance / 3);
-      for (let i = 1; i < steps; i++) {
-        const t = i / steps;
-        const checkPos = new THREE.Vector3().lerpVectors(from, to, t);
-        
-        // Only check walls at chest/head height (y=1.0 to 1.5), not floors
-        const testCapsule = new Capsule(
-          checkPos.clone().setY(1.0),
-          checkPos.clone().setY(1.5),
-          0.1
-        );
-        
-        const result = worldOctree.capsuleIntersect(testCapsule);
-        if (result) {
-          return false; // Wall in the way
-        }
+      raycaster.set(from, direction);
+      raycaster.far = distance;
+      
+      const intersects = raycaster.intersectObjects(wallMeshes, false);
+      
+      // If any wall is between us and target, no LOS
+      if (intersects.length > 0 && intersects[0].distance < distance - 0.5) {
+        return false;
       }
       return true;
+    };
+    
+    // Check if a position is walkable (not inside a wall)
+    const isWalkable = (pos: THREE.Vector3): boolean => {
+      const testCapsule = new Capsule(
+        new THREE.Vector3(pos.x, 0.5, pos.z),
+        new THREE.Vector3(pos.x, 1.5, pos.z),
+        0.4
+      );
+      return !worldOctree.capsuleIntersect(testCapsule);
+    };
+    
+    // Find a clear path around obstacles - simple pathfinding
+    const findClearDirection = (from: THREE.Vector3, to: THREE.Vector3, bot: Bot): THREE.Vector3 | null => {
+      const directDir = to.clone().sub(from).normalize();
+      
+      // First, try direct path
+      const testDist = 2;
+      const testPos = from.clone().add(directDir.clone().multiplyScalar(testDist));
+      if (isWalkable(testPos)) {
+        return directDir;
+      }
+      
+      // Try various angles to find a clear path
+      const angles = [30, -30, 60, -60, 90, -90, 120, -120, 150, -150];
+      for (const angleDeg of angles) {
+        const angle = (angleDeg * Math.PI) / 180;
+        const rotatedDir = new THREE.Vector3(
+          directDir.x * Math.cos(angle) - directDir.z * Math.sin(angle),
+          0,
+          directDir.x * Math.sin(angle) + directDir.z * Math.cos(angle)
+        );
+        const testPosRot = from.clone().add(rotatedDir.multiplyScalar(testDist));
+        if (isWalkable(testPosRot)) {
+          return rotatedDir.normalize();
+        }
+      }
+      
+      return null; // Completely stuck
     };
 
     // Create bullet tracer
@@ -820,11 +898,31 @@ export default function CSBetting() {
             const stuckTime = (botStuckTime.get(bot.id) || 0) + deltaTime;
             botStuckTime.set(bot.id, stuckTime);
             
-            // If stuck for more than 1 second, try a random direction
-            if (stuckTime > 1) {
-              const randomAngle = Math.random() * Math.PI * 2;
-              const escapeDir = new THREE.Vector3(Math.cos(randomAngle), 0, Math.sin(randomAngle));
-              bot.targetPosition = botPos.clone().add(escapeDir.multiplyScalar(5));
+            // If stuck for more than 0.8 seconds, try to find alternate path
+            if (stuckTime > 0.8) {
+              // Try to skip to next waypoint in route, or find a walkable nearby position
+              const route = botRoutes.get(bot.id) || [];
+              const currentIdx = botRouteIndex.get(bot.id) || 0;
+              
+              // Skip to next waypoint if available
+              if (currentIdx + 1 < route.length) {
+                botRouteIndex.set(bot.id, currentIdx + 1);
+              }
+              
+              // Also try a perpendicular direction to escape wall
+              const toTarget = bot.targetPosition?.clone().sub(botPos).normalize() || new THREE.Vector3(1, 0, 0);
+              const perpendicular = new THREE.Vector3(-toTarget.z, 0, toTarget.x);
+              const escapeDir = Math.random() > 0.5 ? perpendicular : perpendicular.negate();
+              
+              // Find a walkable escape position
+              for (let dist = 2; dist <= 6; dist += 2) {
+                const escapePos = botPos.clone().add(escapeDir.clone().multiplyScalar(dist));
+                if (isWalkable(escapePos)) {
+                  bot.targetPosition = escapePos;
+                  break;
+                }
+              }
+              
               botStuckTime.set(bot.id, 0);
             }
           } else {
@@ -915,74 +1013,114 @@ export default function CSBetting() {
 
         // CT bot behavior
         if (bot.team === 'CT') {
-          // Always try to find and engage Ts
-          const nearestT = aliveTBots.reduce((nearest, tBot) => {
+          // Check for enemies with line of sight
+          const nearestVisibleT = aliveTBots.reduce((nearest, tBot) => {
             const dist = botPos.distanceTo(tBot.capsule.start);
+            const hasLOS = checkLineOfSight(
+              botPos.clone().setY(1),
+              tBot.capsule.start.clone().setY(1)
+            );
+            if (!hasLOS) return nearest; // Can't see this T
             return !nearest || dist < botPos.distanceTo(nearest.capsule.start) ? tBot : nearest;
           }, null as Bot | null);
 
           if (bombPlantedRef.current && plantedPositionRef.current) {
-            // Rush to defuse - go directly
-            bot.targetPosition = plantedPositionRef.current.clone();
-          } else if (nearestT) {
-            // Always move toward nearest T
-            bot.targetPosition = nearestT.capsule.start.clone();
+            // Rush to defuse - follow route toward bomb
+            // Find closest waypoint near planted bomb
+            const distToPlant = botPos.distanceTo(plantedPositionRef.current);
+            if (distToPlant < 8) {
+              // Close enough, go direct
+              bot.targetPosition = plantedPositionRef.current.clone();
+            } else {
+              // Follow route waypoints
+              if (routeIdx < route.length) {
+                const currentWaypoint = route[routeIdx];
+                const distToWaypoint = botPos.distanceTo(currentWaypoint);
+                if (distToWaypoint < 3) {
+                  botRouteIndex.set(bot.id, routeIdx + 1);
+                }
+                bot.targetPosition = currentWaypoint.clone();
+              } else {
+                bot.targetPosition = plantedPositionRef.current.clone();
+              }
+            }
+          } else if (nearestVisibleT) {
+            // Can see a T - engage directly
+            bot.targetPosition = nearestVisibleT.capsule.start.clone();
           } else {
-            // No Ts visible, patrol toward a bomb site
-            if (!bot.targetPosition || botPos.distanceTo(bot.targetPosition) < 5) {
-              bot.targetPosition = Math.random() > 0.5 ? bombSiteA.clone() : bombSiteB.clone();
+            // Can't see any T, follow patrol route
+            if (routeIdx < route.length) {
+              const currentWaypoint = route[routeIdx];
+              const distToWaypoint = botPos.distanceTo(currentWaypoint);
+              if (distToWaypoint < 3) {
+                botRouteIndex.set(bot.id, routeIdx + 1);
+              }
+              bot.targetPosition = currentWaypoint.clone();
+            } else {
+              // End of route, pick a new random site to patrol
+              if (!bot.targetPosition || botPos.distanceTo(bot.targetPosition) < 5) {
+                bot.targetPosition = Math.random() > 0.5 ? bombSiteA.clone() : bombSiteB.clone();
+              }
             }
           }
         }
 
-        // Movement - simplified without floor collision issues
+        // Movement with smart obstacle avoidance
         if (bot.targetPosition && !bot.isPlanting) {
-          const direction = bot.targetPosition.clone().sub(botPos).normalize();
-          bot.facingDirection.copy(direction);
           const speed = 8;
           
-          // Calculate new position
-          const newX = bot.capsule.start.x + direction.x * speed * deltaTime;
-          const newZ = bot.capsule.start.z + direction.z * speed * deltaTime;
+          // Get a clear direction toward target, avoiding walls
+          const moveDir = findClearDirection(botPos.clone().setY(1), bot.targetPosition.clone().setY(1), bot);
           
-          // Create test capsule at new position - raised to avoid floor collision
-          const testCapsule = new Capsule(
-            new THREE.Vector3(newX, 0.6, newZ),
-            new THREE.Vector3(newX, 1.7, newZ),
-            0.3
-          );
-          
-          // Check collision with world
-          const result = worldOctree.capsuleIntersect(testCapsule);
-          
-          if (!result) {
-            // No collision - move freely
-            bot.capsule.start.x = newX;
-            bot.capsule.start.z = newZ;
-            bot.capsule.end.x = newX;
-            bot.capsule.end.z = newZ;
-          } else {
-            // Collision detected - try to slide along wall
-            // Try moving only in X
-            const testX = new Capsule(
-              new THREE.Vector3(newX, 0.6, bot.capsule.start.z),
-              new THREE.Vector3(newX, 1.7, bot.capsule.start.z),
-              0.3
-            );
-            if (!worldOctree.capsuleIntersect(testX)) {
-              bot.capsule.start.x = newX;
-              bot.capsule.end.x = newX;
-            }
+          if (moveDir) {
+            bot.facingDirection.copy(moveDir);
             
-            // Try moving only in Z
-            const testZ = new Capsule(
-              new THREE.Vector3(bot.capsule.start.x, 0.6, newZ),
-              new THREE.Vector3(bot.capsule.start.x, 1.7, newZ),
-              0.3
+            // Calculate new position
+            const newX = bot.capsule.start.x + moveDir.x * speed * deltaTime;
+            const newZ = bot.capsule.start.z + moveDir.z * speed * deltaTime;
+            
+            // Create test capsule at new position
+            const testCapsule = new Capsule(
+              new THREE.Vector3(newX, 0.5, newZ),
+              new THREE.Vector3(newX, 1.7, newZ),
+              0.35
             );
-            if (!worldOctree.capsuleIntersect(testZ)) {
+            
+            // Check collision with world
+            const result = worldOctree.capsuleIntersect(testCapsule);
+            
+            if (!result) {
+              // No collision - move freely
+              bot.capsule.start.x = newX;
               bot.capsule.start.z = newZ;
+              bot.capsule.end.x = newX;
               bot.capsule.end.z = newZ;
+            } else {
+              // Collision - use the collision normal to slide along wall
+              const normal = result.normal;
+              
+              // Project velocity onto the wall plane (slide)
+              const slideDir = new THREE.Vector3(moveDir.x, 0, moveDir.z);
+              slideDir.addScaledVector(normal, -slideDir.dot(normal));
+              slideDir.normalize();
+              
+              if (slideDir.length() > 0.1) {
+                const slideX = bot.capsule.start.x + slideDir.x * speed * deltaTime * 0.7;
+                const slideZ = bot.capsule.start.z + slideDir.z * speed * deltaTime * 0.7;
+                
+                const testSlide = new Capsule(
+                  new THREE.Vector3(slideX, 0.5, slideZ),
+                  new THREE.Vector3(slideX, 1.7, slideZ),
+                  0.35
+                );
+                
+                if (!worldOctree.capsuleIntersect(testSlide)) {
+                  bot.capsule.start.x = slideX;
+                  bot.capsule.start.z = slideZ;
+                  bot.capsule.end.x = slideX;
+                  bot.capsule.end.z = slideZ;
+                }
+              }
             }
           }
         }
