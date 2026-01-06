@@ -97,6 +97,12 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     sessionStorage.setItem('casinoBalance', balance.toString());
     
+    // Auto-reload if balance drops below $1k
+    if (balance < 1000 && playerName) {
+      setBalance(25000);
+      sessionStorage.setItem('casinoBalance', '25000');
+    }
+    
     // Check if this is a new peak balance for this session
     if (balance > peakBalance && playerName) {
       setPeakBalance(balance);

@@ -57,6 +57,11 @@ function BlackjackGame() {
   const [hasDoubled, setHasDoubled] = useState(false);
   const [canDouble, setCanDouble] = useState(false);
   const [canSplit, setCanSplit] = useState(false);
+  const [splitHands, setSplitHands] = useState<Card[][]>([]);
+  const [splitHandValues, setSplitHandValues] = useState<number[]>([]);
+  const [splitBets, setSplitBets] = useState<number[]>([]);
+  const [currentSplitHandIndex, setCurrentSplitHandIndex] = useState(0);
+  const [isSplitMode, setIsSplitMode] = useState(false);
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; playerCount: number; maxPlayers: number }>>([]);
@@ -540,6 +545,11 @@ function BlackjackGame() {
       setCanDouble(false); // Can't double after hitting
       setCanSplit(false); // Can't split after hitting
     } else {
+      if (isSplitMode) {
+        hitSplitHand();
+        return;
+      }
+      
       const deck = (window as any).gameDeck as Card[];
       const newCard = deck.pop()!;
       const newHand = [...myHand, newCard];
@@ -574,6 +584,11 @@ function BlackjackGame() {
       if (!isMyTurn) return; // Can only stand on your turn
       socket.emit('casinoStand', { roomId });
     } else {
+      if (isSplitMode) {
+        standSplitHand();
+        return;
+      }
+      
       setShowDealerHole(true);
       // Only play dealer if player hasn't busted
       if (myHandValue > 21) {
@@ -689,9 +704,152 @@ function BlackjackGame() {
   };
 
   const split = () => {
-    // For now, show a message that split is not yet implemented in this version
-    // Full split implementation would require managing two separate hands
-    alert('Split functionality coming soon! For now, please Hit or Stand.');
+    if (myHand.length !== 2 || myHand[0].value !== myHand[1].value) return;
+    if (balance < currentBet) {
+      alert('Insufficient balance to split!');
+      return;
+    }
+
+    // Create two hands from the split
+    const hand1 = [myHand[0]];
+    const hand2 = [myHand[1]];
+    
+    // Deduct additional bet for second hand
+    setBalance(balance - currentBet);
+    
+    setSplitHands([hand1, hand2]);
+    setSplitBets([currentBet, currentBet]);
+    setIsSplitMode(true);
+    setCurrentSplitHandIndex(0);
+    setCanSplit(false);
+    setCanDouble(false);
+    
+    // Deal one card to each split hand
+    const newDeck = createDeck().filter(card => 
+      !dealerHand.some(c => c.suit === card.suit && c.value === card.value) &&
+      !myHand.some(c => c.suit === card.suit && c.value === card.value)
+    );
+    shuffleDeck(newDeck);
+    
+    hand1.push(newDeck.pop()!);
+    hand2.push(newDeck.pop()!);
+    
+    const value1 = calculateHandValue(hand1);
+    const value2 = calculateHandValue(hand2);
+    
+    setSplitHands([hand1, hand2]);
+    setSplitHandValues([value1, value2]);
+    
+    // Start playing first hand
+    if (value1 === 21) {
+      // Blackjack on first split hand, move to second
+      setCurrentSplitHandIndex(1);
+      if (value2 === 21) {
+        // Both blackjacks, end round
+        dealerPlaySplit([value1, value2]);
+      }
+    }
+  };
+
+  const hitSplitHand = () => {
+    if (!isSplitMode || currentSplitHandIndex >= splitHands.length) return;
+    
+    const currentHand = [...splitHands[currentSplitHandIndex]];
+    const newDeck = createDeck().filter(card => 
+      !dealerHand.some(c => c.suit === card.suit && c.value === card.value) &&
+      !splitHands.flat().some(c => c.suit === card.suit && c.value === card.value)
+    );
+    shuffleDeck(newDeck);
+    
+    currentHand.push(newDeck.pop()!);
+    const newValue = calculateHandValue(currentHand);
+    
+    const updatedHands = [...splitHands];
+    updatedHands[currentSplitHandIndex] = currentHand;
+    
+    const updatedValues = [...splitHandValues];
+    updatedValues[currentSplitHandIndex] = newValue;
+    
+    setSplitHands(updatedHands);
+    setSplitHandValues(updatedValues);
+    
+    if (newValue >= 21) {
+      standSplitHand();
+    }
+  };
+
+  const standSplitHand = () => {
+    if (currentSplitHandIndex < splitHands.length - 1) {
+      // Move to next hand
+      setCurrentSplitHandIndex(currentSplitHandIndex + 1);
+    } else {
+      // All hands played, dealer's turn
+      dealerPlaySplit(splitHandValues);
+    }
+  };
+
+  const dealerPlaySplit = (playerValues: number[]) => {
+    setShowDealerHole(true);
+    let dealerValue = calculateHandValue(dealerHand);
+    
+    const dealerPlay = async () => {
+      while (dealerValue < 17) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const newDeck = createDeck().filter(card => 
+          !dealerHand.some(c => c.suit === card.suit && c.value === card.value) &&
+          !splitHands.flat().some(c => c.suit === card.suit && c.value === card.value)
+        );
+        shuffleDeck(newDeck);
+        
+        const newCard = newDeck.pop()!;
+        const newDealerHand = [...dealerHand, newCard];
+        setDealerHand(newDealerHand);
+        dealerValue = calculateHandValue(newDealerHand);
+        setDealerHandValue(dealerValue);
+      }
+      
+      // Determine winners for each hand
+      let totalWinnings = 0;
+      const results: string[] = [];
+      
+      for (let i = 0; i < playerValues.length; i++) {
+        const playerValue = playerValues[i];
+        const bet = splitBets[i];
+        let winAmount = 0;
+        let message = '';
+        
+        if (playerValue > 21) {
+          message = `Hand ${i + 1}: Bust`;
+          winAmount = 0;
+        } else if (dealerValue > 21) {
+          message = `Hand ${i + 1}: Win (Dealer bust)`;
+          winAmount = bet * 2;
+        } else if (playerValue > dealerValue) {
+          message = `Hand ${i + 1}: Win`;
+          winAmount = bet * 2;
+        } else if (playerValue < dealerValue) {
+          message = `Hand ${i + 1}: Lose`;
+          winAmount = 0;
+        } else {
+          message = `Hand ${i + 1}: Push`;
+          winAmount = bet;
+        }
+        
+        totalWinnings += winAmount;
+        results.push(message);
+      }
+      
+      const profit = totalWinnings - (splitBets[0] + splitBets[1]);
+      if (profit > 0) {
+        recordWin(profit);
+      }
+      
+      setBalance(balance + totalWinnings);
+      setResultMessage(results.join(' | '));
+      setGameState('results');
+    };
+    
+    dealerPlay();
   };
 
   const determineWinner = (playerValue: number, dealerValue: number) => {
@@ -738,6 +896,11 @@ function BlackjackGame() {
     setHasDoubled(false);
     setCanDouble(false);
     setCanSplit(false);
+    setSplitHands([]);
+    setSplitHandValues([]);
+    setSplitBets([]);
+    setCurrentSplitHandIndex(0);
+    setIsSplitMode(false);
     setSideBets({ perfectPairs: 0, twentyOnePlus3: 0 });
     setSideBetResults({ perfectPairs: '', twentyOnePlus3: '', perfectPairsWin: 0, twentyOnePlus3Win: 0 });
     setShowDealerHole(false);
