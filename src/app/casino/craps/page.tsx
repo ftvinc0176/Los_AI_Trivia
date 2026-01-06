@@ -438,7 +438,7 @@ export default function Craps() {
             <div className="bg-black/60 p-4 rounded-lg mb-4 grid grid-cols-2 gap-4 text-white text-sm">
               <div>
                 <h3 className="font-bold mb-2 text-yellow-400">Line Bets</h3>
-                <p>Pass/Don't Pass: 1:1</p>
+                <p>Pass/Don&apos;t Pass: 1:1</p>
                 <h3 className="font-bold mb-2 mt-3 text-yellow-400">Place Bets</h3>
                 <p>2, 3, 11, 12: 11:1</p>
                 <p>4, 10: 2:1</p>
@@ -499,7 +499,7 @@ export default function Craps() {
               onClick={() => placeBet('dontPass')}
               className="relative bg-black border-4 border-white rounded-lg p-6 hover:bg-gray-800 transition-colors"
             >
-              <div className="text-center font-bold text-white text-xl">DON'T PASS</div>
+              <div className="text-center font-bold text-white text-xl">DON&apos;T PASS</div>
               {getBetTotal('dontPass') > 0 && (
                 <div className="absolute top-2 right-2 bg-red-600 text-white px-3 py-1 rounded-full font-bold">
                   ${getBetTotal('dontPass')}

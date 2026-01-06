@@ -846,7 +846,8 @@ function BlackjackGame() {
       
       setBalance(balance + totalWinnings);
       setResultMessage(results.join(' | '));
-      setGameState('results');
+      setRoundResults({ 'single': results.join(' | ') });
+      // Stay in 'playing' state to show results
     };
     
     dealerPlay();
@@ -883,7 +884,7 @@ function BlackjackGame() {
     setBalance(balance + winAmount);
     setShowDealerHole(true);
     setRoundResults({ 'single': message });
-    setGameState('results');
+    // Stay in 'playing' state to show results
   };
 
   const playAgain = () => {
