@@ -195,9 +195,9 @@ export default function SweetBonanza() {
         newGrid.push(column);
       }
       setGrid(newGrid);
-      setIsSpinning(false);
       
       // Check for wins after spin (start with empty multipliers, they accumulate during tumbles)
+      // Keep isSpinning true until finalizeRound completes
       setTimeout(() => {
         checkWins(newGrid, 0, []);
       }, 300);
@@ -362,6 +362,9 @@ export default function SweetBonanza() {
         setMessage(`Free Spins Complete! Total Won: $${totalFreeSpinWin.toFixed(2)}`);
       }, 1500);
     }
+    
+    // Mark spin as complete
+    setIsSpinning(false);
     
     // Auto play
     if (autoPlay && !isFreeSpinMode && balance >= betAmount) {
