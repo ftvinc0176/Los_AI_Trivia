@@ -847,9 +847,6 @@ function BlackjackGame() {
       setBalance(balance + totalWinnings);
       setResultMessage(results.join(' | '));
       setGameState('results');
-      
-      // Check and reload balance after round ends
-      setTimeout(() => checkAndReload(), 100);
     };
     
     dealerPlay();
@@ -886,9 +883,7 @@ function BlackjackGame() {
     setBalance(balance + winAmount);
     setShowDealerHole(true);
     setRoundResults({ 'single': message });
-    
-    // Check and reload balance after round ends
-    setTimeout(() => checkAndReload(), 100);
+    setGameState('results');
   };
 
   const playAgain = () => {
@@ -1088,7 +1083,24 @@ function BlackjackGame() {
             ← Exit
           </button>
           <div className="text-xl sm:text-2xl font-bold text-white">♠️ Blackjack ♥️</div>
-          <div className="text-lg sm:text-xl font-bold text-green-400">${balance.toLocaleString()}</div>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button
+              onClick={() => {
+                if (checkAndReload()) {
+                  setBalance(25000);
+                }
+              }}
+              disabled={balance >= 1000}
+              className={`px-3 py-1 sm:px-4 sm:py-2 text-white rounded-lg transition-colors font-bold text-sm sm:text-base ${
+                balance >= 1000 
+                  ? 'bg-gray-600 cursor-not-allowed opacity-50' 
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              💵 Reload
+            </button>
+            <div className="text-lg sm:text-xl font-bold text-green-400">${balance.toLocaleString()}</div>
+          </div>
         </div>
 
         <div className="max-w-6xl w-full mx-auto">

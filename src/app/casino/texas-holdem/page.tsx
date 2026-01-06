@@ -374,7 +374,7 @@ function TexasHoldemGameContent() {
     }
 
     // Check if betting round complete
-    const allActed = activePlayers.every(p => p.hasActed && p.totalBetThisRound === currentBet);
+    const allActed = activePlayers.every(p => p.hasActed && p.currentBet === currentBet);
     if (allActed) {
       proceedToNextPhase(currentPlayers, currentPot);
       return;
@@ -478,11 +478,11 @@ function TexasHoldemGameContent() {
   const proceedToNextPhase = (currentPlayers: Player[], currentPot: number) => {
     const gameDeck = [...deck];
     
-    // Reset for next betting round
+    // Reset for next betting round (but keep totalBetThisRound for tracking contributions)
     currentPlayers.forEach(p => {
       p.hasActed = false;
       p.currentBet = 0;
-      p.totalBetThisRound = 0;
+      // Don't reset totalBetThisRound - we need it to track total contributions
     });
 
     if (phase === 'preflop') {
@@ -664,12 +664,29 @@ function TexasHoldemGameContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-green-900 p-4">
       <div className="max-w-7xl mx-auto">
-        <button
-          onClick={() => router.push('/casino')}
-          className="mb-4 text-white/60 hover:text-white transition-colors"
-        >
-          ← Back to Casino
-        </button>
+        <div className="flex justify-between items-center mb-4">
+          <button
+            onClick={() => router.push('/casino')}
+            className="text-white/60 hover:text-white transition-colors"
+          >
+            ← Back to Casino
+          </button>
+          <button
+            onClick={() => {
+              if (checkAndReload()) {
+                setPlayerBalance(25000);
+              }
+            }}
+            disabled={playerBalance >= 1000}
+            className={`px-4 py-2 text-white rounded-lg transition-colors font-bold ${
+              playerBalance >= 1000 
+                ? 'bg-gray-600 cursor-not-allowed opacity-50' 
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            💵 Reload $25k
+          </button>
+        </div>
 
         {/* Community Cards */}
         <div className="bg-green-700/50 rounded-2xl p-6 mb-4">
