@@ -230,7 +230,7 @@ export default function CSBetting() {
   
   const [started, setStarted] = useState(false);
   const [bet, setBet] = useState(500);
-  const [betOn, setBetOn] = useState<boolean | null>(null);
+  const [betOn, setBetOn] = useState<TeamType | null>(null); // T or CT
   const [phase, setPhase] = useState<'bet' | 'play' | 'end'>('bet');
   const [round, setRound] = useState(1);
   const [tScore, setTScore] = useState(0);
@@ -240,7 +240,7 @@ export default function CSBetting() {
   const [bombTimer, setBombTimer] = useState(45);
   const [bombPos, setBombPos] = useState<{x:number,y:number} | null>(null);
   const [result, setResult] = useState('');
-  const [betResult, setBetResult] = useState<{won:boolean,amt:number} | null>(null);
+  const [betResult, setBetResult] = useState<{won:boolean,amt:number,payout:number} | null>(null);
   const [matchOver, setMatchOver] = useState(false);
   const [winner, setWinner] = useState<TeamType | null>(null);
   const [bots, setBots] = useState<Bot[]>([]);
@@ -330,9 +330,9 @@ export default function CSBetting() {
     return b;
   }, []);
 
-  const startRound = useCallback((onPlant: boolean | null, betAmt: number) => {
-    if (onPlant !== null && betAmt > 0 && betAmt <= balance) {
-      setBetOn(onPlant);
+  const startRound = useCallback((teamBet: TeamType | null, betAmt: number) => {
+    if (teamBet !== null && betAmt > 0 && betAmt <= balance) {
+      setBetOn(teamBet);
       setBalance(balance - betAmt);
       recordBet(betAmt);
     } else {
@@ -374,9 +374,12 @@ export default function CSBetting() {
     }
     
     if (betOn !== null && bet > 0) {
-      const won = betOn === planted;
-      if (won) setBalance(balance + bet * 2);
-      setBetResult({ won, amt: bet });
+      const won = betOn === w;
+      if (won) {
+        const payout = w === 'T' ? bet * 1.5 : bet * 2.65;
+        setBalance(balance + payout);
+      }
+      setBetResult({ won, amt: bet, payout: won ? (w === 'T' ? 1.5 : 2.65) : 0 });
     }
     
     if (tScoreRef.current >= 13 || ctScoreRef.current >= 13) {
@@ -954,7 +957,7 @@ export default function CSBetting() {
           <div className="w-72 flex-shrink-0">
             {phase === 'bet' && (
               <div className="bg-gray-800/90 rounded-xl p-4 border border-gray-700">
-                <h2 className="text-xl font-bold text-white mb-4 text-center">Place Bet</h2>
+                <h2 className="text-xl font-bold text-white mb-4 text-center">Round {round} - Who Wins?</h2>
                 
                 <div className="mb-4">
                   <label className="text-gray-400 text-sm">Bet Amount</label>
@@ -967,15 +970,15 @@ export default function CSBetting() {
                 </div>
 
                 <div className="space-y-2 mb-4">
-                  <button onClick={() => startRound(true, bet)}
+                  <button onClick={() => startRound('T', bet)}
                     disabled={bet > balance}
                     className="w-full py-3 bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg text-white font-bold hover:opacity-90 disabled:opacity-50 transition">
-                    🔥 Bet T Wins (Plant)
+                    🔥 T Wins (1.5x)
                   </button>
-                  <button onClick={() => startRound(false, bet)}
+                  <button onClick={() => startRound('CT', bet)}
                     disabled={bet > balance}
                     className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg text-white font-bold hover:opacity-90 disabled:opacity-50 transition">
-                    🛡️ Bet CT Wins
+                    🛡️ CT Wins (2.65x)
                   </button>
                 </div>
 
@@ -992,8 +995,8 @@ export default function CSBetting() {
                 {betOn !== null && (
                   <div className="text-center">
                     <p className="text-gray-400">Your bet:</p>
-                    <p className={`text-xl font-bold ${betOn ? 'text-orange-400' : 'text-blue-400'}`}>
-                      ${bet.toLocaleString()} on {betOn ? 'T (Plant)' : 'CT'}
+                    <p className={`text-xl font-bold ${betOn === 'T' ? 'text-orange-400' : 'text-blue-400'}`}>
+                      ${bet.toLocaleString()} on {betOn} ({betOn === 'T' ? '1.5x' : '2.65x'})
                     </p>
                   </div>
                 )}
@@ -1021,7 +1024,7 @@ export default function CSBetting() {
                 
                 {betResult && (
                   <div className={`text-center text-2xl font-bold mb-4 ${betResult.won ? 'text-green-400' : 'text-red-400'}`}>
-                    {betResult.won ? `+$${(betResult.amt * 2).toLocaleString()}` : `-$${betResult.amt.toLocaleString()}`}
+                    {betResult.won ? `+$${Math.floor(betResult.amt * betResult.payout).toLocaleString()}` : `-$${betResult.amt.toLocaleString()}`}
                   </div>
                 )}
 
