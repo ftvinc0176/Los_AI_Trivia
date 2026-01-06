@@ -181,9 +181,7 @@ export default function SweetBonanza() {
     setTotalWin(0);
     setLastWin(0);
     setTumbleCount(0);
-    if (!isFreeSpinMode) {
-      setCurrentMultipliers([]);
-    }
+    setCurrentMultipliers([]);
     setMessage(isFreeSpinMode ? `Free Spin! ${freeSpins - 1} remaining` : 'Spinning...');
     
     // Animate spin
@@ -199,9 +197,9 @@ export default function SweetBonanza() {
       setGrid(newGrid);
       setIsSpinning(false);
       
-      // Check for wins after spin
+      // Check for wins after spin (start with empty multipliers, they accumulate during tumbles)
       setTimeout(() => {
-        checkWins(newGrid, 0, isFreeSpinMode ? [...currentMultipliers] : []);
+        checkWins(newGrid, 0, []);
       }, 300);
     }, 500);
   }, [isSpinning, isTumbling, balance, betAmount, isFreeSpinMode, freeSpins, currentMultipliers]);
