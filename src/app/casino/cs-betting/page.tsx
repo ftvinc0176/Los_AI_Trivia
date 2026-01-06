@@ -86,7 +86,10 @@ interface Bot {
   stuck: number;
   lastX: number;
   lastY: number;
-  rushDelay: number; // CT waits before moving
+  rushDelay: number;
+  skill: number; // 0.5-1.5 accuracy/damage multiplier
+  aggression: number; // 0-1 how likely to push vs hold
+  assignedSite: 'A' | 'B'; // which site this bot focuses on
 }
 
 // Check if point is inside any wall
@@ -251,6 +254,7 @@ export default function CSBetting() {
   const tScoreRef = useRef(0);
   const ctScoreRef = useRef(0);
   const gameTimeRef = useRef(0);
+  const targetSiteRef = useRef<'A' | 'B'>('A'); // T's target site for this round
 
   useEffect(() => {
     gridRef.current = buildGrid();
@@ -258,7 +262,23 @@ export default function CSBetting() {
 
   const createBots = useCallback((): Bot[] => {
     const b: Bot[] = [];
-    // T side - spawns at bottom, moves immediately
+    
+    // Randomly pick which site T will attack
+    targetSiteRef.current = Math.random() < 0.5 ? 'A' : 'B';
+    
+    // Randomly assign CT distribution (2-3 to each site)
+    const ctSiteA = 2 + Math.floor(Math.random() * 2); // 2 or 3 to A
+    const ctAssignments: ('A' | 'B')[] = [];
+    for (let i = 0; i < 5; i++) {
+      ctAssignments.push(i < ctSiteA ? 'A' : 'B');
+    }
+    // Shuffle CT assignments
+    for (let i = ctAssignments.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ctAssignments[i], ctAssignments[j]] = [ctAssignments[j], ctAssignments[i]];
+    }
+    
+    // T side - spawns at bottom
     for (let i = 0; i < 5; i++) {
       b.push({
         id: `T${i+1}`, team: 'T',
@@ -267,10 +287,13 @@ export default function CSBetting() {
         plantProg: 0, defuseProg: 0, angle: -Math.PI/2,
         path: [], pathIndex: 0, lastShot: 0,
         stuck: 0, lastX: T_SPAWNS[i].x, lastY: T_SPAWNS[i].y,
-        rushDelay: 0 // T moves immediately
+        rushDelay: Math.random() * 0.5, // Slight stagger
+        skill: 0.7 + Math.random() * 0.6, // 0.7-1.3
+        aggression: 0.5 + Math.random() * 0.5, // T's are aggressive
+        assignedSite: targetSiteRef.current
       });
     }
-    // CT side - spawns at top, waits 2-4 seconds before pushing
+    // CT side - spawns at top, waits before positioning
     for (let i = 0; i < 5; i++) {
       b.push({
         id: `CT${i+1}`, team: 'CT',
@@ -279,7 +302,10 @@ export default function CSBetting() {
         plantProg: 0, defuseProg: 0, angle: Math.PI/2,
         path: [], pathIndex: 0, lastShot: 0,
         stuck: 0, lastX: CT_SPAWNS[i].x, lastY: CT_SPAWNS[i].y,
-        rushDelay: 2 + Math.random() * 2 // CT waits 2-4 seconds
+        rushDelay: 0.5 + Math.random() * 1.5, // CT positions quickly (0.5-2s)
+        skill: 0.7 + Math.random() * 0.6, // 0.7-1.3
+        aggression: Math.random() * 0.6, // CTs are more defensive
+        assignedSite: ctAssignments[i]
       });
     }
     return b;
@@ -404,20 +430,21 @@ export default function CSBetting() {
       for (const bot of cur) {
         if (!bot.alive) continue;
         
-        // CT rush delay - they wait before moving
-        if (bot.team === 'CT' && bot.rushDelay > 0) {
+        // Rush delay - bots wait before moving
+        if (bot.rushDelay > 0) {
           bot.rushDelay -= dt;
           continue;
         }
         
         const enemies = bot.team === 'T' ? aliveCT : aliveT;
         
-        // Find visible enemy (reduced range for bigger map)
+        // Find visible enemy - range affected by skill
         let target: Bot | null = null;
         let minDist = Infinity;
+        const sightRange = 280 + bot.skill * 70; // 330-380 range based on skill
         for (const e of enemies) {
           const d = Math.hypot(e.x - bot.x, e.y - bot.y);
-          if (d < 350 && hasLOS(bot.x, bot.y, e.x, e.y) && d < minDist) {
+          if (d < sightRange && hasLOS(bot.x, bot.y, e.x, e.y) && d < minDist) {
             minDist = d;
             target = e;
           }
@@ -429,11 +456,17 @@ export default function CSBetting() {
           bot.plantProg = 0;
           bot.defuseProg = 0;
           
-          if (now - bot.lastShot > 280) {
+          // Fire rate affected by skill (faster = better)
+          const fireRate = 350 - bot.skill * 80; // 270-420ms between shots
+          if (now - bot.lastShot > fireRate) {
             bot.lastShot = now;
-            const acc = Math.max(0.35, 1 - minDist / 400);
+            // Accuracy affected by skill and distance
+            const baseAcc = Math.max(0.25, 1 - minDist / 450);
+            const acc = baseAcc * bot.skill;
             if (Math.random() < acc) {
-              target.health -= 18 + Math.random() * 14;
+              // Damage affected by skill
+              const dmg = (15 + Math.random() * 12) * bot.skill;
+              target.health -= dmg;
               if (target.health <= 0) {
                 target.health = 0;
                 target.alive = false;
@@ -449,57 +482,71 @@ export default function CSBetting() {
         } else {
           // Movement AI
           let goalX = bot.x, goalY = bot.y;
+          const targetSite = targetSiteRef.current;
+          const targetSitePos = targetSite === 'A' ? SITE_A : SITE_B;
+          const otherSitePos = targetSite === 'A' ? SITE_B : SITE_A;
           
           if (bot.team === 'T') {
             if (bot.hasBomb && !bombRef.current) {
-              // Bomber goes to site A or B (randomly picked at start, but prefer A)
-              goalX = SITE_A.x;
-              goalY = SITE_A.y;
+              // Bomber goes to the randomly chosen target site
+              goalX = targetSitePos.x;
+              goalY = targetSitePos.y;
             } else if (bombRef.current && bombPosRef.current) {
-              // Guard the bomb
-              goalX = bombPosRef.current.x + (Math.random() - 0.5) * 80;
-              goalY = bombPosRef.current.y + (Math.random() - 0.5) * 80;
+              // Guard the bomb with some spread
+              const guardDist = 40 + Math.random() * 60;
+              const guardAngle = Math.random() * Math.PI * 2;
+              goalX = bombPosRef.current.x + Math.cos(guardAngle) * guardDist;
+              goalY = bombPosRef.current.y + Math.sin(guardAngle) * guardDist;
             } else {
-              // Follow bomber
+              // Follow bomber with some spread
               const bomber = cur.find(b => b.hasBomb && b.alive);
               if (bomber && bomber.id !== bot.id) {
-                goalX = bomber.x + (Math.random() - 0.5) * 50;
-                goalY = bomber.y + (Math.random() - 0.5) * 50;
+                const followDist = 30 + Math.random() * 40;
+                const followAngle = Math.random() * Math.PI * 2;
+                goalX = bomber.x + Math.cos(followAngle) * followDist;
+                goalY = bomber.y + Math.sin(followAngle) * followDist;
               } else {
-                goalX = SITE_A.x;
-                goalY = SITE_A.y;
+                goalX = targetSitePos.x;
+                goalY = targetSitePos.y;
               }
             }
           } else {
-            // CT behavior
+            // CT behavior - go to assigned site
+            const mySite = bot.assignedSite === 'A' ? SITE_A : SITE_B;
+            
             if (bombRef.current && bombPosRef.current) {
-              // Rush to defuse
-              goalX = bombPosRef.current.x;
-              goalY = bombPosRef.current.y;
-            } else {
-              // Position at sites to defend
-              const idx = parseInt(bot.id.slice(2)) - 1;
-              if (idx < 3) {
-                // A site defense
-                goalX = SITE_A.x + (idx - 1) * 60;
-                goalY = SITE_A.y + 40;
+              // Rush to defuse - closest CT goes directly, others provide cover
+              const distToBomb = Math.hypot(bombPosRef.current.x - bot.x, bombPosRef.current.y - bot.y);
+              const closestCT = aliveCT.reduce((closest, ct) => {
+                const d = Math.hypot(bombPosRef.current!.x - ct.x, bombPosRef.current!.y - ct.y);
+                return d < closest.dist ? {bot: ct, dist: d} : closest;
+              }, {bot: bot, dist: distToBomb});
+              
+              if (closestCT.bot.id === bot.id || distToBomb < 150) {
+                // Go to bomb
+                goalX = bombPosRef.current.x;
+                goalY = bombPosRef.current.y;
               } else {
-                // B site defense
-                goalX = SITE_B.x + (idx - 3.5) * 60;
-                goalY = SITE_B.y + 40;
+                // Cover/support - approach from angle
+                const coverAngle = Math.atan2(bot.y - bombPosRef.current.y, bot.x - bombPosRef.current.x);
+                goalX = bombPosRef.current.x + Math.cos(coverAngle) * 80;
+                goalY = bombPosRef.current.y + Math.sin(coverAngle) * 80;
               }
+            } else {
+              // Position at assigned site with some variation
+              const posOffset = parseInt(bot.id.slice(2)) * 25;
+              goalX = mySite.x + (Math.sin(posOffset) * 50);
+              goalY = mySite.y + 30 + (Math.cos(posOffset) * 30);
             }
           }
 
           const distToGoal = Math.hypot(goalX - bot.x, goalY - bot.y);
 
-          // Planting logic
+          // Planting logic - only at the target site
           if (bot.team === 'T' && bot.hasBomb && !bombRef.current) {
-            const distToA = Math.hypot(SITE_A.x - bot.x, SITE_A.y - bot.y);
-            const distToB = Math.hypot(SITE_B.x - bot.x, SITE_B.y - bot.y);
-            const minSiteDist = Math.min(distToA, distToB);
+            const distToTarget = Math.hypot(targetSitePos.x - bot.x, targetSitePos.y - bot.y);
             
-            if (minSiteDist < 60) {
+            if (distToTarget < 60) {
               bot.plantProg += dt;
               if (bot.plantProg >= 3.5) {
                 bombRef.current = true;
@@ -543,8 +590,8 @@ export default function CSBetting() {
               if (wpDist < 25) {
                 bot.pathIndex++;
               } else {
-                // T side slightly faster to give head start
-                const baseSpeed = bot.team === 'T' ? 130 : 115;
+                // Speed varies by skill and team - more balanced
+                const baseSpeed = 110 + bot.skill * 20; // 88-132 base
                 const speed = baseSpeed * dt;
                 const nx = bot.x + (dx / wpDist) * speed;
                 const ny = bot.y + (dy / wpDist) * speed;
