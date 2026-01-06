@@ -21,6 +21,21 @@ export default function Home() {
 
         {/* Main Menu Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6 mb-12 animate-slide-up">
+          {/* Casino Card */}
+          <button
+            onClick={() => router.push('/casino')}
+            className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-white/20"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative">
+              <div className="text-6xl mb-4">🎰</div>
+              <h2 className="text-3xl font-bold text-white mb-3">The Casino</h2>
+              <p className="text-purple-100 font-light">
+                Blackjack & more games
+              </p>
+            </div>
+          </button>
+
           {/* Caseonaire Card */}
           <button
             onClick={() => router.push('/singleplayer')}
@@ -81,21 +96,6 @@ export default function Home() {
             </div>
           </button>
 
-          {/* Casino Card */}
-          <button
-            onClick={() => router.push('/casino')}
-            className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-white/20"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <div className="text-6xl mb-4">🎰</div>
-              <h2 className="text-3xl font-bold text-white mb-3">The Casino</h2>
-              <p className="text-purple-100 font-light">
-                Blackjack & more games
-              </p>
-            </div>
-          </button>
-
           {/* Draw & Guess Card */}
           <button
             onClick={() => router.push('/games/draw-guess')}
@@ -122,21 +122,6 @@ export default function Home() {
               <h2 className="text-3xl font-bold text-white mb-3">Draw Battle</h2>
               <p className="text-purple-100 font-light">
                 Multiplayer drawing battle
-              </p>
-            </div>
-          </button>
-
-          {/* CS Betting Card */}
-          <button
-            onClick={() => router.push('/cs-betting')}
-            className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-white/20"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-red-500/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <div className="text-6xl mb-4">💰🎯</div>
-              <h2 className="text-3xl font-bold text-white mb-3">CS Betting</h2>
-              <p className="text-purple-100 font-light">
-                Bet on bot matches
               </p>
             </div>
           </button>
