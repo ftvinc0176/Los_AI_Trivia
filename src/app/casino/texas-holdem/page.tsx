@@ -130,6 +130,141 @@ function TexasHoldemGame() {
     return suit === '♥' || suit === '♦' ? 'text-red-600' : 'text-black';
   };
 
+  // Hand evaluation function
+  const evaluateHand = (cards: Card[]): { rank: number; rankName: string; tiebreaker: number[] } => {
+    // Get best 5 cards from 7
+    const sortedCards = [...cards].sort((a, b) => b.numValue - a.numValue);
+    
+    // Count values and suits
+    const valueCounts: Record<number, number> = {};
+    const suitCounts: Record<string, Card[]> = {};
+    
+    for (const card of sortedCards) {
+      valueCounts[card.numValue] = (valueCounts[card.numValue] || 0) + 1;
+      if (!suitCounts[card.suit]) suitCounts[card.suit] = [];
+      suitCounts[card.suit].push(card);
+    }
+    
+    // Check for flush
+    let flushCards: Card[] | null = null;
+    for (const suit in suitCounts) {
+      if (suitCounts[suit].length >= 5) {
+        flushCards = suitCounts[suit].sort((a, b) => b.numValue - a.numValue).slice(0, 5);
+        break;
+      }
+    }
+    
+    // Check for straight
+    const checkStraight = (cards: Card[]): Card[] | null => {
+      const uniqueValues = [...new Set(cards.map(c => c.numValue))].sort((a, b) => b - a);
+      // Check for ace-low straight (A-2-3-4-5)
+      if (uniqueValues.includes(14)) uniqueValues.push(1);
+      
+      for (let i = 0; i <= uniqueValues.length - 5; i++) {
+        let isSequence = true;
+        for (let j = 0; j < 4; j++) {
+          if (uniqueValues[i + j] - uniqueValues[i + j + 1] !== 1) {
+            isSequence = false;
+            break;
+          }
+        }
+        if (isSequence) {
+          const straightHigh = uniqueValues[i];
+          return cards.filter(c => {
+            const val = c.numValue === 14 && straightHigh === 5 ? 1 : c.numValue;
+            return val <= straightHigh && val > straightHigh - 5;
+          }).slice(0, 5);
+        }
+      }
+      return null;
+    };
+    
+    const straightCards = checkStraight(sortedCards);
+    
+    // Get pairs, trips, quads
+    const pairs: number[] = [];
+    const trips: number[] = [];
+    const quads: number[] = [];
+    
+    for (const [value, count] of Object.entries(valueCounts)) {
+      const v = parseInt(value);
+      if (count === 4) quads.push(v);
+      else if (count === 3) trips.push(v);
+      else if (count === 2) pairs.push(v);
+    }
+    
+    pairs.sort((a, b) => b - a);
+    trips.sort((a, b) => b - a);
+    
+    // Determine hand rank
+    // Royal Flush
+    if (flushCards && straightCards) {
+      const flushStraight = checkStraight(flushCards);
+      if (flushStraight && Math.max(...flushStraight.map(c => c.numValue)) === 14) {
+        return { rank: 9, rankName: 'Royal Flush', tiebreaker: [14] };
+      }
+      // Straight Flush
+      if (flushStraight) {
+        return { rank: 8, rankName: 'Straight Flush', tiebreaker: [Math.max(...flushStraight.map(c => c.numValue))] };
+      }
+    }
+    
+    // Four of a Kind
+    if (quads.length > 0) {
+      const kicker = sortedCards.find(c => c.numValue !== quads[0])!.numValue;
+      return { rank: 7, rankName: 'Four of a Kind', tiebreaker: [quads[0], kicker] };
+    }
+    
+    // Full House
+    if (trips.length > 0 && (pairs.length > 0 || trips.length > 1)) {
+      const pairVal = pairs.length > 0 ? pairs[0] : trips[1];
+      return { rank: 6, rankName: 'Full House', tiebreaker: [trips[0], pairVal] };
+    }
+    
+    // Flush
+    if (flushCards) {
+      return { rank: 5, rankName: 'Flush', tiebreaker: flushCards.map(c => c.numValue) };
+    }
+    
+    // Straight
+    if (straightCards) {
+      const highCard = straightCards[0].numValue === 14 && straightCards[4].numValue === 2 ? 5 : straightCards[0].numValue;
+      return { rank: 4, rankName: 'Straight', tiebreaker: [highCard] };
+    }
+    
+    // Three of a Kind
+    if (trips.length > 0) {
+      const kickers = sortedCards.filter(c => c.numValue !== trips[0]).slice(0, 2).map(c => c.numValue);
+      return { rank: 3, rankName: 'Three of a Kind', tiebreaker: [trips[0], ...kickers] };
+    }
+    
+    // Two Pair
+    if (pairs.length >= 2) {
+      const kicker = sortedCards.find(c => c.numValue !== pairs[0] && c.numValue !== pairs[1])!.numValue;
+      return { rank: 2, rankName: 'Two Pair', tiebreaker: [pairs[0], pairs[1], kicker] };
+    }
+    
+    // One Pair
+    if (pairs.length === 1) {
+      const kickers = sortedCards.filter(c => c.numValue !== pairs[0]).slice(0, 3).map(c => c.numValue);
+      return { rank: 1, rankName: 'One Pair', tiebreaker: [pairs[0], ...kickers] };
+    }
+    
+    // High Card
+    return { rank: 0, rankName: 'High Card', tiebreaker: sortedCards.slice(0, 5).map(c => c.numValue) };
+  };
+
+  // Compare two hands - returns positive if hand1 wins, negative if hand2 wins, 0 for tie
+  const compareHands = (hand1: ReturnType<typeof evaluateHand>, hand2: ReturnType<typeof evaluateHand>): number => {
+    if (hand1.rank !== hand2.rank) return hand1.rank - hand2.rank;
+    for (let i = 0; i < hand1.tiebreaker.length; i++) {
+      if (hand1.tiebreaker[i] !== hand2.tiebreaker[i]) {
+        return hand1.tiebreaker[i] - hand2.tiebreaker[i];
+      }
+    }
+    return 0;
+  };
+
   useEffect(() => {
     if (mode !== 'single') {
       const socketUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
@@ -285,6 +420,13 @@ function TexasHoldemGame() {
   };
 
   const startSinglePlayerGame = () => {
+    // Clear previous game state
+    setCommunityCards([]);
+    setWinners([]);
+    setMessage('');
+    setHasFolded(false);
+    setIsAllIn(false);
+    
     const gameDeck = shuffleDeck(createDeck());
     setDeck(gameDeck);
     
@@ -454,23 +596,34 @@ function TexasHoldemGame() {
       setDeck(gameDeck);
       setGameState('river');
     } else if (gameState === 'river') {
-      // Showdown - simplified winner determination
+      // Showdown - evaluate all hands properly
       const activeAi = updatedAiPlayers.filter(ai => !ai.hasFolded);
-      const allHands = [
-        { id: 'player', cards: [...holeCards, ...newCommunityCards] },
-        ...activeAi.map(ai => ({ id: ai.id, cards: [...ai.holeCards, ...newCommunityCards] }))
-      ];
       
-      // Simple random winner for demo (real poker hand evaluation is complex)
-      const winnerIndex = Math.floor(Math.random() * allHands.length);
-      const winnerId = allHands[winnerIndex].id;
+      // Evaluate player's hand
+      const playerFullHand = [...holeCards, ...newCommunityCards];
+      const playerEval = evaluateHand(playerFullHand);
       
-      if (winnerId === 'player') {
-        setMessage(`🎉 You win $${newPot}!`);
+      // Evaluate AI hands
+      const aiEvals = activeAi.map(ai => ({
+        id: ai.id,
+        name: ai.name,
+        eval: evaluateHand([...ai.holeCards, ...newCommunityCards])
+      }));
+      
+      // Find the winner
+      let bestHand = { id: 'player', name: 'You', eval: playerEval };
+      
+      for (const aiHand of aiEvals) {
+        if (compareHands(aiHand.eval, bestHand.eval) > 0) {
+          bestHand = aiHand;
+        }
+      }
+      
+      if (bestHand.id === 'player') {
+        setMessage(`🎉 You win $${newPot} with ${playerEval.rankName}!`);
         setBalance(newBalance + newPot);
       } else {
-        const winner = updatedAiPlayers.find(ai => ai.id === winnerId);
-        setMessage(`${winner?.name} wins with a better hand!`);
+        setMessage(`${bestHand.name} wins $${newPot} with ${bestHand.eval.rankName}!`);
       }
       setGameState('showdown');
     }
