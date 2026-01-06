@@ -1,10 +1,5 @@
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const DATA_FILE = path.join(process.cwd(), 'data', 'leaderboards.json');
+import { Redis } from '@upstash/redis';
 
 interface LeaderboardEntry {
   name: string;
@@ -17,40 +12,29 @@ interface LeaderboardData {
   biggestWins: LeaderboardEntry[];
 }
 
-// Ensure data directory and file exist
-function ensureDataFile(): LeaderboardData {
-  const dataDir = path.join(process.cwd(), 'data');
-  
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-  
-  if (!fs.existsSync(DATA_FILE)) {
-    const initialData: LeaderboardData = {
-      highestBalances: [],
-      biggestWins: []
-    };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-    return initialData;
-  }
-  
-  try {
-    const data = fs.readFileSync(DATA_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    const initialData: LeaderboardData = {
-      highestBalances: [],
-      biggestWins: []
-    };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-    return initialData;
-  }
-}
+// Initialize Redis client
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || '',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+});
+
+const LEADERBOARD_KEY = 'casino:leaderboards';
 
 // GET - Fetch leaderboards
 export async function GET() {
   try {
-    const data = ensureDataFile();
+    // Check if Redis is configured
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+      console.warn('Redis not configured, returning empty leaderboards');
+      return NextResponse.json({ highestBalances: [], biggestWins: [] });
+    }
+
+    const data = await redis.get<LeaderboardData>(LEADERBOARD_KEY);
+    
+    if (!data) {
+      return NextResponse.json({ highestBalances: [], biggestWins: [] });
+    }
+    
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error reading leaderboard:', error);
@@ -64,6 +48,15 @@ export async function GET() {
 // POST - Update leaderboard
 export async function POST(request: NextRequest) {
   try {
+    // Check if Redis is configured
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+      console.warn('Redis not configured, cannot update leaderboards');
+      return NextResponse.json(
+        { error: 'Leaderboard service not configured' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { type, name, amount } = body;
     
@@ -74,7 +67,12 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const data = ensureDataFile();
+    // Get current data
+    let data = await redis.get<LeaderboardData>(LEADERBOARD_KEY);
+    
+    if (!data) {
+      data = { highestBalances: [], biggestWins: [] };
+    }
     
     const newEntry: LeaderboardEntry = {
       name,
@@ -106,7 +104,8 @@ export async function POST(request: NextRequest) {
       data.biggestWins = data.biggestWins.slice(0, 5);
     }
     
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    // Save to Redis
+    await redis.set(LEADERBOARD_KEY, data);
     
     return NextResponse.json(data);
   } catch (error) {

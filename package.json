@@ -12,6 +12,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@types/three": "^0.182.0",
+    "@upstash/redis": "^1.36.0",
     "cross-fetch": "^4.0.0",
     "dat.gui": "^0.7.9",
     "express": "^4.21.2",

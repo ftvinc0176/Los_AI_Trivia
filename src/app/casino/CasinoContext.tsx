@@ -80,8 +80,8 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
     // Fetch leaderboards from server
     fetchLeaderboards();
     
-    // Refresh leaderboards every 30 seconds
-    const interval = setInterval(fetchLeaderboards, 30000);
+    // Refresh leaderboards every 5 seconds for live updates
+    const interval = setInterval(fetchLeaderboards, 5000);
     return () => clearInterval(interval);
   }, [fetchLeaderboards]);
 
