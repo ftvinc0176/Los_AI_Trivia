@@ -263,11 +263,23 @@ export default function CSBetting() {
   const createBots = useCallback((): Bot[] => {
     const b: Bot[] = [];
     
-    // Randomly pick which site T will attack
-    targetSiteRef.current = Math.random() < 0.5 ? 'A' : 'B';
+    // === T SIDE STRATEGY (random each round) ===
+    // 0 = Rush A, 1 = Rush B, 2 = Split (2 go A, 3 go B), 3 = Slow/Default
+    const tStrategy = Math.floor(Math.random() * 4);
+    targetSiteRef.current = (tStrategy === 0 || tStrategy === 2) ? 'A' : 'B';
     
-    // Randomly assign CT distribution (2-3 to each site)
-    const ctSiteA = 2 + Math.floor(Math.random() * 2); // 2 or 3 to A
+    // === CT SIDE STRATEGY (random each round) ===
+    // 0 = Stack A (4-1), 1 = Stack B (1-4), 2 = Even (3-2), 3 = Even (2-3), 4 = Aggro push
+    const ctStrategy = Math.floor(Math.random() * 5);
+    let ctSiteA: number;
+    switch(ctStrategy) {
+      case 0: ctSiteA = 4; break; // Stack A
+      case 1: ctSiteA = 1; break; // Stack B
+      case 2: ctSiteA = 3; break; // Even 3-2
+      case 3: ctSiteA = 2; break; // Even 2-3
+      default: ctSiteA = 2 + Math.floor(Math.random() * 2); break;
+    }
+    
     const ctAssignments: ('A' | 'B')[] = [];
     for (let i = 0; i < 5; i++) {
       ctAssignments.push(i < ctSiteA ? 'A' : 'B');
@@ -278,7 +290,12 @@ export default function CSBetting() {
       [ctAssignments[i], ctAssignments[j]] = [ctAssignments[j], ctAssignments[i]];
     }
     
-    // T side - spawns at bottom
+    // T side - different delays based on strategy
+    const tDelays = tStrategy === 3 ? [2, 2.5, 3, 3.5, 4] : [0, 0.2, 0.4, 0.6, 0.8];
+    const tSites: ('A' | 'B')[] = tStrategy === 2 
+      ? ['A', 'A', 'B', 'B', 'B'] // Split
+      : Array(5).fill(targetSiteRef.current);
+    
     for (let i = 0; i < 5; i++) {
       b.push({
         id: `T${i+1}`, team: 'T',
@@ -287,13 +304,15 @@ export default function CSBetting() {
         plantProg: 0, defuseProg: 0, angle: -Math.PI/2,
         path: [], pathIndex: 0, lastShot: 0,
         stuck: 0, lastX: T_SPAWNS[i].x, lastY: T_SPAWNS[i].y,
-        rushDelay: Math.random() * 0.5, // Slight stagger
-        skill: 0.7 + Math.random() * 0.6, // 0.7-1.3
-        aggression: 0.5 + Math.random() * 0.5, // T's are aggressive
-        assignedSite: targetSiteRef.current
+        rushDelay: tDelays[i] + Math.random() * 0.3,
+        skill: 0.6 + Math.random() * 0.8, // 0.6-1.4 wider range
+        aggression: 0.4 + Math.random() * 0.6,
+        assignedSite: tSites[i]
       });
     }
-    // CT side - spawns at top, waits before positioning
+    
+    // CT side - aggro strategy has shorter delays
+    const ctBaseDelay = ctStrategy === 4 ? 0.2 : 0.5;
     for (let i = 0; i < 5; i++) {
       b.push({
         id: `CT${i+1}`, team: 'CT',
@@ -302,9 +321,9 @@ export default function CSBetting() {
         plantProg: 0, defuseProg: 0, angle: Math.PI/2,
         path: [], pathIndex: 0, lastShot: 0,
         stuck: 0, lastX: CT_SPAWNS[i].x, lastY: CT_SPAWNS[i].y,
-        rushDelay: 0.5 + Math.random() * 1.5, // CT positions quickly (0.5-2s)
-        skill: 0.7 + Math.random() * 0.6, // 0.7-1.3
-        aggression: Math.random() * 0.6, // CTs are more defensive
+        rushDelay: ctBaseDelay + Math.random() * 1.0,
+        skill: 0.6 + Math.random() * 0.8, // 0.6-1.4 wider range
+        aggression: ctStrategy === 4 ? 0.7 + Math.random() * 0.3 : Math.random() * 0.5,
         assignedSite: ctAssignments[i]
       });
     }
@@ -484,15 +503,13 @@ export default function CSBetting() {
         } else {
           // Movement AI
           let goalX = bot.x, goalY = bot.y;
-          const targetSite = targetSiteRef.current;
-          const targetSitePos = targetSite === 'A' ? SITE_A : SITE_B;
-          const otherSitePos = targetSite === 'A' ? SITE_B : SITE_A;
+          const botSitePos = bot.assignedSite === 'A' ? SITE_A : SITE_B;
           
           if (bot.team === 'T') {
             if (bot.hasBomb && !bombRef.current) {
-              // Bomber goes to the randomly chosen target site
-              goalX = targetSitePos.x;
-              goalY = targetSitePos.y;
+              // Bomber goes to their assigned site
+              goalX = botSitePos.x;
+              goalY = botSitePos.y;
             } else if (bombRef.current && bombPosRef.current) {
               // Guard the bomb with some spread
               const guardDist = 40 + Math.random() * 60;
@@ -500,22 +517,12 @@ export default function CSBetting() {
               goalX = bombPosRef.current.x + Math.cos(guardAngle) * guardDist;
               goalY = bombPosRef.current.y + Math.sin(guardAngle) * guardDist;
             } else {
-              // Follow bomber with some spread
-              const bomber = cur.find(b => b.hasBomb && b.alive);
-              if (bomber && bomber.id !== bot.id) {
-                const followDist = 30 + Math.random() * 40;
-                const followAngle = Math.random() * Math.PI * 2;
-                goalX = bomber.x + Math.cos(followAngle) * followDist;
-                goalY = bomber.y + Math.sin(followAngle) * followDist;
-              } else {
-                goalX = targetSitePos.x;
-                goalY = targetSitePos.y;
-              }
+              // Go to assigned site (may be different from bomber in split strat)
+              goalX = botSitePos.x + (Math.random() - 0.5) * 60;
+              goalY = botSitePos.y + (Math.random() - 0.5) * 60;
             }
           } else {
             // CT behavior - go to assigned site
-            const mySite = bot.assignedSite === 'A' ? SITE_A : SITE_B;
-            
             if (bombRef.current && bombPosRef.current) {
               // Rush to defuse - closest CT goes directly, others provide cover
               const distToBomb = Math.hypot(bombPosRef.current.x - bot.x, bombPosRef.current.y - bot.y);
@@ -525,30 +532,31 @@ export default function CSBetting() {
               }, {bot: bot, dist: distToBomb});
               
               if (closestCT.bot.id === bot.id || distToBomb < 150) {
-                // Go to bomb
                 goalX = bombPosRef.current.x;
                 goalY = bombPosRef.current.y;
               } else {
-                // Cover/support - approach from angle
                 const coverAngle = Math.atan2(bot.y - bombPosRef.current.y, bot.x - bombPosRef.current.x);
                 goalX = bombPosRef.current.x + Math.cos(coverAngle) * 80;
                 goalY = bombPosRef.current.y + Math.sin(coverAngle) * 80;
               }
             } else {
-              // Position at assigned site with some variation
-              const posOffset = parseInt(bot.id.slice(2)) * 25;
-              goalX = mySite.x + (Math.sin(posOffset) * 50);
-              goalY = mySite.y + 30 + (Math.cos(posOffset) * 30);
+              // Position at assigned site with variation
+              const spreadAngle = (parseInt(bot.id.slice(2)) - 1) * (Math.PI / 3);
+              const spreadDist = 30 + Math.random() * 40;
+              goalX = botSitePos.x + Math.cos(spreadAngle) * spreadDist;
+              goalY = botSitePos.y + 20 + Math.sin(spreadAngle) * spreadDist;
             }
           }
 
           const distToGoal = Math.hypot(goalX - bot.x, goalY - bot.y);
 
-          // Planting logic - only at the target site
+          // Planting logic - can plant at either site
           if (bot.team === 'T' && bot.hasBomb && !bombRef.current) {
-            const distToTarget = Math.hypot(targetSitePos.x - bot.x, targetSitePos.y - bot.y);
+            const distToA = Math.hypot(SITE_A.x - bot.x, SITE_A.y - bot.y);
+            const distToB = Math.hypot(SITE_B.x - bot.x, SITE_B.y - bot.y);
+            const minSiteDist = Math.min(distToA, distToB);
             
-            if (distToTarget < 60) {
+            if (minSiteDist < 60) {
               bot.plantProg += dt;
               if (bot.plantProg >= 3.5) {
                 bombRef.current = true;
