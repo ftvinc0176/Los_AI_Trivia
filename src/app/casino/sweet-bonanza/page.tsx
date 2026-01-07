@@ -89,15 +89,19 @@ interface GridCell {
   isWinning: boolean
   isTumbling: boolean
   isNew: boolean
+  isRevealed: boolean
   multiplier?: number
 }
+
+// Column reveal delays (left to right)
+const COLUMN_DELAYS = [0, 150, 300, 450, 600, 750]
 
 export default function SweetBonanza() {
   const { balance, setBalance, recordBet, checkAndReload } = useCasino()
   const router = useRouter()
   
   const [grid, setGrid] = useState<GridCell[][]>([])
-  const [betAmount, setBetAmount] = useState(10)
+  const [betAmount, setBetAmount] = useState(1)
   const [isSpinning, setIsSpinning] = useState(false)
   const [lastWin, setLastWin] = useState(0)
   const [totalWin, setTotalWin] = useState(0)
@@ -109,9 +113,11 @@ export default function SweetBonanza() {
   const [showBigWin, setShowBigWin] = useState(false)
   const [bigWinAmount, setBigWinAmount] = useState(0)
   const [autoPlay, setAutoPlay] = useState(false)
+  const [columnsRevealed, setColumnsRevealed] = useState<boolean[]>([true, true, true, true, true, true])
   
   const spinTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const autoPlayRef = useRef<boolean>(false)
+  const columnTimeoutsRef = useRef<NodeJS.Timeout[]>([])
 
   // Generate random symbol
   const generateRandomSymbol = useCallback((includeSpecial = false): SymbolType => {
@@ -133,13 +139,21 @@ export default function SweetBonanza() {
           symbol: generateRandomSymbol(true),
           isWinning: false,
           isTumbling: false,
-          isNew: false
+          isNew: false,
+          isRevealed: true
         })
       }
       newGrid.push(column)
     }
     setGrid(newGrid)
   }, [generateRandomSymbol])
+
+  // Cleanup column timeouts
+  useEffect(() => {
+    return () => {
+      columnTimeoutsRef.current.forEach(t => clearTimeout(t))
+    }
+  }, [])
 
   // Update autoplay ref
   useEffect(() => {
@@ -242,6 +256,7 @@ export default function SweetBonanza() {
               isWinning: false,
               isTumbling: false,
               isNew: true,
+              isRevealed: true,
               multiplier: symbol === 'bomb' ? BOMB_MULTIPLIERS[Math.floor(Math.random() * BOMB_MULTIPLIERS.length)] : undefined
             })
           }
@@ -333,6 +348,13 @@ export default function SweetBonanza() {
       recordBet(betAmount)
     }
     
+    // Clear any existing column timeouts
+    columnTimeoutsRef.current.forEach(t => clearTimeout(t))
+    columnTimeoutsRef.current = []
+    
+    // Reset all columns to hidden
+    setColumnsRevealed([false, false, false, false, false, false])
+    
     // Generate new grid
     const newGrid: GridCell[][] = []
     for (let col = 0; col < 6; col++) {
@@ -344,6 +366,7 @@ export default function SweetBonanza() {
           isWinning: false,
           isTumbling: false,
           isNew: true,
+          isRevealed: false,
           multiplier: symbol === 'bomb' ? BOMB_MULTIPLIERS[Math.floor(Math.random() * BOMB_MULTIPLIERS.length)] : undefined
         })
       }
@@ -352,10 +375,27 @@ export default function SweetBonanza() {
     
     setGrid(newGrid)
     
-    // Start checking wins after animation
+    // Reveal columns one at a time (left to right)
+    COLUMN_DELAYS.forEach((delay, colIdx) => {
+      const timeout = setTimeout(() => {
+        setColumnsRevealed(prev => {
+          const next = [...prev]
+          next[colIdx] = true
+          return next
+        })
+        setGrid(prev => {
+          const updated = [...prev]
+          updated[colIdx] = updated[colIdx].map(cell => ({ ...cell, isRevealed: true }))
+          return updated
+        })
+      }, delay)
+      columnTimeoutsRef.current.push(timeout)
+    })
+    
+    // Start checking wins after all columns revealed
     setTimeout(() => {
       processTumble(newGrid, 0, 0)
-    }, 500)
+    }, COLUMN_DELAYS[5] + 400)
   }, [isSpinning, balance, betAmount, freeSpins, generateRandomSymbol, recordBet, setBalance, processTumble])
 
   // Buy feature
@@ -372,26 +412,29 @@ export default function SweetBonanza() {
   }, [balance, betAmount, setBalance, recordBet, spin])
 
   // Render symbol
-  const renderSymbol = (cell: GridCell) => {
+  const renderSymbol = (cell: GridCell, colIdx: number) => {
     const config = SYMBOLS[cell.symbol]
+    const isColumnRevealed = columnsRevealed[colIdx]
+    
     return (
       <div 
         className={`
-          w-full h-full rounded-lg flex items-center justify-center text-xl sm:text-2xl md:text-3xl
+          w-full h-full rounded-xl flex items-center justify-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl
           bg-gradient-to-br ${config.gradient}
-          ${cell.isWinning ? 'animate-pulse ring-2 ring-yellow-400 ring-offset-1' : ''}
+          ${cell.isWinning ? 'animate-pulse ring-2 sm:ring-4 ring-yellow-400 ring-offset-1 sm:ring-offset-2' : ''}
           ${cell.isTumbling ? 'animate-bounce opacity-50' : ''}
-          ${cell.isNew ? 'animate-fall-in' : ''}
-          shadow-inner relative overflow-hidden
+          ${isColumnRevealed && cell.isNew ? 'animate-drop-in' : ''}
+          ${!isColumnRevealed ? 'opacity-0 -translate-y-full' : ''}
+          shadow-lg relative overflow-hidden transition-all duration-300
         `}
       >
         <span className="drop-shadow-lg relative z-10">{config.emoji}</span>
         {cell.symbol === 'bomb' && cell.multiplier && (
-          <span className="absolute bottom-0 right-0.5 text-[8px] sm:text-xs font-bold text-yellow-400 bg-black/60 rounded px-0.5">
+          <span className="absolute bottom-0.5 right-1 text-xs sm:text-sm font-bold text-yellow-400 bg-black/70 rounded px-1">
             x{cell.multiplier}
           </span>
         )}
-        <div className="absolute inset-0 bg-white/20 rounded-lg" />
+        <div className="absolute inset-0 bg-white/20 rounded-xl" />
       </div>
     )
   }
@@ -450,45 +493,44 @@ export default function SweetBonanza() {
       )}
 
       {/* Main Game Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center p-1 sm:p-2 md:p-4 relative z-10 min-h-0">
         {/* Slot Frame - Candy Cane Border */}
-        <div className="relative p-2 sm:p-3 rounded-2xl bg-gradient-to-br from-pink-400 via-white to-pink-400 shadow-2xl" 
+        <div className="relative rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-[95vw] sm:max-w-[85vw] md:max-w-2xl lg:max-w-3xl" 
              style={{ 
                background: 'repeating-linear-gradient(45deg, #ff69b4, #ff69b4 10px, white 10px, white 20px)',
-               padding: '8px'
+               padding: 'clamp(6px, 1.5vw, 12px)'
              }}>
-          <div className="bg-gradient-to-b from-purple-900 via-indigo-900 to-purple-900 rounded-xl p-2 sm:p-3">
+          <div className="bg-gradient-to-b from-purple-900 via-indigo-900 to-purple-900 rounded-xl sm:rounded-2xl p-2 sm:p-3 md:p-4">
             {/* Win Display */}
-            {(lastWin > 0 || message) && (
-              <div className="text-center mb-2">
-                {lastWin > 0 && (
-                  <div className="text-xl sm:text-2xl font-bold text-yellow-400 animate-pulse">
-                    WIN: ${lastWin.toFixed(2)}
-                  </div>
-                )}
-                {tumbleCount > 0 && (
-                  <div className="text-xs sm:text-sm text-cyan-400">
-                    Tumble #{tumbleCount}
-                  </div>
-                )}
-                {message && (
-                  <div className="text-sm sm:text-lg text-pink-400 font-bold animate-bounce">
-                    {message}
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="text-center mb-1 sm:mb-2 min-h-[2rem] sm:min-h-[2.5rem]">
+              {lastWin > 0 && (
+                <div className="text-lg sm:text-2xl md:text-3xl font-bold text-yellow-400 animate-pulse">
+                  WIN: ${lastWin.toFixed(2)}
+                </div>
+              )}
+              {tumbleCount > 0 && (
+                <div className="text-xs sm:text-sm text-cyan-400">
+                  Tumble #{tumbleCount}
+                </div>
+              )}
+              {message && (
+                <div className="text-sm sm:text-lg md:text-xl text-pink-400 font-bold animate-bounce">
+                  {message}
+                </div>
+              )}
+            </div>
 
-            {/* Grid */}
-            <div className="grid grid-cols-6 gap-1 sm:gap-1.5 p-2 bg-purple-950 rounded-lg">
+            {/* Grid - Responsive sizing */}
+            <div className="grid grid-cols-6 gap-1 sm:gap-2 md:gap-2.5 p-1 sm:p-2 md:p-3 bg-purple-950 rounded-lg sm:rounded-xl overflow-hidden">
               {grid.map((column, colIdx) => (
-                <div key={colIdx} className="flex flex-col gap-1 sm:gap-1.5">
+                <div key={colIdx} className="flex flex-col gap-1 sm:gap-2 md:gap-2.5">
                   {column.map((cell, rowIdx) => (
                     <div 
                       key={`${colIdx}-${rowIdx}`} 
-                      className="aspect-square w-10 sm:w-12 md:w-14 lg:w-16"
+                      className="aspect-square"
+                      style={{ minWidth: '40px' }}
                     >
-                      {renderSymbol(cell)}
+                      {renderSymbol(cell, colIdx)}
                     </div>
                   ))}
                 </div>
@@ -498,7 +540,7 @@ export default function SweetBonanza() {
             {/* Total Win Display */}
             {totalWin > 0 && (
               <div className="text-center mt-2 py-2 bg-gradient-to-r from-transparent via-yellow-600/50 to-transparent rounded">
-                <div className="text-lg sm:text-xl font-bold text-yellow-300">
+                <div className="text-lg sm:text-2xl md:text-3xl font-bold text-yellow-300">
                   TOTAL WIN: ${totalWin.toFixed(2)}
                 </div>
               </div>
@@ -660,12 +702,19 @@ export default function SweetBonanza() {
 
       {/* CSS Animations */}
       <style jsx>{`
-        @keyframes fall-in {
-          from {
-            transform: translateY(-100%);
+        @keyframes drop-in {
+          0% {
+            transform: translateY(-150%);
             opacity: 0;
           }
-          to {
+          60% {
+            transform: translateY(10%);
+            opacity: 1;
+          }
+          80% {
+            transform: translateY(-5%);
+          }
+          100% {
             transform: translateY(0);
             opacity: 1;
           }
@@ -682,8 +731,8 @@ export default function SweetBonanza() {
           }
         }
         
-        .animate-fall-in {
-          animation: fall-in 0.3s ease-out;
+        .animate-drop-in {
+          animation: drop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
         
         .animate-float {
