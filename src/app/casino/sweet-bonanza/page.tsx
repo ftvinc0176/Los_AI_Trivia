@@ -1,774 +1,695 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useCasino } from '../CasinoContext';
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useCasino } from '../CasinoContext'
+import { useRouter } from 'next/navigation'
 
-// Symbol types
-type SymbolType = 'banana' | 'apple' | 'watermelon' | 'plum' | 'grapes' | 'heart' | 'purple' | 'green' | 'blue' | 'scatter' | 'bomb';
-
-interface Symbol {
-  type: SymbolType;
-  id: string;
-  isWinning?: boolean;
-  isNew?: boolean;
-  multiplier?: number;
-}
+// Symbol types matching real game
+type SymbolType = 'banana' | 'grapes' | 'watermelon' | 'plum' | 'apple' | 'blueCandy' | 'greenCandy' | 'pinkCandy' | 'scatter' | 'bomb'
 
 interface SymbolConfig {
-  emoji: string;
-  name: string;
-  payouts: { [key: number]: number }; // count -> multiplier
-  color: string;
+  emoji: string
+  color: string
+  gradient: string
+  payouts: { [key: number]: number }
 }
 
+// Symbol configurations matching real game visuals
 const SYMBOLS: Record<SymbolType, SymbolConfig> = {
-  // Low paying - Fruits
   banana: {
     emoji: '🍌',
-    name: 'Banana',
-    payouts: { 8: 0.25, 10: 0.5, 12: 1 },
-    color: 'from-yellow-400 to-yellow-600'
+    color: '#FFE135',
+    gradient: 'from-yellow-400 to-yellow-600',
+    payouts: { 8: 0.5, 10: 2, 12: 8 }
   },
-  apple: {
-    emoji: '🍎',
-    name: 'Apple',
-    payouts: { 8: 0.25, 10: 0.5, 12: 1 },
-    color: 'from-red-400 to-red-600'
+  grapes: {
+    emoji: '🍇',
+    color: '#6B21A8',
+    gradient: 'from-purple-500 to-purple-700',
+    payouts: { 8: 0.8, 10: 3, 12: 12 }
   },
   watermelon: {
     emoji: '🍉',
-    name: 'Watermelon',
-    payouts: { 8: 0.3, 10: 0.6, 12: 1.2 },
-    color: 'from-green-400 to-red-500'
+    color: '#22C55E',
+    gradient: 'from-green-500 to-red-500',
+    payouts: { 8: 1, 10: 5, 12: 25 }
   },
   plum: {
-    emoji: '🍇',
-    name: 'Plum',
-    payouts: { 8: 0.4, 10: 0.8, 12: 1.5 },
-    color: 'from-purple-400 to-purple-600'
+    emoji: '🍑',
+    color: '#F472B6',
+    gradient: 'from-pink-400 to-pink-600',
+    payouts: { 8: 0.4, 10: 1.5, 12: 6 }
   },
-  grapes: {
-    emoji: '🫐',
-    name: 'Grapes',
-    payouts: { 8: 0.5, 10: 1, 12: 2 },
-    color: 'from-blue-400 to-purple-600'
+  apple: {
+    emoji: '🍎',
+    color: '#EF4444',
+    gradient: 'from-red-500 to-red-700',
+    payouts: { 8: 0.75, 10: 2.5, 12: 10 }
   },
-  // High paying - Candies
-  blue: {
+  blueCandy: {
     emoji: '💎',
-    name: 'Blue Candy',
-    payouts: { 8: 0.8, 10: 1.5, 12: 3 },
-    color: 'from-cyan-400 to-blue-600'
+    color: '#3B82F6',
+    gradient: 'from-blue-400 to-blue-600',
+    payouts: { 8: 0.25, 10: 1, 12: 4 }
   },
-  green: {
-    emoji: '💚',
-    name: 'Green Candy',
-    payouts: { 8: 1, 10: 2, 12: 4 },
-    color: 'from-emerald-400 to-green-600'
+  greenCandy: {
+    emoji: '🍀',
+    color: '#22C55E',
+    gradient: 'from-green-400 to-green-600',
+    payouts: { 8: 0.25, 10: 1, 12: 4 }
   },
-  purple: {
-    emoji: '💜',
-    name: 'Purple Candy',
-    payouts: { 8: 1.5, 10: 3, 12: 6 },
-    color: 'from-violet-400 to-purple-600'
+  pinkCandy: {
+    emoji: '🍬',
+    color: '#EC4899',
+    gradient: 'from-pink-400 to-pink-500',
+    payouts: { 8: 0.25, 10: 1, 12: 4 }
   },
-  heart: {
-    emoji: '❤️',
-    name: 'Red Heart',
-    payouts: { 8: 2.5, 10: 5, 12: 12 },
-    color: 'from-red-500 to-pink-600'
-  },
-  // Special
   scatter: {
     emoji: '🍭',
-    name: 'Lollipop',
-    payouts: {},
-    color: 'from-pink-400 via-yellow-400 to-cyan-400'
+    color: '#FBBF24',
+    gradient: 'from-amber-400 to-pink-500',
+    payouts: { 4: 3, 5: 5, 6: 100 }
   },
   bomb: {
-    emoji: '🌈',
-    name: 'Rainbow Bomb',
-    payouts: {},
-    color: 'from-red-500 via-yellow-500 via-green-500 to-blue-500'
+    emoji: '💣',
+    color: '#1F2937',
+    gradient: 'from-gray-600 to-gray-800',
+    payouts: {}
   }
-};
+}
 
-const REGULAR_SYMBOLS: SymbolType[] = ['banana', 'apple', 'watermelon', 'plum', 'grapes', 'blue', 'green', 'purple', 'heart'];
-// Weighted bomb multipliers - high values are much rarer
-const BOMB_MULTIPLIERS = [
-  { value: 2, weight: 35 },
-  { value: 3, weight: 25 },
-  { value: 5, weight: 15 },
-  { value: 8, weight: 10 },
-  { value: 10, weight: 6 },
-  { value: 15, weight: 4 },
-  { value: 25, weight: 2.5 },
-  { value: 50, weight: 1.5 },
-  { value: 100, weight: 1 }
-];
+// Regular symbols for spinning (no scatter/bomb)
+const REGULAR_SYMBOLS: SymbolType[] = ['banana', 'grapes', 'watermelon', 'plum', 'apple', 'blueCandy', 'greenCandy', 'pinkCandy']
 
-const getRandomBombMultiplier = (): number => {
-  const totalWeight = BOMB_MULTIPLIERS.reduce((sum, m) => sum + m.weight, 0);
-  let random = Math.random() * totalWeight;
-  for (const m of BOMB_MULTIPLIERS) {
-    random -= m.weight;
-    if (random <= 0) return m.value;
-  }
-  return 2;
-};
+// Multiplier values for bombs
+const BOMB_MULTIPLIERS = [2, 2, 2, 3, 3, 3, 5, 5, 5, 10, 10, 15, 15, 25, 50, 100]
+
+interface GridCell {
+  symbol: SymbolType
+  isWinning: boolean
+  isTumbling: boolean
+  isNew: boolean
+  multiplier?: number
+}
 
 export default function SweetBonanza() {
-  const router = useRouter();
-  const { balance, setBalance, recordBet, checkAndReload } = useCasino();
+  const { balance, setBalance, recordBet, checkAndReload } = useCasino()
+  const router = useRouter()
   
-  const [grid, setGrid] = useState<Symbol[][]>([]);
-  const [betAmount, setBetAmount] = useState(500);
-  const [lastBet, setLastBet] = useState(500);
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [isTumbling, setIsTumbling] = useState(false);
-  const [message, setMessage] = useState('Place your bet and spin!');
-  const [totalWin, setTotalWin] = useState(0);
-  const [lastWin, setLastWin] = useState(0);
-  const [freeSpins, setFreeSpins] = useState(0);
-  const [isFreeSpinMode, setIsFreeSpinMode] = useState(false);
-  const [currentMultipliers, setCurrentMultipliers] = useState<number[]>([]);
-  const [tumbleCount, setTumbleCount] = useState(0);
-  const [showPaytable, setShowPaytable] = useState(false);
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [spinHistory, setSpinHistory] = useState<{ win: number; bet: number }[]>([]);
-  const [totalBonusWin, setTotalBonusWin] = useState(0);
-  const [showHugeWin, setShowHugeWin] = useState(false);
+  const [grid, setGrid] = useState<GridCell[][]>([])
+  const [betAmount, setBetAmount] = useState(10)
+  const [isSpinning, setIsSpinning] = useState(false)
+  const [lastWin, setLastWin] = useState(0)
+  const [totalWin, setTotalWin] = useState(0)
+  const [message, setMessage] = useState('')
+  const [showPaytable, setShowPaytable] = useState(false)
+  const [freeSpins, setFreeSpins] = useState(0)
+  const [freeSpinMultiplier, setFreeSpinMultiplier] = useState(1)
+  const [tumbleCount, setTumbleCount] = useState(0)
+  const [showBigWin, setShowBigWin] = useState(false)
+  const [bigWinAmount, setBigWinAmount] = useState(0)
+  const [autoPlay, setAutoPlay] = useState(false)
+  
+  const spinTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const autoPlayRef = useRef<boolean>(false)
+
+  // Generate random symbol
+  const generateRandomSymbol = useCallback((includeSpecial = false): SymbolType => {
+    const rand = Math.random()
+    if (includeSpecial) {
+      if (rand < 0.02) return 'scatter' // 2% scatter
+      if (rand < 0.05) return 'bomb' // 3% bomb
+    }
+    return REGULAR_SYMBOLS[Math.floor(Math.random() * REGULAR_SYMBOLS.length)]
+  }, [])
 
   // Initialize grid
   useEffect(() => {
-    initializeGrid();
-  }, []);
-
-  const initializeGrid = () => {
-    const newGrid: Symbol[][] = [];
+    const newGrid: GridCell[][] = []
     for (let col = 0; col < 6; col++) {
-      const column: Symbol[] = [];
+      const column: GridCell[] = []
       for (let row = 0; row < 5; row++) {
-        column.push(generateRandomSymbol());
+        column.push({
+          symbol: generateRandomSymbol(true),
+          isWinning: false,
+          isTumbling: false,
+          isNew: false
+        })
       }
-      newGrid.push(column);
+      newGrid.push(column)
     }
-    setGrid(newGrid);
-  };
+    setGrid(newGrid)
+  }, [generateRandomSymbol])
 
-  const generateRandomSymbol = (includeBombs = false): Symbol => {
-    // During free spins, bombs can appear
-    const availableSymbols = [...REGULAR_SYMBOLS];
-    
-    // Scatter appears less frequently
-    const rand = Math.random();
-    if (rand < 0.02) {
-      return { type: 'scatter', id: crypto.randomUUID() };
-    }
-    
-    // Bombs only during free spins - reduced rate
-    if (includeBombs && rand < 0.04) {
-      const multiplier = getRandomBombMultiplier();
-      return { type: 'bomb', id: crypto.randomUUID(), multiplier };
-    }
-    
-    // Weight towards lower paying symbols
-    const weights = [20, 20, 18, 16, 14, 5, 4, 2, 1]; // Matches REGULAR_SYMBOLS order
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
-    let random = Math.random() * totalWeight;
-    
-    for (let i = 0; i < availableSymbols.length; i++) {
-      random -= weights[i];
-      if (random <= 0) {
-        return { type: availableSymbols[i], id: crypto.randomUUID() };
-      }
-    }
-    
-    return { type: 'banana', id: crypto.randomUUID() };
-  };
+  // Update autoplay ref
+  useEffect(() => {
+    autoPlayRef.current = autoPlay
+  }, [autoPlay])
 
-  const spin = useCallback(() => {
-    if (isSpinning || isTumbling) return;
-    
-    if (!isFreeSpinMode) {
-      if (balance < betAmount) {
-        setMessage('Insufficient balance!');
-        return;
-      }
-      setBalance(balance - betAmount);
-      recordBet(betAmount); // Track wager for leaderboard
-      setLastBet(betAmount);
-    } else {
-      setFreeSpins(prev => prev - 1);
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (spinTimeoutRef.current) clearTimeout(spinTimeoutRef.current)
     }
-    
-    setIsSpinning(true);
-    setTotalWin(0);
-    setLastWin(0);
-    setTumbleCount(0);
-    setCurrentMultipliers([]);
-    setMessage(isFreeSpinMode ? `Free Spin! ${freeSpins - 1} remaining` : 'Spinning...');
-    
-    // Animate spin
-    setTimeout(() => {
-      const newGrid: Symbol[][] = [];
-      for (let col = 0; col < 6; col++) {
-        const column: Symbol[] = [];
-        for (let row = 0; row < 5; row++) {
-          column.push(generateRandomSymbol(isFreeSpinMode));
-        }
-        newGrid.push(column);
-      }
-      setGrid(newGrid);
-      
-      // Check for wins after spin (start with empty multipliers and 0 accumulated win)
-      // Keep isSpinning true until finalizeRound completes
-      setTimeout(() => {
-        checkWins(newGrid, 0, [], 0);
-      }, 300);
-    }, 500);
-  }, [isSpinning, isTumbling, balance, betAmount, isFreeSpinMode, freeSpins, currentMultipliers]);
+  }, [])
 
-  const buyBonus = () => {
-    const cost = betAmount * 100;
-    if (balance < cost) {
-      setMessage(`Insufficient balance! Need $${cost.toFixed(2)}`);
-      return;
-    }
-    if (isSpinning || isTumbling || isFreeSpinMode) return;
+  // Check for wins (cluster pays - 8+ matching symbols anywhere)
+  const checkWins = useCallback((currentGrid: GridCell[][]) => {
+    const symbolCounts: { [key in SymbolType]?: { count: number, positions: [number, number][] } } = {}
+    const bombPositions: [number, number][] = []
+    let scatterCount = 0
     
-    setBalance(balance - cost);
-    setMessage(`🎁 Bonus Bought for $${cost.toFixed(2)}! 10 Free Spins!`);
-    setIsFreeSpinMode(true);
-    setFreeSpins(10);
-    setCurrentMultipliers([]);
-    setTotalWin(0);
-    setTotalBonusWin(0);
-  };
-
-  const checkWins = (currentGrid: Symbol[][], currentTumble: number, multipliers: number[], accumulatedWin: number) => {
-    // Flatten grid to count symbols
-    const allSymbols = currentGrid.flat();
-    const symbolCounts: Record<string, { count: number; positions: [number, number][] }> = {};
-    
-    // Count each symbol type
-    allSymbols.forEach((symbol, idx) => {
-      const col = Math.floor(idx / 5);
-      const row = idx % 5;
-      if (!symbolCounts[symbol.type]) {
-        symbolCounts[symbol.type] = { count: 0, positions: [] };
-      }
-      symbolCounts[symbol.type].count++;
-      symbolCounts[symbol.type].positions.push([col, row]);
-    });
-    
-    // Check for scatters (free spins trigger)
-    const scatterCount = symbolCounts['scatter']?.count || 0;
-    if (scatterCount >= 4) {
-      if (!isFreeSpinMode) {
-        setMessage(`🍭 ${scatterCount} Scatters! 10 Free Spins Awarded! 🍭`);
-        setTimeout(() => {
-          setIsFreeSpinMode(true);
-          setFreeSpins(10);
-          setCurrentMultipliers([]);
-          setTotalBonusWin(0);
-        }, 1500);
-      } else {
-        // Retrigger during free spins
-        setFreeSpins(prev => prev + 5);
-        setMessage(`🍭 +5 Free Spins! Total: ${freeSpins + 5} 🍭`);
-      }
-    }
-    
-    // Collect bomb multipliers during free spins
-    const bombCount = symbolCounts['bomb']?.count || 0;
-    if (bombCount > 0 && isFreeSpinMode) {
-      const newMultipliers: number[] = [];
-      symbolCounts['bomb'].positions.forEach(([col, row]) => {
-        const symbol = currentGrid[col][row];
-        if (symbol.multiplier) {
-          newMultipliers.push(symbol.multiplier);
-        }
-      });
-      multipliers = [...multipliers, ...newMultipliers];
-      setCurrentMultipliers(multipliers);
-    }
-    
-    // Calculate wins (8+ matching symbols)
-    let spinWin = 0;
-    const winningPositions: Set<string> = new Set();
-    
-    REGULAR_SYMBOLS.forEach(symbolType => {
-      const count = symbolCounts[symbolType]?.count || 0;
-      const config = SYMBOLS[symbolType];
-      
-      // Check each payout threshold
-      let payout = 0;
-      if (count >= 12) payout = config.payouts[12] || 0;
-      else if (count >= 10) payout = config.payouts[10] || 0;
-      else if (count >= 8) payout = config.payouts[8] || 0;
-      
-      if (payout > 0) {
-        // Payout multipliers represent total return (bet + profit)
-        // Since bet is already deducted, we only add the profit portion
-        // Example: 2x payout means 1x profit (2x total - 1x bet = 1x profit)
-        const profit = (payout - 1) * betAmount;
-        spinWin += profit;
-        symbolCounts[symbolType].positions.forEach(([col, row]) => {
-          winningPositions.add(`${col}-${row}`);
-        });
-      }
-    });
-    
-    if (spinWin > 0) {
-      // Mark winning symbols (multipliers are applied at the end of all tumbles)
-      const markedGrid = currentGrid.map((col, colIdx) =>
-        col.map((symbol, rowIdx) => ({
-          ...symbol,
-          isWinning: winningPositions.has(`${colIdx}-${rowIdx}`)
-        }))
-      );
-      setGrid(markedGrid);
-      
-      // Accumulate base win (without multiplier - applied at end)
-      const newAccumulatedWin = accumulatedWin + spinWin;
-      setTotalWin(newAccumulatedWin);
-      
-      setMessage(`Tumble Win! +$${spinWin.toFixed(2)}`);
-      
-      // Tumble - remove winning symbols and drop new ones
-      setTimeout(() => {
-        tumble(markedGrid, currentTumble + 1, multipliers, newAccumulatedWin);
-      }, 800);
-    } else {
-      // No more wins - finalize with accumulated total and apply multipliers
-      finalizeRound(currentTumble, multipliers, accumulatedWin);
-    }
-  };
-
-  const tumble = (currentGrid: Symbol[][], tumbleNum: number, multipliers: number[], accumulatedWin: number) => {
-    setIsTumbling(true);
-    setTumbleCount(tumbleNum);
-    
-    // Remove winning symbols and let new ones fall
-    const newGrid: Symbol[][] = [];
-    
+    // Count symbols
     for (let col = 0; col < 6; col++) {
-      const remainingSymbols = currentGrid[col].filter(s => !s.isWinning);
-      const newSymbolsNeeded = 5 - remainingSymbols.length;
-      
-      const newSymbols: Symbol[] = [];
-      for (let i = 0; i < newSymbolsNeeded; i++) {
-        const symbol = generateRandomSymbol(isFreeSpinMode);
-        symbol.isNew = true;
-        newSymbols.push(symbol);
-      }
-      
-      // New symbols fall from top
-      newGrid.push([...newSymbols, ...remainingSymbols.map(s => ({ ...s, isWinning: false }))]);
-    }
-    
-    setTimeout(() => {
-      // Clear isNew flag after animation
-      const clearedGrid = newGrid.map(col => 
-        col.map(s => ({ ...s, isNew: false }))
-      );
-      setGrid(clearedGrid);
-      setIsTumbling(false);
-      
-      // Check for more wins
-      setTimeout(() => {
-        checkWins(clearedGrid, tumbleNum, multipliers, accumulatedWin);
-      }, 300);
-    }, 400);
-  };
-
-  const finalizeRound = (tumbles: number, multipliers: number[], accumulatedWin: number) => {
-    // Apply multipliers to accumulated win at the end during free spins
-    let finalWin = accumulatedWin;
-    let totalMultiplier = 1;
-    if (isFreeSpinMode && multipliers.length > 0) {
-      totalMultiplier = multipliers.reduce((a, b) => a + b, 0);
-      finalWin = accumulatedWin * totalMultiplier;
-    }
-    
-    // Update display with multiplied total
-    setTotalWin(finalWin);
-    setLastWin(finalWin);
-    
-    // Pay out the total win
-    if (finalWin > 0) {
-      // finalWin is already calculated as payout * bet, which includes the original bet
-      // So we add back the full finalWin amount since bet was already deducted
-      setBalance(balance + finalWin);
-      setSpinHistory(prev => [...prev.slice(-9), { win: finalWin, bet: betAmount }]);
-      
-      // Track total bonus winnings across all free spins
-      if (isFreeSpinMode) {
-        const newBonusTotal = totalBonusWin + finalWin;
-        setTotalBonusWin(newBonusTotal);
-        
-        // Check if free spins ended (use the updated value)
-        if (freeSpins <= 1) {
-          setTimeout(() => {
-            setIsFreeSpinMode(false);
-            setCurrentMultipliers([]);
-            setMessage(`Free Spins Complete! Total Won: $${newBonusTotal.toFixed(2)}`);
-            setTotalBonusWin(0);
-          }, 1500);
+      for (let row = 0; row < 5; row++) {
+        const cell = currentGrid[col][row]
+        if (cell.symbol === 'scatter') {
+          scatterCount++
+        } else if (cell.symbol === 'bomb') {
+          bombPositions.push([col, row])
+        } else {
+          if (!symbolCounts[cell.symbol]) {
+            symbolCounts[cell.symbol] = { count: 0, positions: [] }
+          }
+          symbolCounts[cell.symbol]!.count++
+          symbolCounts[cell.symbol]!.positions.push([col, row])
         }
       }
+    }
+    
+    let winAmount = 0
+    const winningPositions: [number, number][] = []
+    
+    // Check for wins (8+ matching)
+    for (const [symbolType, data] of Object.entries(symbolCounts)) {
+      if (data && data.count >= 8) {
+        const symbol = SYMBOLS[symbolType as SymbolType]
+        let payoutTier = 8
+        if (data.count >= 12) payoutTier = 12
+        else if (data.count >= 10) payoutTier = 10
+        
+        const payout = symbol.payouts[payoutTier] || 0
+        winAmount += payout * betAmount
+        winningPositions.push(...data.positions)
+      }
+    }
+    
+    // Apply bomb multipliers
+    let totalMultiplier = 1
+    if (winAmount > 0 && bombPositions.length > 0) {
+      for (const [col, row] of bombPositions) {
+        const cell = currentGrid[col][row]
+        if (cell.multiplier) {
+          totalMultiplier *= cell.multiplier
+          winningPositions.push([col, row])
+        }
+      }
+    }
+    
+    // Apply free spin multiplier
+    if (freeSpins > 0) {
+      totalMultiplier *= freeSpinMultiplier
+    }
+    
+    winAmount *= totalMultiplier
+    
+    return { winAmount, winningPositions, scatterCount }
+  }, [betAmount, freeSpins, freeSpinMultiplier])
+
+  // Tumble - remove winning symbols and drop new ones
+  const tumble = useCallback((currentGrid: GridCell[][], winPositions: [number, number][]) => {
+    const newGrid = currentGrid.map(col => col.map(cell => ({ ...cell, isWinning: false, isNew: false })))
+    
+    // Mark winning cells
+    for (const [col, row] of winPositions) {
+      newGrid[col][row].isTumbling = true
+    }
+    
+    return new Promise<GridCell[][]>((resolve) => {
+      setGrid(newGrid)
       
-      // Show huge win popup for 20x+ wins
-      if (finalWin >= betAmount * 20) {
-        setShowHugeWin(true);
-        setTimeout(() => setShowHugeWin(false), 3000);
+      setTimeout(() => {
+        // Remove winning cells and drop new ones
+        for (let col = 0; col < 6; col++) {
+          const remaining = newGrid[col].filter(cell => !cell.isTumbling)
+          const newCells: GridCell[] = []
+          const needed = 5 - remaining.length
+          
+          for (let i = 0; i < needed; i++) {
+            const symbol = generateRandomSymbol(freeSpins > 0)
+            newCells.push({
+              symbol,
+              isWinning: false,
+              isTumbling: false,
+              isNew: true,
+              multiplier: symbol === 'bomb' ? BOMB_MULTIPLIERS[Math.floor(Math.random() * BOMB_MULTIPLIERS.length)] : undefined
+            })
+          }
+          
+          newGrid[col] = [...newCells, ...remaining].map(cell => ({ ...cell, isTumbling: false }))
+        }
+        
+        setGrid(newGrid)
+        resolve(newGrid)
+      }, 300)
+    })
+  }, [generateRandomSymbol, freeSpins])
+
+  // Process tumble cascade
+  const processTumble = useCallback(async (currentGrid: GridCell[][], currentTotalWin: number, tumbles: number) => {
+    const { winAmount, winningPositions, scatterCount } = checkWins(currentGrid)
+    
+    if (winAmount > 0) {
+      setTumbleCount(tumbles + 1)
+      setLastWin(winAmount)
+      const newTotal = currentTotalWin + winAmount
+      setTotalWin(newTotal)
+      setBalance(balance + winAmount)
+      
+      // Mark winning positions
+      const markedGrid = currentGrid.map((col, colIdx) =>
+        col.map((cell, rowIdx) => ({
+          ...cell,
+          isWinning: winningPositions.some(([c, r]) => c === colIdx && r === rowIdx)
+        }))
+      )
+      setGrid(markedGrid)
+      
+      // Wait then tumble
+      await new Promise(resolve => setTimeout(resolve, 500))
+      const newGrid = await tumble(markedGrid, winningPositions)
+      
+      // Continue tumbling
+      await processTumble(newGrid, newTotal, tumbles + 1)
+    } else {
+      // No more wins - check scatters for free spins
+      if (scatterCount >= 4 && freeSpins === 0) {
+        const spinsToAward = scatterCount === 4 ? 10 : scatterCount === 5 ? 12 : 15
+        setFreeSpins(spinsToAward)
+        setFreeSpinMultiplier(1)
+        setMessage(`🎉 ${spinsToAward} FREE SPINS! 🎉`)
       }
       
-      const tumbleText = tumbles > 1 ? ` (${tumbles} tumbles!)` : '';
-      const multiplierText = totalMultiplier > 1 ? ` ${totalMultiplier}x!` : '';
-      setMessage(`Total Win: $${finalWin.toFixed(2)}${tumbleText}${multiplierText}`);
-    } else {
-      setMessage(isFreeSpinMode ? 'No win this spin' : 'No win - try again!');
+      // Show big win if applicable
+      if (currentTotalWin >= betAmount * 15) {
+        setBigWinAmount(currentTotalWin)
+        setShowBigWin(true)
+        setTimeout(() => setShowBigWin(false), 3000)
+      }
+      
+      // Finish spin
+      setIsSpinning(false)
+      setTumbleCount(0)
+      
+      // Handle free spins
+      if (freeSpins > 0) {
+        const newFreeSpins = freeSpins - 1
+        setFreeSpins(newFreeSpins)
+        if (newFreeSpins > 0 && autoPlayRef.current) {
+          spinTimeoutRef.current = setTimeout(() => spin(), 1000)
+        }
+      } else {
+        // Auto play
+        if (autoPlayRef.current && balance >= betAmount) {
+          spinTimeoutRef.current = setTimeout(() => spin(), 1000)
+        }
+      }
+    }
+  }, [checkWins, tumble, balance, betAmount, freeSpins, setBalance])
+
+  // Main spin function
+  const spin = useCallback(() => {
+    if (isSpinning) return
+    if (freeSpins === 0 && betAmount > balance) return
+    
+    setIsSpinning(true)
+    setLastWin(0)
+    setTotalWin(0)
+    setMessage('')
+    
+    // Deduct bet (unless free spin)
+    if (freeSpins === 0) {
+      setBalance(balance - betAmount)
+      recordBet(betAmount)
     }
     
-    
-    // Mark spin as complete
-    setIsSpinning(false);
-    
-    // Auto play
-    if (autoPlay && !isFreeSpinMode && balance >= betAmount) {
-      setTimeout(() => {
-        spin();
-      }, 1500);
+    // Generate new grid
+    const newGrid: GridCell[][] = []
+    for (let col = 0; col < 6; col++) {
+      const column: GridCell[] = []
+      for (let row = 0; row < 5; row++) {
+        const symbol = generateRandomSymbol(freeSpins > 0)
+        column.push({
+          symbol,
+          isWinning: false,
+          isTumbling: false,
+          isNew: true,
+          multiplier: symbol === 'bomb' ? BOMB_MULTIPLIERS[Math.floor(Math.random() * BOMB_MULTIPLIERS.length)] : undefined
+        })
+      }
+      newGrid.push(column)
     }
     
-    checkAndReload();
-  };
-
-  const adjustBet = (amount: number) => {
-    const newBet = Math.max(20, Math.min(500, betAmount + amount));
-    setBetAmount(Math.round(newBet * 100) / 100);
-  };
-
-  const renderSymbol = (symbol: Symbol, colIdx: number, rowIdx: number) => {
-    const config = SYMBOLS[symbol.type];
+    setGrid(newGrid)
     
+    // Start checking wins after animation
+    setTimeout(() => {
+      processTumble(newGrid, 0, 0)
+    }, 500)
+  }, [isSpinning, balance, betAmount, freeSpins, generateRandomSymbol, recordBet, setBalance, processTumble])
+
+  // Buy feature
+  const buyFeature = useCallback(() => {
+    const cost = betAmount * 100
+    if (balance >= cost) {
+      setBalance(balance - cost)
+      recordBet(cost)
+      setFreeSpins(10)
+      setFreeSpinMultiplier(1)
+      setMessage('🎰 BONUS BOUGHT! 10 FREE SPINS! 🎰')
+      spin()
+    }
+  }, [balance, betAmount, setBalance, recordBet, spin])
+
+  // Render symbol
+  const renderSymbol = (cell: GridCell) => {
+    const config = SYMBOLS[cell.symbol]
     return (
-      <div
-        key={symbol.id}
+      <div 
         className={`
-          w-14 h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 
-          rounded-xl flex items-center justify-center text-3xl md:text-4xl lg:text-5xl
-          bg-gradient-to-br ${config.color}
-          border-2 border-white/30
-          transition-all duration-300
-          ${symbol.isWinning ? 'animate-pulse scale-110 ring-4 ring-yellow-400 shadow-lg shadow-yellow-400/50' : ''}
-          ${symbol.isNew ? 'animate-bounce' : ''}
-          ${isSpinning ? 'animate-spin opacity-50' : ''}
+          w-full h-full rounded-lg flex items-center justify-center text-xl sm:text-2xl md:text-3xl
+          bg-gradient-to-br ${config.gradient}
+          ${cell.isWinning ? 'animate-pulse ring-2 ring-yellow-400 ring-offset-1' : ''}
+          ${cell.isTumbling ? 'animate-bounce opacity-50' : ''}
+          ${cell.isNew ? 'animate-fall-in' : ''}
+          shadow-inner relative overflow-hidden
         `}
       >
-        <span className="drop-shadow-lg">
-          {config.emoji}
-          {symbol.type === 'bomb' && symbol.multiplier && (
-            <span className="absolute -bottom-1 -right-1 bg-yellow-400 text-black text-xs font-bold px-1 rounded">
-              {symbol.multiplier}x
-            </span>
-          )}
-        </span>
+        <span className="drop-shadow-lg relative z-10">{config.emoji}</span>
+        {cell.symbol === 'bomb' && cell.multiplier && (
+          <span className="absolute bottom-0 right-0.5 text-[8px] sm:text-xs font-bold text-yellow-400 bg-black/60 rounded px-0.5">
+            x{cell.multiplier}
+          </span>
+        )}
+        <div className="absolute inset-0 bg-white/20 rounded-lg" />
       </div>
-    );
-  };
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-500 via-purple-600 to-indigo-800 p-2 md:p-4">
-      {/* Huge Win Popup */}
-      {showHugeWin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600 p-8 rounded-3xl border-4 border-white shadow-2xl animate-bounce">
-            <div className="text-center">
-              <div className="text-6xl mb-4">🎉💰🎉</div>
-              <h2 className="text-4xl md:text-6xl font-black text-white drop-shadow-lg animate-pulse">
-                HUGE WIN LIL BRO
-              </h2>
-              <div className="text-3xl md:text-5xl font-bold text-yellow-300 mt-4">
-                ${lastWin.toFixed(2)}
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-pink-300 via-blue-200 to-purple-300 relative overflow-hidden">
+      {/* Snowflakes/Sparkles Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(30)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute animate-float text-white text-opacity-60"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 5}s`,
+              animationDuration: `${3 + Math.random() * 4}s`,
+              fontSize: `${8 + Math.random() * 12}px`
+            }}
+          >
+            ✨
+          </div>
+        ))}
+      </div>
+
+      {/* Top Bar */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-pink-500 via-purple-500 to-pink-500 px-2 py-2 sm:py-3 relative z-10">
+        <div className="max-w-xl mx-auto flex items-center justify-between">
+          <button
+            onClick={() => router.push('/casino')}
+            className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors text-sm sm:text-base"
+          >
+            ← Back
+          </button>
+          
+          <h1 className="text-base sm:text-xl font-bold text-white drop-shadow-lg flex items-center gap-1 sm:gap-2">
+            🍬 Sweet Bonanza 🍭
+          </h1>
+          
+          <button
+            onClick={() => setShowPaytable(true)}
+            className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors text-xs sm:text-sm"
+          >
+            Paytable
+          </button>
+        </div>
+      </div>
+
+      {/* Free Spins Banner */}
+      {freeSpins > 0 && (
+        <div className="flex-shrink-0 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 px-4 py-2 text-center relative z-10">
+          <span className="text-lg sm:text-xl font-bold text-white drop-shadow animate-pulse">
+            🎰 FREE SPINS: {freeSpins} | MULTIPLIER: x{freeSpinMultiplier} 🎰
+          </span>
+        </div>
+      )}
+
+      {/* Main Game Area */}
+      <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative z-10">
+        {/* Slot Frame - Candy Cane Border */}
+        <div className="relative p-2 sm:p-3 rounded-2xl bg-gradient-to-br from-pink-400 via-white to-pink-400 shadow-2xl" 
+             style={{ 
+               background: 'repeating-linear-gradient(45deg, #ff69b4, #ff69b4 10px, white 10px, white 20px)',
+               padding: '8px'
+             }}>
+          <div className="bg-gradient-to-b from-purple-900 via-indigo-900 to-purple-900 rounded-xl p-2 sm:p-3">
+            {/* Win Display */}
+            {(lastWin > 0 || message) && (
+              <div className="text-center mb-2">
+                {lastWin > 0 && (
+                  <div className="text-xl sm:text-2xl font-bold text-yellow-400 animate-pulse">
+                    WIN: ${lastWin.toFixed(2)}
+                  </div>
+                )}
+                {tumbleCount > 0 && (
+                  <div className="text-xs sm:text-sm text-cyan-400">
+                    Tumble #{tumbleCount}
+                  </div>
+                )}
+                {message && (
+                  <div className="text-sm sm:text-lg text-pink-400 font-bold animate-bounce">
+                    {message}
+                  </div>
+                )}
               </div>
-              <div className="text-xl text-white/80 mt-2">
-                {(lastWin / betAmount).toFixed(1)}x your bet!
+            )}
+
+            {/* Grid */}
+            <div className="grid grid-cols-6 gap-1 sm:gap-1.5 p-2 bg-purple-950 rounded-lg">
+              {grid.map((column, colIdx) => (
+                <div key={colIdx} className="flex flex-col gap-1 sm:gap-1.5">
+                  {column.map((cell, rowIdx) => (
+                    <div 
+                      key={`${colIdx}-${rowIdx}`} 
+                      className="aspect-square w-10 sm:w-12 md:w-14 lg:w-16"
+                    >
+                      {renderSymbol(cell)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Total Win Display */}
+            {totalWin > 0 && (
+              <div className="text-center mt-2 py-2 bg-gradient-to-r from-transparent via-yellow-600/50 to-transparent rounded">
+                <div className="text-lg sm:text-xl font-bold text-yellow-300">
+                  TOTAL WIN: ${totalWin.toFixed(2)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Control Bar */}
+      <div className="flex-shrink-0 bg-gradient-to-t from-purple-900 via-purple-800 to-purple-700 border-t-4 border-pink-500 px-2 sm:px-4 py-2 sm:py-3 relative z-10">
+        <div className="max-w-xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+          {/* Buy Feature Button */}
+          <button
+            onClick={buyFeature}
+            disabled={isSpinning || balance < betAmount * 100 || freeSpins > 0}
+            className="px-2 sm:px-4 py-2 sm:py-3 rounded-lg bg-gradient-to-br from-amber-500 to-red-600 border-2 border-amber-400 text-[10px] sm:text-xs font-bold text-white disabled:opacity-50 hover:scale-105 transition-transform flex-shrink-0 shadow-lg"
+          >
+            BUY BONUS<br/>
+            <span className="text-amber-200">${(betAmount * 100).toFixed(0)}</span>
+          </button>
+
+          {/* Balance */}
+          <div className="text-center min-w-0 flex-1">
+            <div className="text-[8px] sm:text-xs text-pink-300 uppercase">Balance</div>
+            <div className="text-sm sm:text-lg font-bold text-white truncate">${balance.toLocaleString()}</div>
+          </div>
+
+          {/* Bet Amount */}
+          <div className="flex items-center gap-1 sm:gap-2 bg-purple-900/80 rounded-lg px-2 sm:px-3 py-1 flex-shrink-0">
+            <button
+              onClick={() => setBetAmount(Math.max(1, betAmount - 5))}
+              disabled={isSpinning || freeSpins > 0}
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-pink-600 flex items-center justify-center text-white hover:bg-pink-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
+            >
+              −
+            </button>
+            <div className="text-center min-w-14 sm:min-w-20">
+              <div className="text-[8px] sm:text-xs text-pink-300 uppercase">Bet</div>
+              <div className="text-sm sm:text-lg font-bold text-white">${betAmount.toFixed(2)}</div>
+            </div>
+            <button
+              onClick={() => setBetAmount(Math.min(balance, betAmount + 5))}
+              disabled={isSpinning || freeSpins > 0}
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-pink-600 flex items-center justify-center text-white hover:bg-pink-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Spin Button */}
+          <button
+            onClick={spin}
+            disabled={isSpinning || (betAmount > balance && freeSpins === 0)}
+            className={`
+              w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 flex items-center justify-center flex-shrink-0
+              transition-all transform hover:scale-105 disabled:opacity-50 disabled:transform-none shadow-xl
+              ${freeSpins > 0
+                ? 'bg-gradient-to-br from-yellow-400 to-amber-600 border-yellow-300 animate-pulse'
+                : 'bg-gradient-to-br from-green-500 to-emerald-700 border-green-400 hover:border-green-300'}
+            `}
+          >
+            {isSpinning ? (
+              <div className="w-6 h-6 sm:w-7 sm:h-7 border-3 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span className="text-2xl sm:text-3xl">▶</span>
+            )}
+          </button>
+
+          {/* Auto Play Toggle */}
+          <button
+            onClick={() => setAutoPlay(!autoPlay)}
+            disabled={isSpinning}
+            className={`
+              w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center text-[10px] sm:text-xs font-bold 
+              transition-all flex-shrink-0
+              ${autoPlay 
+                ? 'bg-gradient-to-br from-cyan-500 to-blue-600 border-cyan-400 text-white' 
+                : 'bg-purple-800 border-purple-600 text-purple-300 hover:border-purple-400'}
+            `}
+          >
+            AUTO<br/>{autoPlay ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      </div>
+
+      {/* Big Win Popup */}
+      {showBigWin && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="text-center animate-bounce">
+            <div className="text-4xl sm:text-6xl font-bold text-yellow-400 mb-4 animate-pulse">
+              🎉 BIG WIN! 🎉
+            </div>
+            <div className="text-5xl sm:text-7xl font-black bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 bg-clip-text text-transparent">
+              ${bigWinAmount.toFixed(2)}
+            </div>
+            <div className="text-xl sm:text-2xl text-white mt-4">
+              {bigWinAmount >= betAmount * 50 ? '🍬 SWEET! 🍬' : '✨ TASTY WIN! ✨'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Paytable Modal */}
+      {showPaytable && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-purple-900 to-pink-900 rounded-2xl p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto border-4 border-pink-400">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-pink-300">🍭 Paytable</h2>
+              <button
+                onClick={() => setShowPaytable(false)}
+                className="text-white text-2xl hover:text-pink-400"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-white text-sm sm:text-base">
+              {/* Rules */}
+              <div className="bg-purple-800/50 p-3 rounded-lg">
+                <h3 className="font-bold text-pink-300 mb-2">How to Win</h3>
+                <ul className="list-disc list-inside space-y-1 text-purple-200">
+                  <li>Match 8+ symbols anywhere for wins</li>
+                  <li>Wins cause a tumble - new symbols drop</li>
+                  <li>💣 Bombs multiply wins during tumbles</li>
+                  <li>4+ 🍭 Scatters trigger Free Spins</li>
+                </ul>
+              </div>
+
+              {/* Symbols */}
+              <div className="bg-purple-800/50 p-3 rounded-lg">
+                <h3 className="font-bold text-pink-300 mb-2">Symbol Payouts (per bet)</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {Object.entries(SYMBOLS).filter(([key]) => key !== 'bomb' && key !== 'scatter').map(([key, config]) => (
+                    <div key={key} className="flex items-center justify-between bg-purple-700/50 p-2 rounded">
+                      <span className="text-xl">{config.emoji}</span>
+                      <span className="text-purple-200">
+                        8+: x{config.payouts[8]} | 10+: x{config.payouts[10]} | 12+: x{config.payouts[12]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Scatter */}
+              <div className="bg-amber-800/50 p-3 rounded-lg">
+                <h3 className="font-bold text-amber-300 mb-2">🍭 Scatter</h3>
+                <p>4 = 10 Free Spins | 5 = 12 Free Spins | 6 = 15 Free Spins</p>
+              </div>
+
+              {/* Bombs */}
+              <div className="bg-gray-800/50 p-3 rounded-lg">
+                <h3 className="font-bold text-gray-300 mb-2">💣 Multiplier Bombs</h3>
+                <p>Appear during free spins. Multiply all wins by 2x to 100x!</p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Candy Background Decorations */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-10 left-10 text-6xl opacity-20 animate-bounce">🍬</div>
-        <div className="absolute top-20 right-20 text-5xl opacity-20 animate-pulse">🍭</div>
-        <div className="absolute bottom-20 left-20 text-7xl opacity-20 animate-bounce delay-100">🧁</div>
-        <div className="absolute bottom-10 right-10 text-6xl opacity-20 animate-pulse delay-200">🍩</div>
-      </div>
-
-      {/* Header */}
-      <div className="max-w-6xl mx-auto relative z-10">
-        <div className="flex justify-between items-center mb-4">
-          <button
-            onClick={() => router.push('/casino')}
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition-all backdrop-blur-sm"
-          >
-            ← Casino
-          </button>
-          <h1 className="text-3xl md:text-5xl font-bold text-white drop-shadow-lg">
-            🍭 Sweet Bonanza 🍭
-          </h1>
-          <button
-            onClick={() => setShowPaytable(!showPaytable)}
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition-all backdrop-blur-sm"
-          >
-            {showPaytable ? 'Hide' : 'Paytable'}
-          </button>
-        </div>
-
-        {/* Balance & Info Bar */}
-        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-4 mb-4 border border-white/20">
-          <div className="flex flex-wrap justify-between items-center gap-4">
-            <div className="text-white">
-              <span className="text-white/70">Balance:</span>
-              <span className="text-2xl font-bold ml-2 text-yellow-400">${balance.toLocaleString()}</span>
-            </div>
-            
-            {isFreeSpinMode && (
-              <div className="bg-gradient-to-r from-pink-500 to-yellow-500 px-4 py-2 rounded-xl animate-pulse">
-                <span className="text-white font-bold">🎰 FREE SPINS: {freeSpins} 🎰</span>
-              </div>
-            )}
-            
-            {currentMultipliers.length > 0 && (
-              <div className="bg-gradient-to-r from-purple-500 to-blue-500 px-4 py-2 rounded-xl">
-                <span className="text-white font-bold">
-                  🌈 Multipliers: {currentMultipliers.join('x + ')}x = {currentMultipliers.reduce((a, b) => a + b, 0)}x
-                </span>
-              </div>
-            )}
-            
-            <div className="text-white">
-              <span className="text-white/70">{isFreeSpinMode ? 'Bonus Total:' : 'Last Win:'}</span>
-              <span className={`text-2xl font-bold ml-2 ${(isFreeSpinMode ? totalBonusWin : lastWin) > 0 ? 'text-green-400' : 'text-gray-400'}`}>
-                ${(isFreeSpinMode ? totalBonusWin + totalWin : lastWin).toFixed(2)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Message */}
-        <div className="text-center mb-4">
-          <div className={`text-xl md:text-2xl font-bold text-white drop-shadow-lg transition-all ${
-            lastWin > betAmount * 10 ? 'text-yellow-300 animate-pulse text-3xl' : ''
-          }`}>
-            {message}
-          </div>
-          {tumbleCount > 0 && (
-            <div className="text-white/70 text-sm mt-1">Tumble #{tumbleCount}</div>
-          )}
-        </div>
-
-        {/* Game Grid */}
-        <div className="bg-gradient-to-br from-pink-300/30 to-purple-400/30 backdrop-blur-lg rounded-3xl p-4 md:p-6 mb-4 border-4 border-white/30 shadow-2xl">
-          <div className="flex justify-center gap-1 md:gap-2">
-            {grid.map((column, colIdx) => (
-              <div key={colIdx} className="flex flex-col gap-1 md:gap-2">
-                {column.map((symbol, rowIdx) => (
-                  <div key={`${colIdx}-${rowIdx}`} className="relative">
-                    {renderSymbol(symbol, colIdx, rowIdx)}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
-          <div className="flex flex-wrap justify-center items-center gap-4">
-            {/* Bet Controls */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => adjustBet(-20)}
-                disabled={isSpinning || isTumbling || isFreeSpinMode}
-                className="w-10 h-10 bg-red-500 hover:bg-red-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
-              >
-                -
-              </button>
-              <div className="bg-white/10 px-4 py-2 rounded-xl min-w-24 text-center">
-                <div className="text-white/70 text-xs">BET</div>
-                <div className="text-white font-bold text-lg">${betAmount.toFixed(2)}</div>
-              </div>
-              <button
-                onClick={() => adjustBet(20)}
-                disabled={isSpinning || isTumbling || isFreeSpinMode}
-                className="w-10 h-10 bg-green-500 hover:bg-green-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
-              >
-                +
-              </button>
-            </div>
-
-            {/* All In and Rebet Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setBetAmount(balance)}
-                disabled={isSpinning || isTumbling || isFreeSpinMode || balance < 20}
-                className="px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:opacity-50 rounded-lg text-white font-bold transition-all"
-              >
-                💰 All In
-              </button>
-              <button
-                onClick={() => setBetAmount(lastBet)}
-                disabled={isSpinning || isTumbling || isFreeSpinMode || balance < lastBet}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 rounded-lg text-white font-bold transition-all"
-              >
-                🔄 Rebet
-              </button>
-            </div>
-
-            {/* Quick Bet Buttons */}
-            <div className="flex gap-2">
-              {[500, 1000, 5000, 10000, 25000, 50000].map(amount => (
-                <button
-                  key={amount}
-                  onClick={() => setBetAmount(amount)}
-                  disabled={isSpinning || isTumbling || isFreeSpinMode}
-                  className={`px-3 py-2 rounded-lg font-bold transition-all ${
-                    betAmount === amount
-                      ? 'bg-yellow-500 text-black'
-                      : 'bg-white/10 text-white hover:bg-white/20'
-                  } disabled:opacity-50`}
-                >
-                  ${amount}
-                </button>
-              ))}
-            </div>
-
-            {/* Spin Button */}
-            <button
-              onClick={spin}
-              disabled={isSpinning || isTumbling || (!isFreeSpinMode && balance < betAmount)}
-              className={`
-                px-8 py-4 rounded-2xl font-bold text-xl transition-all transform hover:scale-105
-                ${isFreeSpinMode 
-                  ? 'bg-gradient-to-r from-pink-500 to-yellow-500 animate-pulse' 
-                  : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'}
-                text-white shadow-lg disabled:opacity-50 disabled:transform-none
-              `}
-            >
-              {isSpinning ? '🎰' : isTumbling ? '⬇️' : isFreeSpinMode ? `🎁 FREE SPIN (${freeSpins})` : '🎰 SPIN'}
-            </button>
-
-            {/* Auto Play Toggle */}
-            <button
-              onClick={() => setAutoPlay(!autoPlay)}
-              disabled={isFreeSpinMode}
-              className={`px-4 py-2 rounded-xl font-bold transition-all ${
-                autoPlay ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
-              } disabled:opacity-50`}
-            >
-              {autoPlay ? '⏹️ Stop Auto' : '▶️ Auto'}
-            </button>
-
-            {/* Buy Bonus Button */}
-            <button
-              onClick={buyBonus}
-              disabled={isSpinning || isTumbling || isFreeSpinMode || balance < betAmount * 100}
-              className="px-4 py-2 rounded-xl font-bold transition-all bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black disabled:opacity-50"
-              title={`Cost: $${(betAmount * 100).toFixed(2)}`}
-            >
-              🎁 Buy Bonus (100x)
-            </button>
-          </div>
-        </div>
-
-        {/* Paytable Modal */}
-        {showPaytable && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gradient-to-br from-purple-900 to-pink-900 rounded-3xl p-6 max-w-4xl max-h-[90vh] overflow-y-auto border-4 border-white/30">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold text-white">🍭 Paytable 🍭</h2>
-                <button
-                  onClick={() => setShowPaytable(false)}
-                  className="text-white text-3xl hover:text-gray-300"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              {/* Rules */}
-              <div className="bg-white/10 rounded-xl p-4 mb-6">
-                <h3 className="text-xl font-bold text-yellow-400 mb-2">How to Win</h3>
-                <ul className="text-white/90 space-y-2">
-                  <li>• <b>8+ matching symbols anywhere</b> on the grid pays!</li>
-                  <li>• Winning symbols disappear and new ones <b>tumble</b> down</li>
-                  <li>• Tumbles continue until no more wins</li>
-                  <li>• <b>4+ Lollipops 🍭</b> trigger 10 Free Spins</li>
-                  <li>• During Free Spins, <b>Rainbow Bombs 🌈</b> add multipliers</li>
-                  <li>• All multipliers are summed and applied to wins!</li>
-                </ul>
-              </div>
-
-              {/* Symbol Payouts */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {[...REGULAR_SYMBOLS, 'scatter' as SymbolType].map(symbolType => {
-                  const config = SYMBOLS[symbolType];
-                  return (
-                    <div key={symbolType} className="bg-white/10 rounded-xl p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-3xl">{config.emoji}</span>
-                        <span className="text-white font-bold">{config.name}</span>
-                      </div>
-                      {symbolType === 'scatter' ? (
-                        <div className="text-white/80 text-sm">
-                          4+ = 10 Free Spins<br/>
-                          +3 scatters = +5 spins
-                        </div>
-                      ) : (
-                        <div className="text-white/80 text-sm">
-                          8+ = {config.payouts[8]}x<br/>
-                          10+ = {config.payouts[10]}x<br/>
-                          12+ = {config.payouts[12]}x
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                
-                {/* Rainbow Bomb */}
-                <div className="bg-white/10 rounded-xl p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-3xl">🌈</span>
-                    <span className="text-white font-bold">Rainbow Bomb</span>
-                  </div>
-                  <div className="text-white/80 text-sm">
-                    Free Spins only!<br/>
-                    Random 2x-100x<br/>
-                    All multipliers sum!
-                  </div>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="mt-6 bg-white/10 rounded-xl p-4">
-                <h3 className="text-xl font-bold text-yellow-400 mb-2">Game Info</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white/90">
-                  <div><b>RTP:</b> 96.51%</div>
-                  <div><b>Volatility:</b> High</div>
-                  <div><b>Max Win:</b> 21,000x</div>
-                  <div><b>Grid:</b> 6x5</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* CSS Animations */}
+      <style jsx>{`
+        @keyframes fall-in {
+          from {
+            transform: translateY(-100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 0.4;
+          }
+          50% {
+            transform: translateY(-20px) rotate(180deg);
+            opacity: 0.8;
+          }
+        }
+        
+        .animate-fall-in {
+          animation: fall-in 0.3s ease-out;
+        }
+        
+        .animate-float {
+          animation: float 4s ease-in-out infinite;
+        }
+      `}</style>
     </div>
-  );
+  )
 }

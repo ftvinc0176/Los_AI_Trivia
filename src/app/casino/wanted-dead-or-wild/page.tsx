@@ -652,49 +652,41 @@ export default function WantedDeadOrWild() {
 
         {/* Bottom Control Bar - Matching real game layout */}
         <div className="flex-shrink-0 bg-gradient-to-t from-gray-900 to-gray-800 border-t border-gray-700 px-2 sm:px-4 py-2 sm:py-3">
-          <div className="max-w-xl mx-auto flex items-center justify-between gap-1 sm:gap-2">
+          <div className="max-w-xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
             {/* Buy Bonus Button */}
             <button
               onClick={() => setShowBuyBonus(true)}
               disabled={isSpinning || !!bonus.type}
-              className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-teal-600 to-teal-800 border-2 border-teal-400 flex items-center justify-center text-[8px] sm:text-xs font-bold text-white disabled:opacity-50 hover:scale-105 transition-transform flex-shrink-0"
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-teal-600 to-teal-800 border-2 border-teal-400 flex items-center justify-center text-[8px] sm:text-xs font-bold text-white disabled:opacity-50 hover:scale-105 transition-transform flex-shrink-0"
             >
               BUY<br/>BONUS
-            </button>
-
-            {/* Back Button */}
-            <button
-              onClick={() => router.push('/casino')}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors flex-shrink-0"
-            >
-              ≡
             </button>
 
             {/* Balance */}
             <div className="text-center min-w-0 flex-1">
               <div className="text-[8px] sm:text-xs text-gray-400 uppercase">Balance</div>
-              <div className="text-xs sm:text-lg font-bold text-white truncate">${balance.toLocaleString()}</div>
+              <div className="text-sm sm:text-lg font-bold text-white truncate">${balance.toLocaleString()}</div>
             </div>
 
             {/* Bet Amount */}
-            <div className="flex items-center gap-0.5 sm:gap-2 bg-gray-800 rounded-lg px-1.5 sm:px-3 py-1 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 bg-gray-800 rounded-lg px-2 sm:px-3 py-1 flex-shrink-0">
               <button
                 onClick={() => setBetAmount(Math.max(1, betAmount / 2))}
                 disabled={isSpinning || !!bonus.type}
-                className="text-gray-400 hover:text-white disabled:opacity-50 text-base sm:text-xl px-1"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-600 disabled:opacity-50 text-lg sm:text-xl"
               >
-                ‹
+                −
               </button>
-              <div className="text-center min-w-12 sm:min-w-20">
+              <div className="text-center min-w-16 sm:min-w-24">
                 <div className="text-[8px] sm:text-xs text-gray-400 uppercase">Bet</div>
-                <div className="text-xs sm:text-base font-bold text-white">${betAmount.toFixed(2)}</div>
+                <div className="text-sm sm:text-lg font-bold text-white">${betAmount.toFixed(2)}</div>
               </div>
               <button
                 onClick={() => setBetAmount(Math.min(balance, betAmount * 2))}
                 disabled={isSpinning || !!bonus.type}
-                className="text-gray-400 hover:text-white disabled:opacity-50 text-base sm:text-xl px-1"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-600 disabled:opacity-50 text-lg sm:text-xl"
               >
-                ›
+                +
               </button>
             </div>
 
@@ -703,7 +695,7 @@ export default function WantedDeadOrWild() {
               onClick={spin}
               disabled={isSpinning || (betAmount > balance && !bonus.type)}
               className={`
-                w-12 h-12 sm:w-16 sm:h-16 rounded-full border-4 flex items-center justify-center flex-shrink-0
+                w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 flex items-center justify-center flex-shrink-0
                 transition-all transform hover:scale-105 disabled:opacity-50 disabled:transform-none
                 ${bonus.type 
                   ? 'bg-gradient-to-br from-purple-500 to-amber-500 border-purple-400' 
@@ -711,17 +703,20 @@ export default function WantedDeadOrWild() {
               `}
             >
               {isSpinning ? (
-                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-6 h-6 sm:w-7 sm:h-7 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <svg className="w-5 h-5 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               )}
             </button>
 
-            {/* Autoplay Placeholder */}
-            <button className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors flex-shrink-0">
-              ⊙
+            {/* Back to Casino */}
+            <button
+              onClick={() => router.push('/casino')}
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-red-600 to-red-800 border-2 border-red-400 flex items-center justify-center text-[8px] sm:text-xs font-bold text-white hover:scale-105 transition-transform flex-shrink-0"
+            >
+              EXIT
             </button>
           </div>
         </div>
