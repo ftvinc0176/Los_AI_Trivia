@@ -11,6 +11,7 @@ export default function Casino() {
   const { playerName, balance, setBalance, isLoggedIn, logout, highestBalances, mostWagered, checkAndReload, loginWithUsername } = useCasino();
   const [selectedGame, setSelectedGame] = useState<GameType>(null);
   const [showMultiplayerOptions, setShowMultiplayerOptions] = useState(false);
+  const [gameMode, setGameMode] = useState<'single' | 'multiplayer'>('single');
   const [nameInput, setNameInput] = useState('');
 
   const handleLogin = async () => {
@@ -151,7 +152,7 @@ export default function Casino() {
                     i === 0 ? 'bg-red-500/20' : 'bg-black/20'
                   }`}>
                     <span className="text-white truncate max-w-[60px]">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`} {entry.name}</span>
-                    <span className="text-green-400 font-bold">${(entry.amount/1000).toFixed(0)}k</span>
+                    <span className="text-green-400 font-bold">${entry.amount.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -165,79 +166,119 @@ export default function Casino() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {!showMultiplayerOptions ? (
             <>
+              {/* Game Mode Toggle */}
+              <div className="flex-shrink-0 flex justify-center gap-2 mb-2 px-2">
+                <button
+                  onClick={() => setGameMode('single')}
+                  className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                    gameMode === 'single'
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30'
+                      : 'bg-black/40 text-white/60 hover:text-white border border-red-500/20'
+                  }`}
+                >
+                  🎮 Singleplayer
+                </button>
+                <button
+                  onClick={() => setGameMode('multiplayer')}
+                  className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                    gameMode === 'multiplayer'
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
+                      : 'bg-black/40 text-white/60 hover:text-white border border-blue-500/20'
+                  }`}
+                >
+                  👥 Multiplayer
+                </button>
+              </div>
+
               {/* Mobile: Compact Icon Grid */}
               <div className="lg:hidden flex-1 overflow-auto">
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 p-1">
-                  {/* Blackjack */}
-                  <button onClick={() => router.push('/casino/blackjack?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🃏</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Blackjack</span>
-                  </button>
-                  {/* Andar Bahar */}
-                  <button onClick={() => router.push('/casino/andar-bahar?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🎴</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Andar Bahar</span>
-                  </button>
-                  {/* Ultimate Hold'em */}
-                  <button onClick={() => router.push('/casino/ultimate-holdem')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🎲</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Ultimate</span>
-                  </button>
-                  {/* Texas Hold'em */}
-                  <button onClick={() => handleGameSelect('texas-holdem', 'multiplayer')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🃏</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Texas</span>
-                  </button>
-                  {/* Horse Racing */}
-                  <button onClick={() => router.push('/casino/horse-racing?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🏇</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Horses</span>
-                  </button>
-                  {/* Baccarat */}
-                  <button onClick={() => router.push('/casino/baccarat?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🎴</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Baccarat</span>
-                  </button>
-                  {/* Craps */}
-                  <button onClick={() => router.push('/casino/craps')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🎲</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Craps</span>
-                  </button>
-                  {/* CS Betting */}
-                  <button onClick={() => router.push('/casino/cs-betting')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-orange-500/20 hover:border-orange-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🎯</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">CS Bet</span>
-                  </button>
-                  {/* Sweet Bonanza */}
-                  <button onClick={() => router.push('/casino/sweet-bonanza')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-pink-500/20 hover:border-pink-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🍭</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Bonanza</span>
-                  </button>
-                  {/* Madame Destiny */}
-                  <button onClick={() => router.push('/casino/madame-destiny')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🔮</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Destiny</span>
-                  </button>
-                  {/* Wild Booster */}
-                  <button onClick={() => router.push('/casino/wild-booster')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">💎</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Wild Boost</span>
-                  </button>
-                  {/* Keno */}
-                  <button onClick={() => router.push('/casino/keno')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🎱</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Keno</span>
-                  </button>
-                  {/* Limbo */}
-                  <button onClick={() => router.push('/casino/limbo')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-indigo-500/20 hover:border-indigo-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">⚡</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Limbo</span>
-                  </button>
-                  {/* Wanted */}
-                  <button onClick={() => router.push('/casino/wanted-dead-or-wild')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-amber-500/20 hover:border-amber-500/50 transition-all">
-                    <span className="text-2xl sm:text-3xl mb-1">🤠</span>
-                    <span className="text-[10px] sm:text-xs text-white font-medium">Wanted</span>
-                  </button>
+                  {gameMode === 'single' ? (
+                    <>
+                      {/* Singleplayer Games */}
+                      <button onClick={() => router.push('/casino/blackjack?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🃏</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Blackjack</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/andar-bahar?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎴</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Andar Bahar</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/ultimate-holdem')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎲</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Ultimate</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/horse-racing?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🏇</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Horses</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/baccarat?mode=single')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎴</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Baccarat</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/craps')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎲</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Craps</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/cs-betting')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-orange-500/20 hover:border-orange-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎯</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">CS Bet</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/sweet-bonanza')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-pink-500/20 hover:border-pink-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🍭</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Bonanza</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/madame-destiny')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🔮</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Destiny</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/wild-booster')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">💎</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Wild Boost</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/keno')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎱</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Keno</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/limbo')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-indigo-500/20 hover:border-indigo-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">⚡</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Limbo</span>
+                      </button>
+                      <button onClick={() => router.push('/casino/wanted-dead-or-wild')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-amber-500/20 hover:border-amber-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🤠</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Wanted</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Multiplayer Games */}
+                      <button onClick={() => handleGameSelect('blackjack', 'multiplayer')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-blue-500/20 hover:border-blue-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🃏</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Blackjack</span>
+                        <span className="text-[8px] text-blue-400">👥 Lobby</span>
+                      </button>
+                      <button onClick={() => handleGameSelect('andar-bahar', 'multiplayer')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-blue-500/20 hover:border-blue-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎴</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Andar Bahar</span>
+                        <span className="text-[8px] text-blue-400">👥 Lobby</span>
+                      </button>
+                      <button onClick={() => handleGameSelect('texas-holdem', 'multiplayer')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-blue-500/20 hover:border-blue-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🃏</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Texas</span>
+                        <span className="text-[8px] text-blue-400">👥 Lobby</span>
+                      </button>
+                      <button onClick={() => handleGameSelect('baccarat', 'multiplayer')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-blue-500/20 hover:border-blue-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🎴</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Baccarat</span>
+                        <span className="text-[8px] text-blue-400">👥 Lobby</span>
+                      </button>
+                      <button onClick={() => handleGameSelect('horse-racing', 'multiplayer')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-blue-500/20 hover:border-blue-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🏇</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Horses</span>
+                        <span className="text-[8px] text-blue-400">👥 Lobby</span>
+                      </button>
+                    </>
+                  )}
                 </div>
                 
                 {/* Mobile Leaderboards Row */}
@@ -247,7 +288,7 @@ export default function Casino() {
                     {highestBalances.slice(0, 3).map((e, i) => (
                       <div key={i} className="flex justify-between text-[10px]">
                         <span className="text-white truncate max-w-[60px]">{['🥇','🥈','🥉'][i]} {e.name}</span>
-                        <span className="text-green-400">${(e.amount/1000).toFixed(0)}k</span>
+                        <span className="text-green-400">${e.amount.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -256,7 +297,7 @@ export default function Casino() {
                     {mostWagered.slice(0, 3).map((e, i) => (
                       <div key={i} className="flex justify-between text-[10px]">
                         <span className="text-white truncate max-w-[60px]">{['🔥','⚡','✨'][i]} {e.name}</span>
-                        <span className="text-green-400">${(e.amount/1000).toFixed(0)}k</span>
+                        <span className="text-green-400">${e.amount.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -266,213 +307,265 @@ export default function Casino() {
               {/* Desktop: Full Card Grid */}
               <div className="hidden lg:block flex-1 overflow-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
-                {/* Blackjack */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🃏</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Blackjack</h2>
-                        <p className="text-white/40 text-xs">Beat the dealer to 21</p>
+                {gameMode === 'single' ? (
+                  <>
+                    {/* Singleplayer Games */}
+                    {/* Blackjack */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🃏</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Blackjack</h2>
+                            <p className="text-white/40 text-xs">Beat the dealer to 21</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/blackjack?mode=single')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎮 Play Now</button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      <button onClick={() => handleGameSelect('blackjack', 'single')} className="py-1.5 bg-red-500/20 hover:bg-red-500/40 text-white rounded-lg font-medium text-xs transition-all border border-red-500/20">🎮 Solo</button>
-                      <button onClick={() => handleGameSelect('blackjack', 'multiplayer')} className="py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-xs transition-all border border-white/10">👥 Multi</button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Andar Bahar */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🎴</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Andar Bahar</h2>
-                        <p className="text-white/40 text-xs">Match the card side</p>
+                    {/* Andar Bahar */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎴</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Andar Bahar</h2>
+                            <p className="text-white/40 text-xs">Match the card side</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/andar-bahar?mode=single')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎮 Play Now</button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      <button onClick={() => handleGameSelect('andar-bahar', 'single')} className="py-1.5 bg-red-500/20 hover:bg-red-500/40 text-white rounded-lg font-medium text-xs transition-all border border-red-500/20">🎮 Solo</button>
-                      <button onClick={() => handleGameSelect('andar-bahar', 'multiplayer')} className="py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-xs transition-all border border-white/10">👥 Multi</button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Ultimate Texas Hold'em */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🎲</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Ultimate Hold&apos;em</h2>
-                        <p className="text-white/40 text-xs">Casino table poker</p>
+                    {/* Ultimate Texas Hold'em */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎲</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Ultimate Hold&apos;em</h2>
+                            <p className="text-white/40 text-xs">Casino table poker</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/ultimate-holdem')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎮 Play Now</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/ultimate-holdem')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎮 Play Now</button>
-                  </div>
-                </div>
 
-                {/* Texas Hold'em Multiplayer */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🃏</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Texas Hold&apos;em</h2>
-                        <p className="text-white/40 text-xs">Play with real players</p>
+                    {/* Horse Racing */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🏇</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Horse Racing</h2>
+                            <p className="text-white/40 text-xs">Bet on winners</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/horse-racing?mode=single')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎮 Play Now</button>
                       </div>
                     </div>
-                    <button onClick={() => handleGameSelect('texas-holdem', 'multiplayer')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">👥 Join Table</button>
-                  </div>
-                </div>
 
-                {/* Horse Racing */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🏇</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Horse Racing</h2>
-                        <p className="text-white/40 text-xs">Bet on winners</p>
+                    {/* Baccarat */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎴</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Baccarat</h2>
+                            <p className="text-white/40 text-xs">High-stakes classic</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/baccarat?mode=single')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎮 Play Now</button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      <button onClick={() => handleGameSelect('horse-racing', 'single')} className="py-1.5 bg-red-500/20 hover:bg-red-500/40 text-white rounded-lg font-medium text-xs transition-all border border-red-500/20">🎮 Solo</button>
-                      <button onClick={() => handleGameSelect('horse-racing', 'multiplayer')} className="py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-xs transition-all border border-white/10">👥 Multi</button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Baccarat */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🎴</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Baccarat</h2>
-                        <p className="text-white/40 text-xs">High-stakes classic</p>
+                    {/* Craps */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎲</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Craps</h2>
+                            <p className="text-white/40 text-xs">Crapless dice game</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/craps')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎲 Play Craps</button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      <button onClick={() => handleGameSelect('baccarat', 'single')} className="py-1.5 bg-red-500/20 hover:bg-red-500/40 text-white rounded-lg font-medium text-xs transition-all border border-red-500/20">🎮 Solo</button>
-                      <button onClick={() => handleGameSelect('baccarat', 'multiplayer')} className="py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-xs transition-all border border-white/10">👥 Multi</button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Craps */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🎲</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Craps</h2>
-                        <p className="text-white/40 text-xs">Crapless dice game</p>
+                    {/* CS Betting */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-orange-500/20 hover:border-orange-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">💰🎯</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">CS Betting</h2>
+                            <p className="text-white/40 text-xs">Bet on bot matches</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/cs-betting')} className="w-full py-1.5 bg-gradient-to-r from-orange-500/30 to-orange-600/20 hover:from-orange-500/50 text-white rounded-lg font-medium text-xs transition-all border border-orange-500/30">💰 Place Bets</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/craps')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🎲 Play Craps</button>
-                  </div>
-                </div>
 
-                {/* CS Betting */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-orange-500/20 hover:border-orange-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">💰🎯</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">CS Betting</h2>
-                        <p className="text-white/40 text-xs">Bet on bot matches</p>
+                    {/* Sweet Bonanza */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-pink-500/20 hover:border-pink-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🍭🍬</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Sweet Bonanza</h2>
+                            <p className="text-white/40 text-xs">Tumbling slots</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/sweet-bonanza')} className="w-full py-1.5 bg-gradient-to-r from-pink-500/30 to-pink-600/20 hover:from-pink-500/50 text-white rounded-lg font-medium text-xs transition-all border border-pink-500/30">🍭 Play Slots</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/cs-betting')} className="w-full py-1.5 bg-gradient-to-r from-orange-500/30 to-orange-600/20 hover:from-orange-500/50 text-white rounded-lg font-medium text-xs transition-all border border-orange-500/30">💰 Place Bets</button>
-                  </div>
-                </div>
 
-                {/* Sweet Bonanza */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-pink-500/20 hover:border-pink-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🍭🍬</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Sweet Bonanza</h2>
-                        <p className="text-white/40 text-xs">Tumbling slots</p>
+                    {/* Madame Destiny */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🔮✨</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Madame Destiny</h2>
+                            <p className="text-white/40 text-xs">Megaways slots</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/madame-destiny')} className="w-full py-1.5 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 text-white rounded-lg font-medium text-xs transition-all border border-purple-500/30">🔮 Play Megaways</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/sweet-bonanza')} className="w-full py-1.5 bg-gradient-to-r from-pink-500/30 to-pink-600/20 hover:from-pink-500/50 text-white rounded-lg font-medium text-xs transition-all border border-pink-500/30">🍭 Play Slots</button>
-                  </div>
-                </div>
 
-                {/* Madame Destiny */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🔮✨</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Madame Destiny</h2>
-                        <p className="text-white/40 text-xs">Megaways slots</p>
+                    {/* Wild Booster */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">💎🔥</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Wild Booster</h2>
+                            <p className="text-white/40 text-xs">Wild multiplier slots</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/wild-booster')} className="w-full py-1.5 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 text-white rounded-lg font-medium text-xs transition-all border border-purple-500/30">💎 Play Wild Booster</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/madame-destiny')} className="w-full py-1.5 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 text-white rounded-lg font-medium text-xs transition-all border border-purple-500/30">🔮 Play Megaways</button>
-                  </div>
-                </div>
 
-                {/* Wild Booster */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">💎🔥</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Wild Booster</h2>
-                        <p className="text-white/40 text-xs">Wild multiplier slots</p>
+                    {/* Keno */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎱🔢</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Keno</h2>
+                            <p className="text-white/40 text-xs">Pick your lucky numbers</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/keno')} className="w-full py-1.5 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 text-white rounded-lg font-medium text-xs transition-all border border-purple-500/30">🎱 Play Keno</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/wild-booster')} className="w-full py-1.5 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 text-white rounded-lg font-medium text-xs transition-all border border-purple-500/30">💎 Play Wild Booster</button>
-                  </div>
-                </div>
 
-                {/* Keno */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🎱🔢</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Keno</h2>
-                        <p className="text-white/40 text-xs">Pick your lucky numbers</p>
+                    {/* Limbo */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-indigo-500/20 hover:border-indigo-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">⚡🎯</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Limbo</h2>
+                            <p className="text-white/40 text-xs">Beat the multiplier</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/limbo')} className="w-full py-1.5 bg-gradient-to-r from-indigo-500/30 to-indigo-600/20 hover:from-indigo-500/50 text-white rounded-lg font-medium text-xs transition-all border border-indigo-500/30">⚡ Play Limbo</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/keno')} className="w-full py-1.5 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 text-white rounded-lg font-medium text-xs transition-all border border-purple-500/30">🎱 Play Keno</button>
-                  </div>
-                </div>
 
-                {/* Limbo */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-indigo-500/20 hover:border-indigo-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">⚡🎯</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Limbo</h2>
-                        <p className="text-white/40 text-xs">Beat the multiplier</p>
+                    {/* Wanted Dead or a Wild */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-amber-500/20 hover:border-amber-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🤠⭐</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Wanted Dead or Wild</h2>
+                            <p className="text-white/40 text-xs">Wild West slots</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/wanted-dead-or-wild')} className="w-full py-1.5 bg-gradient-to-r from-amber-500/30 to-amber-600/20 hover:from-amber-500/50 text-white rounded-lg font-medium text-xs transition-all border border-amber-500/30">🤠 Play Wild West</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/limbo')} className="w-full py-1.5 bg-gradient-to-r from-indigo-500/30 to-indigo-600/20 hover:from-indigo-500/50 text-white rounded-lg font-medium text-xs transition-all border border-indigo-500/30">⚡ Play Limbo</button>
-                  </div>
-                </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Multiplayer Games */}
+                    {/* Blackjack */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-blue-500/20 hover:border-blue-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🃏</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Blackjack</h2>
+                            <p className="text-white/40 text-xs">Beat the dealer to 21</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleGameSelect('blackjack', 'multiplayer')} className="w-full py-1.5 bg-gradient-to-r from-blue-500/30 to-blue-600/20 hover:from-blue-500/50 text-white rounded-lg font-medium text-xs transition-all border border-blue-500/30">👥 Join Lobby</button>
+                      </div>
+                    </div>
 
-                {/* Wanted Dead or a Wild */}
-                <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-amber-500/20 hover:border-amber-500/50 transition-all duration-300">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-2xl">🤠⭐</div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">Wanted Dead or Wild</h2>
-                        <p className="text-white/40 text-xs">Wild West slots</p>
+                    {/* Andar Bahar */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-blue-500/20 hover:border-blue-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎴</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Andar Bahar</h2>
+                            <p className="text-white/40 text-xs">Match the card side</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleGameSelect('andar-bahar', 'multiplayer')} className="w-full py-1.5 bg-gradient-to-r from-blue-500/30 to-blue-600/20 hover:from-blue-500/50 text-white rounded-lg font-medium text-xs transition-all border border-blue-500/30">👥 Join Lobby</button>
                       </div>
                     </div>
-                    <button onClick={() => router.push('/casino/wanted-dead-or-wild')} className="w-full py-1.5 bg-gradient-to-r from-amber-500/30 to-amber-600/20 hover:from-amber-500/50 text-white rounded-lg font-medium text-xs transition-all border border-amber-500/30">🤠 Play Wild West</button>
-                  </div>
-                </div>
+
+                    {/* Texas Hold'em */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-blue-500/20 hover:border-blue-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🃏</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Texas Hold&apos;em</h2>
+                            <p className="text-white/40 text-xs">Play with real players</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleGameSelect('texas-holdem', 'multiplayer')} className="w-full py-1.5 bg-gradient-to-r from-blue-500/30 to-blue-600/20 hover:from-blue-500/50 text-white rounded-lg font-medium text-xs transition-all border border-blue-500/30">👥 Join Lobby</button>
+                      </div>
+                    </div>
+
+                    {/* Baccarat */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-blue-500/20 hover:border-blue-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎴</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Baccarat</h2>
+                            <p className="text-white/40 text-xs">High-stakes classic</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleGameSelect('baccarat', 'multiplayer')} className="w-full py-1.5 bg-gradient-to-r from-blue-500/30 to-blue-600/20 hover:from-blue-500/50 text-white rounded-lg font-medium text-xs transition-all border border-blue-500/30">👥 Join Lobby</button>
+                      </div>
+                    </div>
+
+                    {/* Horse Racing */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-blue-500/20 hover:border-blue-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🏇</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Horse Racing</h2>
+                            <p className="text-white/40 text-xs">Bet on winners</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleGameSelect('horse-racing', 'multiplayer')} className="w-full py-1.5 bg-gradient-to-r from-blue-500/30 to-blue-600/20 hover:from-blue-500/50 text-white rounded-lg font-medium text-xs transition-all border border-blue-500/30">👥 Join Lobby</button>
+                      </div>
+                    </div>
+                  </>
+                )}
                 </div>
               </div>
             </>
@@ -529,7 +622,7 @@ export default function Casino() {
                     i === 0 ? 'bg-red-500/20' : 'bg-black/20'
                   }`}>
                     <span className="text-white truncate max-w-[60px]">{i === 0 ? '🔥' : i === 1 ? '⚡' : i === 2 ? '✨' : `${i+1}.`} {entry.name}</span>
-                    <span className="text-green-400 font-bold">${(entry.amount/1000).toFixed(0)}k</span>
+                    <span className="text-green-400 font-bold">${entry.amount.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
