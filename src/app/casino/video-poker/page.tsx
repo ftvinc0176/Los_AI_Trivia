@@ -273,58 +273,11 @@ export default function VideoPoker() {
         <div className="text-green-400 font-bold">${balance.toLocaleString()}</div>
       </div>
 
-      {/* Main Layout */}
-      <div className="flex flex-col lg:flex-row gap-4 p-4">
+      {/* Main Layout - Centered container for desktop */}
+      <div className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
         
-        {/* Left Panel - Controls */}
-        <div className="lg:w-48 flex-shrink-0 space-y-3">
-          {/* Amount */}
-          <div>
-            <label className="text-slate-400 text-xs mb-1 block">Amount</label>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                value={betAmount}
-                onChange={(e) => setBetAmount(Math.max(0, parseFloat(e.target.value) || 0))}
-                disabled={gamePhase !== 'betting'}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none disabled:opacity-50"
-              />
-              <button 
-                onClick={() => gamePhase === 'betting' && setBetAmount(Math.max(0, betAmount / 2))}
-                disabled={gamePhase !== 'betting'}
-                className="px-2 py-2 bg-slate-800 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
-              >½</button>
-              <button 
-                onClick={() => gamePhase === 'betting' && setBetAmount(betAmount * 2)}
-                disabled={gamePhase !== 'betting'}
-                className="px-2 py-2 bg-slate-800 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
-              >2×</button>
-            </div>
-          </div>
-
-          {/* Action Button */}
-          <button
-            onClick={gamePhase === 'betting' ? deal : gamePhase === 'holding' ? draw : newGame}
-            disabled={gamePhase === 'betting' && (betAmount > balance || betAmount <= 0)}
-            className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${
-              (gamePhase === 'betting' && (betAmount > balance || betAmount <= 0))
-                ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                : 'bg-green-500 hover:bg-green-400 text-white'
-            }`}
-          >
-            {gamePhase === 'betting' ? 'Deal' : gamePhase === 'holding' ? 'Draw' : 'New Game'}
-          </button>
-
-          {/* Instructions */}
-          <div className="text-slate-500 text-xs">
-            {gamePhase === 'betting' && 'Click Deal to start.'}
-            {gamePhase === 'holding' && 'Click cards to HOLD, then Draw.'}
-            {gamePhase === 'result' && 'Click New Game to play again.'}
-          </div>
-        </div>
-
-        {/* Right Panel - Game */}
-        <div className="flex-1">
+        {/* Game Area - ORDER 1 on mobile (shows first) */}
+        <div className="order-1">
           {/* Paytable */}
           <div className="bg-slate-800/50 rounded-xl overflow-hidden mb-4">
             {Object.entries(PAYTABLE).map(([name, mult]) => (
@@ -352,10 +305,10 @@ export default function VideoPoker() {
             </div>
           )}
 
-          {/* Cards */}
-          <div className="flex justify-center gap-2 sm:gap-4 mt-8">
+          {/* Cards - Bigger cards in centered container */}
+          <div className="flex justify-center gap-2 sm:gap-3">
             {hand.map((card, i) => (
-              <div key={i} className="w-[16%] max-w-[100px]">
+              <div key={i} className="w-[18%] sm:w-[17%] min-w-[60px] max-w-[110px]">
                 {renderCard(card, i)}
               </div>
             ))}
@@ -363,10 +316,57 @@ export default function VideoPoker() {
 
           {/* Hold Instruction */}
           {gamePhase === 'holding' && (
-            <p className="text-center text-slate-500 text-sm mt-6">
+            <p className="text-center text-slate-500 text-sm mt-4">
               Tap cards to HOLD, then click DRAW
             </p>
           )}
+        </div>
+
+        {/* Controls - ORDER 2 on mobile (shows below cards) */}
+        <div className="order-2 space-y-3 mt-4">
+          {/* Amount */}
+          <div>
+            <label className="text-slate-400 text-xs mb-1 block">Amount</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={betAmount}
+                onChange={(e) => setBetAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                disabled={gamePhase !== 'betting'}
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none disabled:opacity-50"
+              />
+              <button 
+                onClick={() => gamePhase === 'betting' && setBetAmount(Math.max(0, betAmount / 2))}
+                disabled={gamePhase !== 'betting'}
+                className="px-3 py-2 bg-slate-800 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+              >½</button>
+              <button 
+                onClick={() => gamePhase === 'betting' && setBetAmount(betAmount * 2)}
+                disabled={gamePhase !== 'betting'}
+                className="px-3 py-2 bg-slate-800 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+              >2×</button>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
+            onClick={gamePhase === 'betting' ? deal : gamePhase === 'holding' ? draw : newGame}
+            disabled={gamePhase === 'betting' && (betAmount > balance || betAmount <= 0)}
+            className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${
+              (gamePhase === 'betting' && (betAmount > balance || betAmount <= 0))
+                ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                : 'bg-green-500 hover:bg-green-400 text-white'
+            }`}
+          >
+            {gamePhase === 'betting' ? 'Deal' : gamePhase === 'holding' ? 'Draw' : 'New Game'}
+          </button>
+
+          {/* Instructions */}
+          <div className="text-slate-500 text-xs text-center">
+            {gamePhase === 'betting' && 'Click Deal to start.'}
+            {gamePhase === 'holding' && 'Click cards to HOLD, then Draw.'}
+            {gamePhase === 'result' && 'Click New Game to play again.'}
+          </div>
         </div>
       </div>
     </div>
