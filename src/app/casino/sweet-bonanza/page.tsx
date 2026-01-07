@@ -310,7 +310,11 @@ export default function SweetBonanza() {
       else if (count >= 8) payout = config.payouts[8] || 0;
       
       if (payout > 0) {
-        spinWin += payout * betAmount;
+        // Payout multipliers represent total return (bet + profit)
+        // Since bet is already deducted, we only add the profit portion
+        // Example: 2x payout means 1x profit (2x total - 1x bet = 1x profit)
+        const profit = (payout - 1) * betAmount;
+        spinWin += profit;
         symbolCounts[symbolType].positions.forEach(([col, row]) => {
           winningPositions.add(`${col}-${row}`);
         });
@@ -395,6 +399,8 @@ export default function SweetBonanza() {
     
     // Pay out the total win
     if (finalWin > 0) {
+      // finalWin is already calculated as payout * bet, which includes the original bet
+      // So we add back the full finalWin amount since bet was already deducted
       setBalance(balance + finalWin);
       setSpinHistory(prev => [...prev.slice(-9), { win: finalWin, bet: betAmount }]);
       

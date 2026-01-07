@@ -283,7 +283,9 @@ export default function MadameDestinyMegaways() {
     // Calculate ways wins
     const { totalPayout, winningPositions, hasWild } = calculateWaysWins(currentGrid);
     
-    let spinWin = totalPayout * betAmount + scatterPay;
+    // totalPayout is a multiplier representing total return (bet + profit)
+    // Since bet is already deducted, we only add the profit portion
+    let spinWin = (totalPayout - 1) * betAmount + scatterPay;
     
     // Apply free spin multiplier
     if (isFreeSpinMode && spinWin > 0) {
@@ -424,6 +426,8 @@ export default function MadameDestinyMegaways() {
     setLastWin(accumulatedWin);
     
     if (accumulatedWin > 0) {
+      // accumulatedWin is the total payout which includes the original bet
+      // Add it back since bet was already deducted
       setBalance(balance + accumulatedWin);
       
       if (isFreeSpinMode) {
