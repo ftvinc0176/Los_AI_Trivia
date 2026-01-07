@@ -398,7 +398,18 @@ export default function SweetBonanza() {
       
       // Track total bonus winnings across all free spins
       if (isFreeSpinMode) {
-        setTotalBonusWin(prev => prev + finalWin);
+        const newBonusTotal = totalBonusWin + finalWin;
+        setTotalBonusWin(newBonusTotal);
+        
+        // Check if free spins ended (use the updated value)
+        if (freeSpins <= 1) {
+          setTimeout(() => {
+            setIsFreeSpinMode(false);
+            setCurrentMultipliers([]);
+            setMessage(`Free Spins Complete! Total Won: $${newBonusTotal.toFixed(2)}`);
+            setTotalBonusWin(0);
+          }, 1500);
+        }
       }
       
       // Show huge win popup for 20x+ wins
@@ -414,16 +425,6 @@ export default function SweetBonanza() {
       setMessage(isFreeSpinMode ? 'No win this spin' : 'No win - try again!');
     }
     
-    // Check if free spins ended
-    if (isFreeSpinMode && freeSpins <= 1) {
-      const bonusTotal = totalBonusWin + finalWin;
-      setTimeout(() => {
-        setIsFreeSpinMode(false);
-        setCurrentMultipliers([]);
-        setMessage(`Free Spins Complete! Total Won: $${bonusTotal.toFixed(2)}`);
-        setTotalBonusWin(0);
-      }, 1500);
-    }
     
     // Mark spin as complete
     setIsSpinning(false);
