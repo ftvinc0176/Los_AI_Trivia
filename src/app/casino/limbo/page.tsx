@@ -191,9 +191,9 @@ export default function LimboGame() {
         </div>
       </div>
 
-      {/* Scrollable Main Area */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4">
-        <div className="max-w-5xl mx-auto grid lg:grid-cols-3 gap-3 sm:gap-4">
+      {/* Main Area - No Scroll on Mobile */}
+      <div className="flex-1 overflow-hidden p-2 sm:p-4">
+        <div className="h-full max-w-5xl mx-auto flex flex-col lg:grid lg:grid-cols-3 gap-2 sm:gap-4">
           {/* Left Panel - Controls */}
           <div className="space-y-2 sm:space-y-3 order-2 lg:order-1">
             {/* Bet + Target Row on Mobile */}

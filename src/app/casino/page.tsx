@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCasino } from './CasinoContext';
 
-type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'ultimate-holdem' | 'horse-racing' | 'baccarat' | 'craps' | 'cs-betting' | 'sweet-bonanza' | 'madame-destiny' | null;
+type GameType = 'blackjack' | 'andar-bahar' | 'texas-holdem' | 'ultimate-holdem' | 'horse-racing' | 'baccarat' | 'craps' | 'cs-betting' | 'sweet-bonanza' | 'madame-destiny' | 'wild-booster' | null;
 
 export default function Casino() {
   const router = useRouter();
@@ -410,6 +410,26 @@ export default function Casino() {
                       className="w-full py-2 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 hover:to-red-600/30 text-white rounded-lg font-medium text-sm transition-all border border-red-500/30"
                     >
                       🔮 Play Megaways
+                    </button>
+                  </div>
+                </div>
+
+                {/* Wild Booster */}
+                <div className="group relative bg-black/40 backdrop-blur-xl rounded-2xl p-5 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-1">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="text-4xl">💎🔥</div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Wild Booster</h2>
+                        <p className="text-white/40 text-sm">Wild multiplier slots</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => router.push('/casino/wild-booster')}
+                      className="w-full py-2 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 hover:to-purple-600/30 text-white rounded-lg font-medium text-sm transition-all border border-purple-500/30"
+                    >
+                      💎 Play Wild Booster
                     </button>
                   </div>
                 </div>
