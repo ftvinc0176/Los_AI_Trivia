@@ -395,8 +395,8 @@ export default function LimboGame() {
 
           {/* Center - Main Game Display */}
           <div className="lg:col-span-2 order-1 lg:order-2">
-            {/* Result Display */}
-            <div className={`relative bg-gray-800/50 rounded-2xl p-4 sm:p-8 border transition-all duration-300 ${
+            {/* Result Display - Compact on mobile */}
+            <div className={`relative bg-gray-800/50 rounded-xl sm:rounded-2xl p-3 sm:p-8 border transition-all duration-300 ${
               showWin ? 'border-green-500/50 shadow-lg shadow-green-500/20' :
               showLoss ? 'border-red-500/50 shadow-lg shadow-red-500/20' :
               'border-gray-700/50'
@@ -410,24 +410,24 @@ export default function LimboGame() {
 
               <div className="relative text-center">
                 {/* Target display */}
-                <div className="mb-4">
-                  <span className="text-gray-400 text-sm">Target</span>
-                  <div className={`text-3xl font-bold ${getMultiplierColor(targetMultiplier)}`}>
+                <div className="mb-2 sm:mb-4">
+                  <span className="text-gray-400 text-xs sm:text-sm">Target</span>
+                  <div className={`text-xl sm:text-3xl font-bold ${getMultiplierColor(targetMultiplier)}`}>
                     {targetMultiplier.toFixed(2)}×
                   </div>
                 </div>
 
                 {/* Divider with vs */}
-                <div className="flex items-center justify-center gap-4 mb-4">
+                <div className="flex items-center justify-center gap-2 sm:gap-4 mb-2 sm:mb-4">
                   <div className="flex-1 h-px bg-gradient-to-r from-transparent to-gray-600" />
-                  <span className="text-gray-500 text-lg font-bold">VS</span>
+                  <span className="text-gray-500 text-sm sm:text-lg font-bold">VS</span>
                   <div className="flex-1 h-px bg-gradient-to-l from-transparent to-gray-600" />
                 </div>
 
                 {/* Result display */}
-                <div className="mb-4 sm:mb-6">
+                <div className="mb-2 sm:mb-6">
                   <span className="text-gray-400 text-xs sm:text-sm">Result</span>
-                  <div className={`text-4xl sm:text-6xl font-bold transition-all duration-100 ${
+                  <div className={`text-3xl sm:text-6xl font-bold transition-all duration-100 ${
                     displayNumber !== null 
                       ? (displayNumber >= targetMultiplier ? 'text-green-400' : 'text-red-400')
                       : 'text-gray-600'
@@ -441,10 +441,10 @@ export default function LimboGame() {
                 {/* Win/Loss message */}
                 {showWin && currentResult !== null && (
                   <div className="animate-bounce">
-                    <div className="text-3xl font-bold text-green-400 mb-2">
+                    <div className="text-xl sm:text-3xl font-bold text-green-400 mb-1">
                       🎉 WIN! 🎉
                     </div>
-                    <div className="text-xl text-white">
+                    <div className="text-sm sm:text-xl text-white">
                       +${((targetMultiplier - 1) * betAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                     </div>
                   </div>
@@ -452,7 +452,7 @@ export default function LimboGame() {
 
                 {showLoss && currentResult !== null && (
                   <div>
-                    <div className="text-2xl font-bold text-red-400">
+                    <div className="text-lg sm:text-2xl font-bold text-red-400">
                       Bust! {currentResult.toFixed(2)}× &lt; {targetMultiplier.toFixed(2)}×
                     </div>
                   </div>
@@ -466,8 +466,8 @@ export default function LimboGame() {
               </div>
             </div>
 
-            {/* Multiplier Scale Visual */}
-            <div className="mt-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            {/* Multiplier Scale Visual - Hidden on mobile */}
+            <div className="hidden sm:block mt-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-gray-400 text-sm">Multiplier Range</span>
               </div>
@@ -510,8 +510,8 @@ export default function LimboGame() {
               </div>
             </div>
 
-            {/* Game History */}
-            <div className="mt-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            {/* Game History - Hidden on mobile */}
+            <div className="hidden sm:block mt-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
               <h3 className="text-gray-400 text-sm mb-3">Recent Games</h3>
               {gameHistory.length === 0 ? (
                 <div className="text-gray-600 text-center py-4">No games yet</div>
@@ -534,8 +534,8 @@ export default function LimboGame() {
               )}
             </div>
 
-            {/* Statistics */}
-            <div className="mt-3 sm:mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            {/* Statistics - Hidden on mobile */}
+            <div className="hidden sm:grid mt-3 sm:mt-4 grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
               <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
                 <div className="text-[10px] sm:text-xs text-gray-500">Games</div>
                 <div className="text-lg sm:text-xl font-bold text-white">{gameHistory.length}</div>
