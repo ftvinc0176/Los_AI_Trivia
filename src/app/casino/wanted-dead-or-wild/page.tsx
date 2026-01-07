@@ -510,6 +510,80 @@ export default function WantedDeadOrWild() {
     }
   }, [balance, isSpinning, bonus.type]);
 
+  // Buy Bonus - purchase bonus rounds directly
+  const buyBonus = useCallback((bonusType: 'train' | 'duel' | 'dead') => {
+    const costs = { train: 80, duel: 200, dead: 400 };
+    const cost = betAmount * costs[bonusType];
+    
+    if (balance < cost || isSpinning || bonus.type) return;
+    
+    setBalance(balance - cost);
+    recordBet(cost);
+    setLastBet(cost);
+    
+    // Initialize the bonus round based on type
+    if (bonusType === 'train') {
+      // Great Train Robbery - 10 spins with sticky wilds
+      setBonus({
+        type: 'train',
+        spinsRemaining: 10,
+        stickyWilds: [],
+        collectedWilds: 0,
+        collectedMultiplier: 1,
+        phase: null,
+        showdownSpins: 0
+      });
+    } else if (bonusType === 'duel') {
+      // Duel at Dawn - 10 spins with multiplier collection
+      setBonus({
+        type: 'duel',
+        spinsRemaining: 10,
+        stickyWilds: [],
+        collectedWilds: 0,
+        collectedMultiplier: 1,
+        phase: null,
+        showdownSpins: 0
+      });
+    } else {
+      // Dead Man's Hand - Collection then showdown
+      setBonus({
+        type: 'dead',
+        spinsRemaining: 10,
+        stickyWilds: [],
+        collectedWilds: 0,
+        collectedMultiplier: 1,
+        phase: 'collect',
+        showdownSpins: 3
+      });
+    }
+    
+    // Generate initial bonus grid with guaranteed scatter/wild presence
+    const newGrid: Symbol[] = [];
+    for (let i = 0; i < GRID_SIZE; i++) {
+      const rand = Math.random();
+      const id = Math.random().toString(36).substr(2, 9);
+      let type: SymbolType;
+      
+      // Higher chance of wilds in bonus
+      if (rand < 0.15) {
+        type = Math.random() < 0.3 ? 'vs' : 'wild';
+      } else if (rand < 0.35) {
+        type = ['gun', 'bottle', 'moneybag'][Math.floor(Math.random() * 3)] as SymbolType;
+      } else {
+        type = ['A', 'K', 'Q', 'J', '10'][Math.floor(Math.random() * 5)] as SymbolType;
+      }
+      
+      newGrid.push({ 
+        type, 
+        id,
+        multiplier: type === 'vs' ? getVSMultiplier() : undefined, 
+        isExpanded: false,
+        isWild: type === 'wild' || type === 'vs'
+      });
+    }
+    setGrid(newGrid);
+  }, [betAmount, balance, isSpinning, bonus.type, setBalance, recordBet]);
+
   // Get symbol display
   const getSymbolDisplay = (sym: Symbol, pos: number) => {
     const config = SYMBOLS[sym.type];
@@ -607,175 +681,209 @@ export default function WantedDeadOrWild() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-4 gap-4">
-          {/* Left Panel - Controls */}
-          <div className="space-y-4">
-            {/* Bet Amount */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-              <label className="block text-sm text-gray-400 mb-2">Bet Amount</label>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setBetAmount(Math.max(10, betAmount / 2))}
-                  disabled={isSpinning || !!bonus.type}
-                  className="px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 disabled:opacity-50"
+        {/* Game Grid - Full Width */}
+        <div className="bg-gradient-to-br from-amber-900/30 to-red-900/30 rounded-2xl p-4 border border-amber-500/20">
+          {/* Expanded reel indicators */}
+          {expandedReels.length > 0 && (
+            <div className="grid grid-cols-5 gap-2 mb-2 max-w-lg mx-auto">
+              {[0, 1, 2, 3, 4].map(col => (
+                <div 
+                  key={col}
+                  className={`text-center text-xs py-1 rounded ${
+                    expandedReels.includes(col) 
+                      ? 'bg-yellow-500/30 text-yellow-400 font-bold' 
+                      : 'text-transparent'
+                  }`}
                 >
-                  ½
-                </button>
-                <input
-                  type="number"
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(Math.max(10, parseInt(e.target.value) || 10))}
-                  disabled={isSpinning || !!bonus.type}
-                  className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-center"
-                />
-                <button
-                  onClick={() => setBetAmount(Math.min(balance, betAmount * 2))}
-                  disabled={isSpinning || !!bonus.type}
-                  className="px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 disabled:opacity-50"
-                >
-                  2×
-                </button>
+                  {expandedReels.includes(col) ? `×${activeMultipliers.get(col * ROWS) || '?'}` : '-'}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-5 gap-2 max-w-lg mx-auto">
+            {grid.map((sym, idx) => (
+              <div key={sym.id}>
+                {getSymbolDisplay(sym, idx)}
               </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={rebet}
-                  disabled={isSpinning || !!bonus.type || lastBet === 0}
-                  className="flex-1 px-2 py-1 bg-blue-600/50 rounded-lg hover:bg-blue-600 disabled:opacity-50 text-xs"
-                >
-                  Rebet
-                </button>
-                <button
-                  onClick={allIn}
-                  disabled={isSpinning || !!bonus.type}
-                  className="flex-1 px-2 py-1 bg-red-600/50 rounded-lg hover:bg-red-600 disabled:opacity-50 text-xs"
-                >
-                  All In
-                </button>
+            ))}
+          </div>
+
+          {/* Paylines indicator */}
+          <div className="mt-3 text-center text-xs text-amber-300/60">
+            15 Paylines • Left to Right
+          </div>
+        </div>
+
+        {/* Win Display */}
+        {winAmount > 0 && (
+          <div className="mt-4 bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-500/30 text-center">
+            <div className="text-sm text-green-400">WIN!</div>
+            <div className="text-3xl font-bold text-white">+${winAmount.toLocaleString()}</div>
+          </div>
+        )}
+
+        {/* Controls Under Grid */}
+        <div className="mt-4 bg-black/40 backdrop-blur-lg rounded-2xl p-4 border border-amber-500/20">
+          <div className="flex flex-wrap justify-center items-center gap-4">
+            {/* Bet Controls */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBetAmount(Math.max(10, betAmount / 2))}
+                disabled={isSpinning || !!bonus.type}
+                className="w-10 h-10 bg-red-500 hover:bg-red-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
+              >
+                -
+              </button>
+              <div className="bg-white/10 px-4 py-2 rounded-xl min-w-24 text-center">
+                <div className="text-white/70 text-xs">BET</div>
+                <div className="text-white font-bold text-lg">${betAmount}</div>
               </div>
+              <button
+                onClick={() => setBetAmount(Math.min(balance, betAmount * 2))}
+                disabled={isSpinning || !!bonus.type}
+                className="w-10 h-10 bg-green-500 hover:bg-green-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
+              >
+                +
+              </button>
+            </div>
+
+            {/* All In and Rebet Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={allIn}
+                disabled={isSpinning || !!bonus.type}
+                className="px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:opacity-50 rounded-lg text-white font-bold transition-all"
+              >
+                💰 All In
+              </button>
+              <button
+                onClick={rebet}
+                disabled={isSpinning || !!bonus.type || lastBet === 0}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 rounded-lg text-white font-bold transition-all"
+              >
+                🔄 Rebet
+              </button>
+            </div>
+
+            {/* Quick Bet Buttons */}
+            <div className="flex gap-2 flex-wrap justify-center">
+              {[100, 500, 1000, 5000, 10000].map(amount => (
+                <button
+                  key={amount}
+                  onClick={() => setBetAmount(amount)}
+                  disabled={isSpinning || !!bonus.type}
+                  className={`px-3 py-2 rounded-lg font-bold transition-all ${
+                    betAmount === amount
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  } disabled:opacity-50`}
+                >
+                  ${amount}
+                </button>
+              ))}
             </div>
 
             {/* Spin Button */}
             <button
               onClick={spin}
               disabled={isSpinning || (betAmount > balance && !bonus.type)}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-                !isSpinning && (bonus.type || betAmount <= balance)
-                  ? 'bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700 shadow-lg shadow-amber-500/30'
-                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-              }`}
+              className={`
+                px-8 py-4 rounded-2xl font-bold text-xl transition-all transform hover:scale-105
+                ${bonus.type 
+                  ? 'bg-gradient-to-r from-purple-500 to-amber-500 animate-pulse' 
+                  : 'bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700'}
+                text-white shadow-lg disabled:opacity-50 disabled:transform-none
+              `}
             >
-              {isSpinning ? '🎰 Spinning...' : bonus.type ? `🎰 Free Spin (${bonus.spinsRemaining})` : '🎰 SPIN'}
+              {isSpinning ? '🎰' : bonus.type ? `🎁 FREE SPIN (${bonus.spinsRemaining})` : '🎰 SPIN'}
             </button>
+          </div>
+        </div>
 
-            {/* Win Display */}
-            {winAmount > 0 && (
-              <div className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-500/30 text-center">
-                <div className="text-sm text-green-400">WIN!</div>
-                <div className="text-2xl font-bold text-white">+${winAmount.toLocaleString()}</div>
-              </div>
-            )}
+        {/* Buy Bonus Section */}
+        {!bonus.type && (
+          <div className="mt-4 bg-gradient-to-r from-amber-900/30 to-red-900/30 rounded-2xl p-4 border border-amber-500/20">
+            <div className="text-center mb-3">
+              <h3 className="text-lg font-bold text-amber-400">🎁 Buy Bonus</h3>
+              <p className="text-xs text-gray-400">Skip straight to the action!</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Train Robbery - 80x */}
+              <button
+                onClick={() => buyBonus('train')}
+                disabled={isSpinning || balance < betAmount * 80}
+                className="p-4 bg-gradient-to-br from-gray-700/50 to-gray-900/50 rounded-xl border border-gray-600 hover:border-amber-500 transition-all disabled:opacity-50 group"
+              >
+                <div className="text-3xl mb-2">🚂</div>
+                <div className="font-bold text-white group-hover:text-amber-400">Train Robbery</div>
+                <div className="text-xs text-gray-400">Sticky Wilds</div>
+                <div className="mt-2 text-amber-400 font-bold">${(betAmount * 80).toLocaleString()}</div>
+                <div className="text-xs text-gray-500">80× Bet</div>
+              </button>
 
-            {/* Paytable Preview */}
-            <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50">
-              <div className="text-xs text-gray-400 mb-2">Top Pays (×Bet)</div>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                <div className="flex items-center gap-1">
-                  <span>🔫</span>
-                  <span className="text-gray-500">5×</span>
-                  <span className="text-green-400">20×</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span>🥃</span>
-                  <span className="text-gray-500">5×</span>
-                  <span className="text-green-400">10×</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span>💰</span>
-                  <span className="text-gray-500">5×</span>
-                  <span className="text-green-400">10×</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span>⭐</span>
-                  <span className="text-gray-500">5×</span>
-                  <span className="text-green-400">20×</span>
-                </div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-amber-400">
-                ⚔️ VS Wild: Expands + ×2-×100 multiplier!
-              </div>
+              {/* Duel at Dawn - 200x */}
+              <button
+                onClick={() => buyBonus('duel')}
+                disabled={isSpinning || balance < betAmount * 200}
+                className="p-4 bg-gradient-to-br from-orange-700/50 to-red-900/50 rounded-xl border border-orange-600 hover:border-amber-500 transition-all disabled:opacity-50 group"
+              >
+                <div className="text-3xl mb-2">🤺</div>
+                <div className="font-bold text-white group-hover:text-amber-400">Duel at Dawn</div>
+                <div className="text-xs text-gray-400">More VS Wilds</div>
+                <div className="mt-2 text-amber-400 font-bold">${(betAmount * 200).toLocaleString()}</div>
+                <div className="text-xs text-gray-500">200× Bet</div>
+              </button>
+
+              {/* Dead Man's Hand - 400x */}
+              <button
+                onClick={() => buyBonus('dead')}
+                disabled={isSpinning || balance < betAmount * 400}
+                className="p-4 bg-gradient-to-br from-purple-700/50 to-black/50 rounded-xl border border-purple-600 hover:border-amber-500 transition-all disabled:opacity-50 group"
+              >
+                <div className="text-3xl mb-2">☠️</div>
+                <div className="font-bold text-white group-hover:text-amber-400">Dead Man&apos;s Hand</div>
+                <div className="text-xs text-gray-400">Collect & Showdown</div>
+                <div className="mt-2 text-amber-400 font-bold">${(betAmount * 400).toLocaleString()}</div>
+                <div className="text-xs text-gray-500">400× Bet</div>
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Game Grid */}
-          <div className="lg:col-span-3">
-            <div className="bg-gradient-to-br from-amber-900/30 to-red-900/30 rounded-2xl p-4 border border-amber-500/20">
-              {/* Expanded reel indicators */}
-              {expandedReels.length > 0 && (
-                <div className="grid grid-cols-5 gap-2 mb-2">
-                  {[0, 1, 2, 3, 4].map(col => (
-                    <div 
-                      key={col}
-                      className={`text-center text-xs py-1 rounded ${
-                        expandedReels.includes(col) 
-                          ? 'bg-yellow-500/30 text-yellow-400 font-bold' 
-                          : 'text-transparent'
-                      }`}
-                    >
-                      {expandedReels.includes(col) ? `×${activeMultipliers.get(col * ROWS) || '?'}` : '-'}
-                    </div>
-                  ))}
-                </div>
-              )}
+        {/* Feature Info */}
+        <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50">
+            <div className="text-2xl mb-1">🚂</div>
+            <div className="text-xs text-gray-400">Train Robbery</div>
+            <div className="text-xs text-amber-400">Sticky Wilds</div>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50">
+            <div className="text-2xl mb-1">🤺</div>
+            <div className="text-xs text-gray-400">Duel at Dawn</div>
+            <div className="text-xs text-amber-400">More VS Wilds</div>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50">
+            <div className="text-2xl mb-1">☠️</div>
+            <div className="text-xs text-gray-400">Dead Man&apos;s Hand</div>
+            <div className="text-xs text-amber-400">Collect & Showdown</div>
+          </div>
+        </div>
 
-              {/* Main Grid */}
-              <div className="grid grid-cols-5 gap-2">
-                {grid.map((sym, idx) => (
-                  <div key={sym.id}>
-                    {getSymbolDisplay(sym, idx)}
-                  </div>
-                ))}
-              </div>
-
-              {/* Paylines indicator */}
-              <div className="mt-3 text-center text-xs text-amber-300/60">
-                15 Paylines • Left to Right
-              </div>
-            </div>
-
-            {/* Feature Info */}
-            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-              <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50">
-                <div className="text-2xl mb-1">🚂</div>
-                <div className="text-xs text-gray-400">Train Robbery</div>
-                <div className="text-xs text-amber-400">Sticky Wilds</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50">
-                <div className="text-2xl mb-1">🤺</div>
-                <div className="text-xs text-gray-400">Duel at Dawn</div>
-                <div className="text-xs text-amber-400">More VS Wilds</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50">
-                <div className="text-2xl mb-1">☠️</div>
-                <div className="text-xs text-gray-400">Dead Man&apos;s Hand</div>
-                <div className="text-xs text-amber-400">Collect & Showdown</div>
-              </div>
-            </div>
-
-            {/* Legend */}
-            <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
-              <div className="flex items-center gap-1">
-                <span>⭐</span>
-                <span className="text-gray-400">Wild</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span>⚔️</span>
-                <span className="text-gray-400">VS Wild (Expands)</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span>🚂🤺☠️</span>
-                <span className="text-gray-400">3+ = Bonus</span>
-              </div>
-            </div>
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
+          <div className="flex items-center gap-1">
+            <span>⭐</span>
+            <span className="text-gray-400">Wild</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span>⚔️</span>
+            <span className="text-gray-400">VS Wild (Expands)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span>🚂🤺☠️</span>
+            <span className="text-gray-400">3+ = Bonus</span>
           </div>
         </div>
       </div>
