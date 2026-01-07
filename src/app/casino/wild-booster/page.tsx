@@ -866,25 +866,50 @@ export default function WildBooster() {
 
           {/* Multiplier Trail during bonus */}
           {bonus.active && (
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <span className="text-xs text-gray-400">MULTIPLIER TRAIL:</span>
-              {bonus.multiplierTrail.map((mult, i) => (
-                <div
-                  key={i}
-                  className={`px-2 py-0.5 rounded text-xs font-bold ${
-                    mult === bonus.currentMultiplier
-                      ? 'bg-yellow-500 text-black animate-pulse'
-                      : mult < bonus.currentMultiplier
-                      ? 'bg-green-500/50 text-green-200'
-                      : 'bg-gray-700 text-gray-400'
-                  }`}
-                >
-                  {mult}×
+            <div className="flex flex-col items-center gap-2 mt-2">
+              {/* Multiplier Trail */}
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-xs text-gray-400">MULTIPLIER:</span>
+                {bonus.multiplierTrail.map((mult, i) => (
+                  <div
+                    key={i}
+                    className={`px-2 py-0.5 rounded text-xs font-bold ${
+                      mult === bonus.currentMultiplier
+                        ? 'bg-yellow-500 text-black animate-pulse'
+                        : mult < bonus.currentMultiplier
+                        ? 'bg-green-500/50 text-green-200'
+                        : 'bg-gray-700 text-gray-400'
+                    }`}
+                  >
+                    {mult}×
+                  </div>
+                ))}
+              </div>
+              
+              {/* Scatter Progress - Prominent Display */}
+              <div className="flex items-center gap-3 bg-gradient-to-r from-purple-900/60 to-pink-900/60 px-4 py-2 rounded-xl border border-purple-500/40">
+                <div className="text-xs text-purple-300 font-medium">COLLECT 💠</div>
+                <div className="flex items-center gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div 
+                      key={i}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-all ${
+                        bonus.scattersCollected % 3 > i 
+                          ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-yellow-400 shadow-lg shadow-purple-500/50' 
+                          : 'bg-gray-800/80 border-gray-600'
+                      }`}
+                    >
+                      <span className={`text-lg ${bonus.scattersCollected % 3 > i ? 'animate-pulse' : 'opacity-40'}`}>
+                        {bonus.scattersCollected % 3 > i ? '💠' : '◇'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              <span className="text-xs text-purple-300 ml-2">
-                Scatters: {bonus.scattersCollected}/3 for upgrade
-              </span>
+                <div className="flex flex-col items-center">
+                  <div className="text-yellow-400 font-bold text-sm">→ UPGRADE!</div>
+                  <div className="text-[10px] text-gray-400">+5 Spins & Higher ×</div>
+                </div>
+              </div>
             </div>
           )}
         </div>
