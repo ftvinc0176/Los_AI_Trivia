@@ -452,12 +452,30 @@ export default function CSBetting() {
         ctIntel.set(ct.id, {enemiesSpotted, spotLocation});
       }
       
-      // Check if any CT spots 3+ enemies - trigger team rotation
-      let hotspot: {x: number, y: number} | null = null;
-      for (const [, intel] of ctIntel) {
+      // Check if any CT spots 3+ enemies - trigger team rotation (all but 1 rotate)
+      let hotspot: {x: number, y: number, spotterId: string} | null = null;
+      for (const [ctId, intel] of ctIntel) {
         if (intel.enemiesSpotted >= 3 && intel.spotLocation) {
-          hotspot = intel.spotLocation;
+          const spotter = aliveCT.find(ct => ct.id === ctId);
+          if (spotter) {
+            hotspot = {x: spotter.x, y: spotter.y, spotterId: ctId};
+          }
           break;
+        }
+      }
+      
+      // Determine which CT stays behind (furthest from hotspot, or random if no hotspot)
+      let stayBehindCtId: string | null = null;
+      if (hotspot && aliveCT.length > 1) {
+        // Pick the CT furthest from the hotspot to stay behind (hold other site)
+        let maxDist = 0;
+        for (const ct of aliveCT) {
+          if (ct.id === hotspot.spotterId) continue; // Spotter definitely rotates
+          const d = Math.hypot(ct.x - hotspot.x, ct.y - hotspot.y);
+          if (d > maxDist) {
+            maxDist = d;
+            stayBehindCtId = ct.id;
+          }
         }
       }
       
@@ -575,12 +593,16 @@ export default function CSBetting() {
                 goalX = bombPosRef.current.x + Math.cos(coverAngle) * 80;
                 goalY = bombPosRef.current.y + Math.sin(coverAngle) * 80;
               }
-            } else if (hotspot) {
-              // ROTATE: Another CT spotted 3+ enemies - go help!
+            } else if (hotspot && bot.id !== stayBehindCtId) {
+              // ROTATE: Another CT spotted 3+ enemies - go help! (except the designated stay-behind CT)
               const helpAngle = Math.random() * Math.PI * 2;
               const helpDist = 50 + Math.random() * 50;
               goalX = hotspot.x + Math.cos(helpAngle) * helpDist;
               goalY = hotspot.y + Math.sin(helpAngle) * helpDist;
+            } else if (hotspot && bot.id === stayBehindCtId) {
+              // This CT stays behind to hold the other site
+              goalX = botSitePos.x + Math.cos((parseInt(bot.id.slice(2)) - 1) * (Math.PI / 3)) * 40;
+              goalY = botSitePos.y + 20;
             } else if (needRotateToA && bot.assignedSite === 'B') {
               // ROTATE: No CTs left at A - one B player rotates
               // Only rotate if this is the first B player (by ID)

@@ -590,7 +590,7 @@ export default function MadameDestinyMegaways() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-violet-950 p-2 md:p-4">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-indigo-900 via-purple-900 to-violet-950 relative overflow-hidden">
       {/* Drop animation keyframes */}
       <style jsx>{`
         @keyframes dropIn {
@@ -610,19 +610,28 @@ export default function MadameDestinyMegaways() {
           }
         }
       `}</style>
+
+      {/* Mystic Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-10 left-10 text-4xl opacity-20 animate-pulse">🌙</div>
+        <div className="absolute top-20 right-20 text-3xl opacity-20 animate-bounce">⭐</div>
+        <div className="absolute bottom-20 left-20 text-5xl opacity-20 animate-pulse delay-100">🔮</div>
+        <div className="absolute bottom-10 right-10 text-4xl opacity-20 animate-bounce delay-200">✨</div>
+      </div>
+
       {/* Huge Win Popup */}
       {showHugeWin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 p-8 rounded-3xl border-4 border-white shadow-2xl animate-bounce">
+          <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 p-6 sm:p-8 rounded-3xl border-4 border-white shadow-2xl animate-bounce">
             <div className="text-center">
-              <div className="text-6xl mb-4">🔮✨🔮</div>
-              <h2 className="text-4xl md:text-6xl font-black text-white drop-shadow-lg animate-pulse">
+              <div className="text-4xl sm:text-6xl mb-2 sm:mb-4">🔮✨🔮</div>
+              <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-white drop-shadow-lg animate-pulse">
                 HUGE WIN LIL BRO
               </h2>
-              <div className="text-3xl md:text-5xl font-bold text-yellow-300 mt-4">
+              <div className="text-xl sm:text-3xl md:text-5xl font-bold text-yellow-300 mt-2 sm:mt-4">
                 ${lastWin.toFixed(2)}
               </div>
-              <div className="text-xl text-white/80 mt-2">
+              <div className="text-sm sm:text-xl text-white/80 mt-1 sm:mt-2">
                 {(lastWin / betAmount).toFixed(1)}x your bet!
               </div>
             </div>
@@ -632,20 +641,20 @@ export default function MadameDestinyMegaways() {
 
       {/* Bonus Wheel Modal */}
       {showBonusWheel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-          <div className="bg-gradient-to-br from-purple-900 to-indigo-950 p-8 rounded-3xl border-4 border-yellow-400 shadow-2xl max-w-lg">
-            <h2 className="text-3xl font-bold text-white text-center mb-6">🔮 Wheel of Destiny 🔮</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+          <div className="bg-gradient-to-br from-purple-900 to-indigo-950 p-4 sm:p-8 rounded-3xl border-4 border-yellow-400 shadow-2xl max-w-lg w-full">
+            <h2 className="text-xl sm:text-3xl font-bold text-white text-center mb-4 sm:mb-6">🔮 Wheel of Destiny 🔮</h2>
             
             {/* The Wheel */}
-            <div className="relative w-80 h-80 mx-auto mb-6">
+            <div className="relative w-48 h-48 sm:w-80 sm:h-80 mx-auto mb-4 sm:mb-6">
               {/* Pointer at top */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-20">
-                <div className="w-0 h-0 border-l-[15px] border-r-[15px] border-t-[25px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" />
+                <div className="w-0 h-0 border-l-[10px] sm:border-l-[15px] border-r-[10px] sm:border-r-[15px] border-t-[18px] sm:border-t-[25px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" />
               </div>
               
               {/* Spinning wheel */}
               <div 
-                className="w-full h-full rounded-full border-8 border-yellow-500 shadow-2xl overflow-hidden relative"
+                className="w-full h-full rounded-full border-4 sm:border-8 border-yellow-500 shadow-2xl overflow-hidden relative"
                 style={{
                   transform: `rotate(${wheelRotation}deg)`,
                   transition: bonusWheelSpinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
@@ -655,7 +664,7 @@ export default function MadameDestinyMegaways() {
                 <svg viewBox="0 0 200 200" className="w-full h-full">
                   {wheelSegments.map((seg, i) => {
                     const angle = 360 / wheelSegments.length;
-                    const startAngle = i * angle - 90; // Start from top
+                    const startAngle = i * angle - 90;
                     const endAngle = startAngle + angle;
                     const startRad = (startAngle * Math.PI) / 180;
                     const endRad = (endAngle * Math.PI) / 180;
@@ -693,7 +702,6 @@ export default function MadameDestinyMegaways() {
                       </g>
                     );
                   })}
-                  {/* Center circle */}
                   <circle cx="100" cy="100" r="20" fill="#1a1a2e" stroke="#ffd700" strokeWidth="3" />
                   <text x="100" y="100" fill="#ffd700" fontSize="10" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">🔮</text>
                 </svg>
@@ -703,22 +711,22 @@ export default function MadameDestinyMegaways() {
             {/* Result or Spin Button */}
             {wheelResult ? (
               <div className="text-center animate-pulse">
-                <p className="text-2xl font-bold text-yellow-400 mb-2">🎉 YOU WON! 🎉</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-lg sm:text-2xl font-bold text-yellow-400 mb-2">🎉 YOU WON! 🎉</p>
+                <p className="text-xl sm:text-3xl font-bold text-white">
                   {wheelResult.spins} Free Spins @ {wheelResult.multiplier}x!
                 </p>
-                <p className="text-white/60 mt-2">Starting bonus...</p>
+                <p className="text-white/60 mt-2 text-sm">Starting bonus...</p>
               </div>
             ) : bonusWheelSpinning ? (
               <div className="text-center">
-                <p className="text-xl text-white animate-pulse">🔮 The wheel of destiny spins... 🔮</p>
+                <p className="text-base sm:text-xl text-white animate-pulse">🔮 The wheel of destiny spins... 🔮</p>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-white/80 mb-4">Spin to reveal your Free Spins and Multiplier!</p>
+                <p className="text-white/80 mb-4 text-sm sm:text-base">Spin to reveal your Free Spins and Multiplier!</p>
                 <button
                   onClick={spinBonusWheel}
-                  className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-bold text-xl rounded-2xl transition-all transform hover:scale-105 shadow-lg"
+                  className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-bold text-lg sm:text-xl rounded-2xl transition-all transform hover:scale-105 shadow-lg"
                 >
                   🎡 SPIN THE WHEEL
                 </button>
@@ -728,236 +736,239 @@ export default function MadameDestinyMegaways() {
         </div>
       )}
 
-      {/* Mystic Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-10 left-10 text-6xl opacity-20 animate-pulse">🌙</div>
-        <div className="absolute top-20 right-20 text-5xl opacity-20 animate-bounce">⭐</div>
-        <div className="absolute bottom-20 left-20 text-7xl opacity-20 animate-pulse delay-100">🔮</div>
-        <div className="absolute bottom-10 right-10 text-6xl opacity-20 animate-bounce delay-200">✨</div>
-      </div>
-
-      {/* Header */}
-      <div className="max-w-7xl mx-auto relative z-10">
-        <div className="flex justify-between items-center mb-4">
+      {/* Top Bar */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-purple-800 via-indigo-700 to-purple-800 px-2 py-2 sm:py-3 relative z-10">
+        <div className="max-w-xl mx-auto flex items-center justify-between">
           <button
             onClick={() => router.push('/casino')}
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition-all backdrop-blur-sm"
+            className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors text-sm sm:text-base"
           >
-            ← Casino
+            ← Back
           </button>
-          <h1 className="text-2xl md:text-4xl font-bold text-white drop-shadow-lg text-center">
-            🔮 Madame Destiny Megaways 🔮
+          
+          <h1 className="text-sm sm:text-xl font-bold text-white drop-shadow-lg flex items-center gap-1 sm:gap-2">
+            🔮 Madame Destiny 🔮
           </h1>
+          
           <button
-            onClick={() => setShowPaytable(!showPaytable)}
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition-all backdrop-blur-sm"
+            onClick={() => setShowPaytable(true)}
+            className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors text-xs sm:text-sm"
           >
-            {showPaytable ? 'Hide' : 'Paytable'}
+            Paytable
           </button>
         </div>
+      </div>
 
-        {/* Balance & Info Bar */}
-        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-3 mb-4 border border-white/20">
-          <div className="flex flex-wrap justify-between items-center gap-2">
+      {/* Free Spins Banner */}
+      {isFreeSpinMode && (
+        <div className="flex-shrink-0 bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500 px-4 py-2 text-center relative z-10">
+          <span className="text-base sm:text-xl font-bold text-white drop-shadow animate-pulse">
+            🎰 FREE SPINS: {freeSpins} | {freeSpinMultiplier}x MULTIPLIER 🎰
+          </span>
+        </div>
+      )}
+
+      {/* Main Game Area */}
+      <div className="flex-1 flex flex-col items-center justify-center p-1 sm:p-2 md:p-4 relative z-10 min-h-0">
+        {/* Info Row */}
+        <div className="w-full max-w-[95vw] sm:max-w-[85vw] md:max-w-2xl lg:max-w-3xl mb-2">
+          <div className="flex justify-between items-center bg-black/30 rounded-xl px-3 py-2 backdrop-blur-sm">
             <div className="text-white">
-              <span className="text-white/70">Balance:</span>
-              <span className="text-2xl font-bold text-green-400 ml-2">${balance.toLocaleString()}</span>
+              <span className="text-white/70 text-xs">Balance:</span>
+              <span className="text-lg sm:text-xl font-bold text-green-400 ml-1">${balance.toLocaleString()}</span>
             </div>
-            
-            <div className="bg-purple-500/30 px-4 py-2 rounded-xl">
-              <span className="text-white font-bold">Ways: {totalWays.toLocaleString()}</span>
+            <div className="bg-purple-500/30 px-3 py-1 rounded-lg">
+              <span className="text-white font-bold text-xs sm:text-sm">Ways: {totalWays.toLocaleString()}</span>
             </div>
-            
-            {isFreeSpinMode && (
-              <div className="bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-2 rounded-xl animate-pulse">
-                <span className="text-black font-bold">
-                  🎁 FREE SPINS: {freeSpins} | {freeSpinMultiplier}x 🎁
-                </span>
-              </div>
-            )}
-            
             <div className="text-white">
-              <span className="text-white/70">{isFreeSpinMode ? 'Bonus Total:' : 'Last Win:'}</span>
-              <span className={`text-2xl font-bold ml-2 ${(isFreeSpinMode ? totalBonusWin : lastWin) > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+              <span className="text-white/70 text-xs">{isFreeSpinMode ? 'Bonus:' : 'Win:'}</span>
+              <span className={`text-lg sm:text-xl font-bold ml-1 ${(isFreeSpinMode ? totalBonusWin + totalWin : lastWin) > 0 ? 'text-green-400' : 'text-gray-400'}`}>
                 ${(isFreeSpinMode ? totalBonusWin + totalWin : lastWin).toFixed(2)}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Message */}
-        <div className="text-center mb-4">
-          <div className={`text-xl md:text-2xl font-bold text-white drop-shadow-lg transition-all ${
-            lastWin > betAmount * 10 ? 'text-yellow-300 animate-pulse text-3xl' : ''
-          }`}>
-            {message}
-          </div>
-          {tumbleCount > 0 && (
-            <div className="text-white/70 text-sm mt-1">Tumble #{tumbleCount}</div>
-          )}
-        </div>
+        {/* Slot Frame - Mystic Border */}
+        <div className="relative rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-[95vw] sm:max-w-[85vw] md:max-w-2xl lg:max-w-3xl" 
+             style={{ 
+               background: 'linear-gradient(135deg, #6366f1, #8b5cf6, #6366f1)',
+               padding: 'clamp(6px, 1.5vw, 12px)'
+             }}>
+          <div className="bg-gradient-to-b from-indigo-950 via-purple-950 to-indigo-950 rounded-xl sm:rounded-2xl p-2 sm:p-3 md:p-4">
+            {/* Win Display */}
+            <div className="text-center mb-1 sm:mb-2 min-h-[2rem] sm:min-h-[2.5rem]">
+              {lastWin > 0 && (
+                <div className="text-lg sm:text-2xl md:text-3xl font-bold text-yellow-400 animate-pulse">
+                  WIN: ${lastWin.toFixed(2)}
+                </div>
+              )}
+              {tumbleCount > 0 && (
+                <div className="text-xs sm:text-sm text-purple-400">
+                  Tumble #{tumbleCount}
+                </div>
+              )}
+              {message && !lastWin && (
+                <div className="text-sm sm:text-lg md:text-xl text-purple-400 font-bold">
+                  {message}
+                </div>
+              )}
+            </div>
 
-        {/* Game Grid - Megaways Style */}
-        <div className="bg-gradient-to-br from-indigo-800/40 to-purple-900/40 backdrop-blur-lg rounded-3xl p-4 mb-4 border-2 border-purple-400/30 shadow-2xl">
-          <div className="flex justify-center gap-1 items-end">
-            {grid.map((column, colIdx) => (
-              <div key={colIdx} className="flex flex-col gap-1">
-                {column.map((symbol, rowIdx) => (
-                  <div key={`${colIdx}-${rowIdx}`}>
-                    {renderSymbol(symbol, colIdx, rowIdx, column.length)}
+            {/* Megaways Grid - Responsive sizing */}
+            <div className="bg-indigo-950/80 rounded-lg sm:rounded-xl p-1 sm:p-2 md:p-3 overflow-hidden">
+              <div className="flex justify-center gap-1 sm:gap-2 items-end">
+                {grid.map((column, colIdx) => (
+                  <div key={colIdx} className="flex flex-col gap-0.5 sm:gap-1">
+                    {column.map((symbol, rowIdx) => (
+                      <div key={`${colIdx}-${rowIdx}`}>
+                        {renderSymbol(symbol, colIdx, rowIdx, column.length)}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
-          <div className="flex flex-wrap justify-center items-center gap-4">
-            {/* Bet Controls */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => adjustBet(-20)}
-                disabled={isSpinning || isTumbling || isFreeSpinMode}
-                className="w-10 h-10 bg-red-500 hover:bg-red-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
-              >
-                -
-              </button>
-              <div className="bg-white/10 px-4 py-2 rounded-xl min-w-24 text-center">
-                <div className="text-white/70 text-xs">BET</div>
-                <div className="text-white font-bold text-lg">${betAmount.toFixed(2)}</div>
-                {anteBet && <div className="text-yellow-400 text-xs">+25% Ante</div>}
-              </div>
-              <button
-                onClick={() => adjustBet(20)}
-                disabled={isSpinning || isTumbling || isFreeSpinMode}
-                className="w-10 h-10 bg-green-500 hover:bg-green-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
-              >
-                +
-              </button>
             </div>
 
-            {/* Ante Bet Toggle */}
-            <button
-              onClick={() => setAnteBet(!anteBet)}
-              disabled={isSpinning || isTumbling || isFreeSpinMode}
-              className={`px-4 py-2 rounded-xl font-bold transition-all ${
-                anteBet ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
-              } disabled:opacity-50`}
-              title="2x Free Spins chance for +25% bet"
-            >
-              {anteBet ? '⚡ Ante ON' : '⚡ Ante'}
-            </button>
-
-            {/* All In and Rebet Buttons */}
-            <button
-              onClick={() => setBetAmount(balance)}
-              disabled={isSpinning || isTumbling || isFreeSpinMode || balance < 500}
-              className="px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:opacity-50 rounded-xl text-white font-bold transition-all"
-            >
-              💰 All In
-            </button>
-            <button
-              onClick={() => setBetAmount(lastBet)}
-              disabled={isSpinning || isTumbling || isFreeSpinMode || balance < lastBet}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 rounded-xl text-white font-bold transition-all"
-            >
-              🔄 Rebet
-            </button>
-
-            {/* Spin Button */}
-            <button
-              onClick={spin}
-              disabled={isSpinning || isTumbling || (!isFreeSpinMode && balance < getEffectiveBet())}
-              className={`
-                px-8 py-4 rounded-2xl font-bold text-xl transition-all transform hover:scale-105
-                ${isFreeSpinMode 
-                  ? 'bg-gradient-to-r from-purple-500 to-indigo-500 animate-pulse' 
-                  : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'}
-                text-white shadow-lg disabled:opacity-50 disabled:transform-none
-              `}
-            >
-              {isSpinning ? '🔮' : isTumbling ? '⬇️' : isFreeSpinMode ? `🎁 FREE (${freeSpins})` : '🔮 SPIN'}
-            </button>
-
-            {/* Auto Play Toggle */}
-            <button
-              onClick={() => setAutoPlay(!autoPlay)}
-              disabled={isFreeSpinMode}
-              className={`px-4 py-2 rounded-xl font-bold transition-all ${
-                autoPlay ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
-              } disabled:opacity-50`}
-            >
-              {autoPlay ? '⏹️ Stop' : '▶️ Auto'}
-            </button>
-
-            {/* Buy Bonus Button */}
-            <button
-              onClick={buyBonus}
-              disabled={isSpinning || isTumbling || isFreeSpinMode || balance < betAmount * 100}
-              className="px-4 py-2 rounded-xl font-bold transition-all bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black disabled:opacity-50"
-              title={`Cost: $${(betAmount * 100).toFixed(2)}`}
-            >
-              🎁 Buy Bonus (100x)
-            </button>
+            {/* Total Win Display */}
+            {totalWin > 0 && (
+              <div className="text-center mt-2 py-2 bg-gradient-to-r from-transparent via-purple-600/50 to-transparent rounded">
+                <div className="text-lg sm:text-2xl md:text-3xl font-bold text-yellow-300">
+                  TOTAL WIN: ${totalWin.toFixed(2)}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Paytable Modal */}
-        {showPaytable && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gradient-to-br from-indigo-900 to-purple-900 rounded-3xl p-6 max-w-4xl max-h-[90vh] overflow-y-auto border-4 border-purple-400/30">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold text-white">🔮 Paytable 🔮</h2>
-                <button
-                  onClick={() => setShowPaytable(false)}
-                  className="text-white text-3xl hover:text-gray-300"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              {/* Rules */}
-              <div className="bg-white/10 rounded-xl p-4 mb-6">
-                <h3 className="text-xl font-bold text-yellow-400 mb-2">How to Win</h3>
-                <ul className="text-white/90 space-y-2">
-                  <li>• <b>Megaways</b> - Up to 200,704 ways to win!</li>
-                  <li>• Match symbols on <b>consecutive reels from left</b></li>
-                  <li>• <b>Tumble Feature</b> - Wins disappear, new symbols fall</li>
-                  <li>• <b>Madame Destiny 🔮</b> is Wild and <b>doubles all wins</b></li>
-                  <li>• <b>3+ Crystal Balls 🔴</b> trigger Bonus Wheel</li>
-                  <li>• Bonus Wheel awards <b>5-12 Free Spins</b> and <b>2x-25x Multiplier</b></li>
-                  <li>• Free Spin multiplier is <b>fixed</b> for the entire bonus</li>
-                </ul>
-              </div>
-
-              {/* Symbol Payouts */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {[...REGULAR_SYMBOLS, 'scatter' as SymbolType].map(symbolType => {
-                  const config = SYMBOLS[symbolType];
-                  return (
-                    <div key={symbolType} className={`bg-gradient-to-br ${config.color} rounded-xl p-3 border border-white/20`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-3xl">{config.emoji}</span>
-                        <span className="text-white font-bold">{config.name}</span>
-                      </div>
-                      <div className="text-white/90 text-sm">
-                        {Object.entries(config.payouts).map(([count, mult]) => (
-                          <div key={count}>{count}x: {mult}x bet</div>
-                        ))}
-                      </div>
-                      {symbolType === 'madame' && (
-                        <div className="text-yellow-300 text-xs mt-1">Wild + 2x Multiplier!</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Bottom Control Bar */}
+      <div className="flex-shrink-0 bg-gradient-to-t from-indigo-900 via-purple-800 to-purple-700 border-t-4 border-purple-500 px-2 sm:px-4 py-2 sm:py-3 relative z-10">
+        <div className="max-w-xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+          {/* Buy Feature Button */}
+          <button
+            onClick={buyBonus}
+            disabled={isSpinning || isTumbling || balance < betAmount * 100 || isFreeSpinMode}
+            className="px-2 sm:px-4 py-2 sm:py-3 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 border-2 border-purple-400 text-[10px] sm:text-xs font-bold text-white disabled:opacity-50 hover:scale-105 transition-transform flex-shrink-0 shadow-lg"
+          >
+            BUY BONUS<br/>
+            <span className="text-purple-200">${(betAmount * 100).toFixed(0)}</span>
+          </button>
+
+          {/* Ante Toggle - Mobile Compact */}
+          <button
+            onClick={() => setAnteBet(!anteBet)}
+            disabled={isSpinning || isTumbling || isFreeSpinMode}
+            className={`px-2 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all flex-shrink-0 ${
+              anteBet ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
+            } disabled:opacity-50`}
+          >
+            ⚡{anteBet ? 'ON' : 'Ante'}
+          </button>
+
+          {/* Bet Amount */}
+          <div className="flex items-center gap-1 sm:gap-2 bg-purple-900/80 rounded-lg px-2 sm:px-3 py-1 flex-shrink-0">
+            <button
+              onClick={() => adjustBet(-20)}
+              disabled={isSpinning || isTumbling || isFreeSpinMode}
+              className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-purple-600 flex items-center justify-center text-white hover:bg-purple-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
+            >
+              −
+            </button>
+            <div className="text-center min-w-[50px] sm:min-w-[70px]">
+              <div className="text-[8px] sm:text-xs text-purple-300">BET</div>
+              <div className="text-xs sm:text-base font-bold text-white">${betAmount}</div>
+              {anteBet && <div className="text-yellow-400 text-[8px] sm:text-xs">+25%</div>}
+            </div>
+            <button
+              onClick={() => adjustBet(20)}
+              disabled={isSpinning || isTumbling || isFreeSpinMode}
+              className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-purple-600 flex items-center justify-center text-white hover:bg-purple-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Spin Button */}
+          <button
+            onClick={spin}
+            disabled={isSpinning || isTumbling || (!isFreeSpinMode && balance < getEffectiveBet())}
+            className={`
+              px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-base sm:text-xl transition-all flex-shrink-0
+              ${isFreeSpinMode 
+                ? 'bg-gradient-to-r from-purple-500 to-indigo-500 animate-pulse' 
+                : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'}
+              text-white shadow-lg disabled:opacity-50
+            `}
+          >
+            {isSpinning ? '🔮' : isTumbling ? '⬇️' : isFreeSpinMode ? `🎁 ${freeSpins}` : '🔮 SPIN'}
+          </button>
+
+          {/* Auto Play Toggle */}
+          <button
+            onClick={() => setAutoPlay(!autoPlay)}
+            disabled={isFreeSpinMode}
+            className={`px-2 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all flex-shrink-0 ${
+              autoPlay ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
+            } disabled:opacity-50`}
+          >
+            {autoPlay ? '⏹️' : '▶️'}
+          </button>
+        </div>
+      </div>
+
+      {/* Paytable Modal */}
+      {showPaytable && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-4xl max-h-[90vh] overflow-y-auto border-4 border-purple-400/30 w-full">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <h2 className="text-xl sm:text-3xl font-bold text-white">🔮 Paytable 🔮</h2>
+              <button
+                onClick={() => setShowPaytable(false)}
+                className="text-white text-2xl sm:text-3xl hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Rules */}
+            <div className="bg-white/10 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-bold text-yellow-400 mb-2">How to Win</h3>
+              <ul className="text-white/90 space-y-1 sm:space-y-2 text-sm sm:text-base">
+                <li>• <b>Megaways</b> - Up to 200,704 ways to win!</li>
+                <li>• Match symbols on <b>consecutive reels from left</b></li>
+                <li>• <b>Tumble Feature</b> - Wins disappear, new symbols fall</li>
+                <li>• <b>Madame Destiny 🔮</b> is Wild and <b>doubles all wins</b></li>
+                <li>• <b>3+ Crystal Balls 🔴</b> trigger Bonus Wheel</li>
+                <li>• Bonus Wheel awards <b>5-12 Free Spins</b> and <b>2x-25x Multiplier</b></li>
+              </ul>
+            </div>
+
+            {/* Symbol Payouts */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+              {[...REGULAR_SYMBOLS, 'scatter' as SymbolType].map(symbolType => {
+                const config = SYMBOLS[symbolType];
+                return (
+                  <div key={symbolType} className={`bg-gradient-to-br ${config.color} rounded-xl p-2 sm:p-3 border border-white/20`}>
+                    <div className="flex items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                      <span className="text-xl sm:text-3xl">{config.emoji}</span>
+                      <span className="text-white font-bold text-xs sm:text-base">{config.name}</span>
+                    </div>
+                    <div className="text-white/90 text-[10px] sm:text-sm">
+                      {Object.entries(config.payouts).map(([count, mult]) => (
+                        <div key={count}>{count}x: {mult}x</div>
+                      ))}
+                    </div>
+                    {symbolType === 'madame' && (
+                      <div className="text-yellow-300 text-[9px] sm:text-xs mt-1">Wild + 2x!</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+}
