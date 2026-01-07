@@ -1,158 +1,77 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCasino } from '../CasinoContext';
 
-// Symbol types
-type SymbolType = 'gun' | 'bottle' | 'moneybag' | 'bandit' | 'skull' | 'A' | 'K' | 'Q' | 'J' | '10' | 'wild' | 'vs' | 'train' | 'duel' | 'dead';
+// Symbol types matching the actual game
+type SymbolType = 'bandit' | 'skull' | 'gun' | 'bottle' | 'moneybag' | 'A' | 'K' | 'Q' | 'J' | '10' | 'wild' | 'vs' | 'train' | 'duel' | 'dead';
 
 interface Symbol {
   type: SymbolType;
   id: string;
-  isWinning?: boolean;
-  isWild?: boolean;
-  isExpanded?: boolean;
   multiplier?: number;
 }
 
-interface SymbolConfig {
-  emoji: string;
-  name: string;
-  payouts: { [key: number]: number }; // count -> multiplier (for 3,4,5 of a kind)
-  color: string;
+interface ReelState {
+  symbols: Symbol[];
+  isSpinning: boolean;
+  hasStopped: boolean;
 }
 
-// Paylines for 5x5 grid - 15 paylines
-const PAYLINES = [
-  // Horizontal lines
-  [0, 1, 2, 3, 4],        // Row 1
-  [5, 6, 7, 8, 9],        // Row 2
-  [10, 11, 12, 13, 14],   // Row 3
-  [15, 16, 17, 18, 19],   // Row 4
-  [20, 21, 22, 23, 24],   // Row 5
-  // Diagonal and zigzag patterns
-  [0, 6, 12, 18, 24],     // Diagonal top-left to bottom-right
-  [4, 8, 12, 16, 20],     // Diagonal top-right to bottom-left
-  [0, 6, 12, 8, 4],       // V shape
-  [20, 16, 12, 18, 24],   // Inverted V
-  [0, 1, 7, 13, 14],      // Zigzag 1
-  [10, 6, 7, 8, 14],      // Zigzag 2
-  [10, 16, 17, 18, 14],   // Zigzag 3
-  [5, 1, 2, 3, 9],        // Zigzag 4
-  [15, 21, 22, 23, 19],   // Zigzag 5
-  [5, 11, 12, 13, 9],     // Center cross-ish
-];
-
-const SYMBOLS: Record<SymbolType, SymbolConfig> = {
-  // Premium symbols
-  gun: {
-    emoji: '🔫',
-    name: 'Gun Chamber',
-    payouts: { 3: 2, 4: 10, 5: 20 },
-    color: 'from-gray-400 to-gray-600'
-  },
-  bottle: {
-    emoji: '🥃',
-    name: 'Whiskey',
-    payouts: { 3: 1, 4: 5, 5: 10 },
-    color: 'from-amber-400 to-amber-700'
-  },
-  moneybag: {
-    emoji: '💰',
-    name: 'Money Bag',
-    payouts: { 3: 1, 4: 5, 5: 10 },
-    color: 'from-green-400 to-green-700'
-  },
-  bandit: {
-    emoji: '🤠',
-    name: 'Bandit',
-    payouts: { 3: 0.5, 4: 2.5, 5: 5 },
-    color: 'from-yellow-600 to-brown-700'
-  },
-  skull: {
-    emoji: '💀',
-    name: 'Skull',
-    payouts: { 3: 0.5, 4: 2.5, 5: 5 },
-    color: 'from-gray-200 to-gray-500'
-  },
-  // Low paying symbols
-  A: {
-    emoji: '🅰️',
-    name: 'Ace',
-    payouts: { 3: 0.1, 4: 0.5, 5: 1 },
-    color: 'from-red-500 to-red-700'
-  },
-  K: {
-    emoji: '🔷',
-    name: 'King',
-    payouts: { 3: 0.1, 4: 0.5, 5: 1 },
-    color: 'from-blue-500 to-blue-700'
-  },
-  Q: {
-    emoji: '💜',
-    name: 'Queen',
-    payouts: { 3: 0.1, 4: 0.5, 5: 1 },
-    color: 'from-purple-500 to-purple-700'
-  },
-  J: {
-    emoji: '💚',
-    name: 'Jack',
-    payouts: { 3: 0.1, 4: 0.5, 5: 1 },
-    color: 'from-green-500 to-green-700'
-  },
-  '10': {
-    emoji: '🔟',
-    name: 'Ten',
-    payouts: { 3: 0.1, 4: 0.5, 5: 1 },
-    color: 'from-orange-500 to-orange-700'
-  },
-  // Special symbols
-  wild: {
-    emoji: '⭐',
-    name: 'Wild',
-    payouts: { 3: 2, 4: 10, 5: 20 },
-    color: 'from-yellow-400 to-yellow-600'
-  },
-  vs: {
-    emoji: '⚔️',
-    name: 'VS Wild',
-    payouts: {},
-    color: 'from-red-500 via-yellow-500 to-red-500'
-  },
-  train: {
-    emoji: '🚂',
-    name: 'Train Scatter',
-    payouts: {},
-    color: 'from-gray-700 to-gray-900'
-  },
-  duel: {
-    emoji: '🤺',
-    name: 'Duel Scatter',
-    payouts: {},
-    color: 'from-orange-500 to-red-600'
-  },
-  dead: {
-    emoji: '☠️',
-    name: 'Dead Scatter',
-    payouts: {},
-    color: 'from-purple-700 to-black'
-  }
+// Symbol configurations with colors matching the actual game
+const SYMBOL_STYLES: Record<SymbolType, { bg: string; border: string; text: string; label: string }> = {
+  bandit: { bg: 'bg-gradient-to-br from-teal-700 to-teal-900', border: 'border-teal-500', text: '🤠', label: 'Bandit' },
+  skull: { bg: 'bg-gradient-to-br from-cyan-600 to-cyan-800', border: 'border-cyan-400', text: '🦴', label: 'Skull' },
+  gun: { bg: 'bg-gradient-to-br from-red-800 to-red-950', border: 'border-red-600', text: '🔫', label: 'Gun' },
+  bottle: { bg: 'bg-gradient-to-br from-amber-700 to-amber-900', border: 'border-amber-500', text: '🥃', label: 'Whiskey' },
+  moneybag: { bg: 'bg-gradient-to-br from-yellow-600 to-yellow-800', border: 'border-yellow-500', text: '💰', label: 'Money' },
+  A: { bg: 'bg-gradient-to-br from-red-700 to-red-900', border: 'border-red-500', text: 'A', label: 'Ace' },
+  K: { bg: 'bg-gradient-to-br from-green-700 to-green-900', border: 'border-green-500', text: 'K', label: 'King' },
+  Q: { bg: 'bg-gradient-to-br from-cyan-700 to-cyan-900', border: 'border-cyan-500', text: 'Q', label: 'Queen' },
+  J: { bg: 'bg-gradient-to-br from-blue-700 to-blue-900', border: 'border-blue-500', text: 'J', label: 'Jack' },
+  '10': { bg: 'bg-gradient-to-br from-gray-600 to-gray-800', border: 'border-gray-500', text: '10', label: 'Ten' },
+  wild: { bg: 'bg-gradient-to-br from-yellow-500 to-orange-600', border: 'border-yellow-400', text: '⭐', label: 'Wild' },
+  vs: { bg: 'bg-gradient-to-br from-red-600 via-yellow-500 to-red-600', border: 'border-yellow-400', text: '⚔️', label: 'VS' },
+  train: { bg: 'bg-gradient-to-br from-gray-700 to-gray-900', border: 'border-gray-500', text: '🚂', label: 'Train' },
+  duel: { bg: 'bg-gradient-to-br from-orange-600 to-red-700', border: 'border-orange-500', text: '🤺', label: 'Duel' },
+  dead: { bg: 'bg-gradient-to-br from-purple-800 to-gray-900', border: 'border-purple-600', text: '☠️', label: 'Dead' },
 };
 
-const REGULAR_SYMBOLS: SymbolType[] = ['gun', 'bottle', 'moneybag', 'bandit', 'skull', 'A', 'K', 'Q', 'J', '10'];
-const SCATTER_SYMBOLS: SymbolType[] = ['train', 'duel', 'dead'];
+// Payouts for symbols (bet multiplier for 3, 4, 5 of a kind)
+const PAYOUTS: Record<SymbolType, Record<number, number>> = {
+  bandit: { 3: 1.5, 4: 4, 5: 12 },
+  skull: { 3: 1.5, 4: 4, 5: 12 },
+  gun: { 3: 0.75, 4: 2, 5: 5 },
+  bottle: { 3: 0.5, 4: 1.5, 5: 4 },
+  moneybag: { 3: 0.5, 4: 1.5, 5: 4 },
+  A: { 3: 0.25, 4: 0.75, 5: 2 },
+  K: { 3: 0.25, 4: 0.75, 5: 2 },
+  Q: { 3: 0.2, 4: 0.5, 5: 1.5 },
+  J: { 3: 0.2, 4: 0.5, 5: 1.5 },
+  '10': { 3: 0.2, 4: 0.5, 5: 1.5 },
+  wild: { 3: 1.5, 4: 4, 5: 12 },
+  vs: {},
+  train: {},
+  duel: {},
+  dead: {},
+};
 
-// Weighted multipliers for VS wilds
+const REGULAR_SYMBOLS: SymbolType[] = ['bandit', 'skull', 'gun', 'bottle', 'moneybag', 'A', 'K', 'Q', 'J', '10'];
+const SCATTER_TYPES: SymbolType[] = ['train', 'duel', 'dead'];
+
+// Paylines for 5x5 grid (row-major: position = row * 5 + col)
+const PAYLINES = [
+  [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
+  [0, 6, 12, 18, 24], [4, 8, 12, 16, 20], [0, 6, 12, 8, 4], [20, 16, 12, 18, 24],
+  [0, 1, 7, 13, 14], [10, 6, 7, 8, 14], [10, 16, 17, 18, 14], [5, 1, 2, 3, 9], [15, 21, 22, 23, 19], [5, 11, 12, 13, 9],
+];
+
+// VS wild multipliers with weights
 const VS_MULTIPLIERS = [
-  { value: 2, weight: 40 },
-  { value: 3, weight: 25 },
-  { value: 5, weight: 15 },
-  { value: 10, weight: 10 },
-  { value: 15, weight: 5 },
-  { value: 25, weight: 3 },
-  { value: 50, weight: 1.5 },
-  { value: 100, weight: 0.5 }
+  { value: 2, weight: 40 }, { value: 3, weight: 25 }, { value: 5, weight: 15 },
+  { value: 10, weight: 10 }, { value: 15, weight: 5 }, { value: 25, weight: 3 },
+  { value: 50, weight: 1.5 }, { value: 100, weight: 0.5 },
 ];
 
 type BonusType = 'train' | 'duel' | 'dead' | null;
@@ -160,48 +79,91 @@ type BonusType = 'train' | 'duel' | 'dead' | null;
 interface BonusState {
   type: BonusType;
   spinsRemaining: number;
-  stickyWilds: number[];  // Positions with sticky wilds
-  collectedWilds: number;
-  collectedMultiplier: number;
-  phase: 'collect' | 'showdown' | null;
-  showdownSpins: number;
+  stickyWilds: number[];
+  totalWin: number;
 }
+
+// Get VS multiplier with weighted random
+const getVSMultiplier = (): number => {
+  const total = VS_MULTIPLIERS.reduce((s, m) => s + m.weight, 0);
+  let rand = Math.random() * total;
+  for (const m of VS_MULTIPLIERS) {
+    rand -= m.weight;
+    if (rand <= 0) return m.value;
+  }
+  return 2;
+};
 
 export default function WantedDeadOrWild() {
   const router = useRouter();
   const { balance, setBalance, recordBet, checkAndReload } = useCasino();
 
-  // Game state
-  const [grid, setGrid] = useState<Symbol[]>([]);
-  const [betAmount, setBetAmount] = useState(100);
-  const [lastBet, setLastBet] = useState<number>(0);
+  const ROWS = 5;
+  const COLS = 5;
+
+  // Reel states - each reel is a column
+  const [reels, setReels] = useState<ReelState[]>([]);
+  const [betAmount, setBetAmount] = useState(10);
+  const [lastBet, setLastBet] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [winAmount, setWinAmount] = useState(0);
-  const [totalWin, setTotalWin] = useState(0);
   const [winningPositions, setWinningPositions] = useState<number[]>([]);
-  const [expandedReels, setExpandedReels] = useState<number[]>([]); // Reel indices with expanded VS wilds
-  const [activeMultipliers, setActiveMultipliers] = useState<Map<number, number>>(new Map()); // Position -> multiplier
-  
+  const [expandingReels, setExpandingReels] = useState<number[]>([]); // Reels currently animating expansion
+  const [expandedReels, setExpandedReels] = useState<number[]>([]); // Reels fully expanded
+  const [activeMultipliers, setActiveMultipliers] = useState<Map<number, number>>(new Map());
+  const [showBuyBonus, setShowBuyBonus] = useState(false);
+
   // Bonus state
   const [bonus, setBonus] = useState<BonusState>({
     type: null,
     spinsRemaining: 0,
     stickyWilds: [],
-    collectedWilds: 0,
-    collectedMultiplier: 1,
-    phase: null,
-    showdownSpins: 0
+    totalWin: 0,
   });
   const [showBonusTrigger, setShowBonusTrigger] = useState<BonusType>(null);
 
-  const GRID_SIZE = 25; // 5x5
-  const ROWS = 5;
-  const COLS = 5;
+  const spinIntervalsRef = useRef<NodeJS.Timeout[]>([]);
 
-  // Initialize grid
-  useEffect(() => {
-    setGrid(generateGrid());
+  // Generate random symbol
+  const generateSymbol = useCallback((includeSpecials = true, bonusMode: BonusType = null): Symbol => {
+    const id = Math.random().toString(36).substr(2, 9);
+    
+    if (bonusMode) {
+      if (bonusMode === 'duel' && Math.random() < 0.08) {
+        const mult = getVSMultiplier();
+        return { type: 'vs', id, multiplier: mult };
+      }
+      if (Math.random() < 0.06) {
+        return { type: 'wild', id };
+      }
+    } else if (includeSpecials) {
+      if (Math.random() < 0.015) {
+        const mult = getVSMultiplier();
+        return { type: 'vs', id, multiplier: mult };
+      }
+      if (Math.random() < 0.025) {
+        return { type: 'wild', id };
+      }
+      if (Math.random() < 0.012) {
+        return { type: SCATTER_TYPES[Math.floor(Math.random() * SCATTER_TYPES.length)], id };
+      }
+    }
+    
+    return { type: REGULAR_SYMBOLS[Math.floor(Math.random() * REGULAR_SYMBOLS.length)], id };
   }, []);
+
+  // Initialize reels
+  useEffect(() => {
+    const initialReels: ReelState[] = [];
+    for (let col = 0; col < COLS; col++) {
+      const symbols: Symbol[] = [];
+      for (let row = 0; row < ROWS; row++) {
+        symbols.push(generateSymbol(false));
+      }
+      initialReels.push({ symbols, isSpinning: false, hasStopped: true });
+    }
+    setReels(initialReels);
+  }, [generateSymbol]);
 
   // Check for reload
   useEffect(() => {
@@ -210,579 +172,530 @@ export default function WantedDeadOrWild() {
     }
   }, [balance, isSpinning, bonus.type, checkAndReload]);
 
-  // Get weighted random VS multiplier
-  const getVSMultiplier = useCallback(() => {
-    const totalWeight = VS_MULTIPLIERS.reduce((sum, m) => sum + m.weight, 0);
-    let random = Math.random() * totalWeight;
-    
-    for (const mult of VS_MULTIPLIERS) {
-      random -= mult.weight;
-      if (random <= 0) return mult.value;
-    }
-    return VS_MULTIPLIERS[0].value;
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      spinIntervalsRef.current.forEach(t => clearInterval(t));
+    };
   }, []);
 
-  // Generate a random symbol
-  const generateSymbol = useCallback((includeSpecials: boolean = true, bonusType: BonusType = null): Symbol => {
-    const id = Math.random().toString(36).substr(2, 9);
-    
-    // In bonus, different spawn rates
-    if (bonusType) {
-      // Higher VS wild chance in Duel at Dawn
-      if (bonusType === 'duel' && Math.random() < 0.08) {
-        return { type: 'vs', id, multiplier: getVSMultiplier() };
-      }
-      // Regular wild chance
-      if (Math.random() < 0.05) {
-        return { type: 'wild', id, isWild: true };
-      }
-    } else {
-      // Base game - low VS wild chance
-      if (includeSpecials && Math.random() < 0.02) {
-        return { type: 'vs', id, multiplier: getVSMultiplier() };
-      }
-      // Regular wild
-      if (includeSpecials && Math.random() < 0.03) {
-        return { type: 'wild', id, isWild: true };
-      }
-      // Scatter symbols - very rare
-      if (includeSpecials && Math.random() < 0.015) {
-        const scatterType = SCATTER_SYMBOLS[Math.floor(Math.random() * SCATTER_SYMBOLS.length)];
-        return { type: scatterType, id };
-      }
-    }
-    
-    // Regular symbol
-    const type = REGULAR_SYMBOLS[Math.floor(Math.random() * REGULAR_SYMBOLS.length)];
-    return { type, id };
-  }, [getVSMultiplier]);
-
-  // Generate initial grid
-  const generateGrid = useCallback((): Symbol[] => {
-    return Array.from({ length: GRID_SIZE }, () => generateSymbol(false));
-  }, [generateSymbol]);
-
-  // Check for wins on all paylines
-  const checkWins = useCallback((currentGrid: Symbol[], multipliers: Map<number, number>): { positions: number[], totalPayout: number } => {
-    const allWinningPositions = new Set<number>();
+  // Check wins on paylines
+  const checkWins = useCallback((grid: Symbol[], multipliers: Map<number, number>): { positions: number[]; payout: number } => {
+    const allWinPos = new Set<number>();
     let totalPayout = 0;
 
     for (const payline of PAYLINES) {
-      // Get symbols on this payline
-      const symbols = payline.map(pos => currentGrid[pos]);
-      
-      // Find the first non-wild symbol to determine what we're matching
+      const symbols = payline.map(p => grid[p]);
       let matchType: SymbolType | null = null;
-      for (const sym of symbols) {
-        if (sym.type !== 'wild' && sym.type !== 'vs' && !SCATTER_SYMBOLS.includes(sym.type)) {
-          matchType = sym.type;
+      
+      for (const s of symbols) {
+        if (s.type !== 'wild' && s.type !== 'vs' && !SCATTER_TYPES.includes(s.type)) {
+          matchType = s.type;
           break;
         }
       }
-      
-      if (!matchType) {
-        // All wilds - use wild payout
-        matchType = 'wild';
-      }
+      if (!matchType) matchType = 'wild';
 
-      // Count consecutive matching symbols from left
       let count = 0;
-      let lineMultiplier = 1;
-      const linePositions: number[] = [];
-      
+      let lineMult = 1;
+      const linePos: number[] = [];
+
       for (let i = 0; i < payline.length; i++) {
-        const sym = symbols[i];
+        const s = symbols[i];
         const pos = payline[i];
-        
-        const isMatch = sym.type === matchType || sym.type === 'wild' || sym.type === 'vs';
+        const isMatch = s.type === matchType || s.type === 'wild' || s.type === 'vs';
         
         if (isMatch) {
           count++;
-          linePositions.push(pos);
-          
-          // Add VS multiplier
+          linePos.push(pos);
           if (multipliers.has(pos)) {
-            lineMultiplier *= multipliers.get(pos)!;
+            lineMult *= multipliers.get(pos)!;
           }
-        } else {
-          break;
-        }
+        } else break;
       }
 
-      // Check for win (3+ matching)
       if (count >= 3) {
-        const basePayout = SYMBOLS[matchType].payouts[count] || 0;
-        if (basePayout > 0) {
-          totalPayout += basePayout * lineMultiplier;
-          linePositions.forEach(pos => allWinningPositions.add(pos));
+        const basePay = PAYOUTS[matchType]?.[count] || 0;
+        if (basePay > 0) {
+          totalPayout += basePay * lineMult;
+          linePos.forEach(p => allWinPos.add(p));
         }
       }
     }
 
-    return { positions: Array.from(allWinningPositions), totalPayout };
+    return { positions: Array.from(allWinPos), payout: totalPayout };
   }, []);
 
-  // Check for scatter bonus triggers
-  const checkScatters = useCallback((currentGrid: Symbol[]): BonusType => {
-    const scatterCounts: Record<string, number> = { train: 0, duel: 0, dead: 0 };
-    
-    for (const sym of currentGrid) {
-      if (SCATTER_SYMBOLS.includes(sym.type)) {
-        scatterCounts[sym.type]++;
-      }
+  // Check for scatter bonus
+  const checkScatters = useCallback((grid: Symbol[]): BonusType => {
+    const counts: Record<string, number> = { train: 0, duel: 0, dead: 0 };
+    for (const s of grid) {
+      if (SCATTER_TYPES.includes(s.type)) counts[s.type]++;
     }
-
-    // Need 3+ of same scatter to trigger
-    if (scatterCounts.train >= 3) return 'train';
-    if (scatterCounts.duel >= 3) return 'duel';
-    if (scatterCounts.dead >= 3) return 'dead';
-    
+    if (counts.train >= 3) return 'train';
+    if (counts.duel >= 3) return 'duel';
+    if (counts.dead >= 3) return 'dead';
     return null;
   }, []);
 
-  // Process VS wilds - expand full reel
-  const processVSWilds = useCallback((currentGrid: Symbol[]): { grid: Symbol[], expandedReels: number[], multipliers: Map<number, number> } => {
-    const newGrid = [...currentGrid];
-    const expanded: number[] = [];
-    const multipliers = new Map<number, number>();
-
-    for (let col = 0; col < COLS; col++) {
-      // Check each cell in column for VS wild
-      for (let row = 0; row < ROWS; row++) {
-        const pos = row * COLS + col;
-        if (newGrid[pos].type === 'vs') {
-          // Expand to fill entire reel
-          expanded.push(col);
-          const mult = newGrid[pos].multiplier || getVSMultiplier();
-          
-          for (let r = 0; r < ROWS; r++) {
-            const expandPos = r * COLS + col;
-            newGrid[expandPos] = {
-              ...newGrid[expandPos],
-              type: 'wild',
-              isWild: true,
-              isExpanded: true
-            };
-            multipliers.set(expandPos, mult);
-          }
-          break; // Only process first VS in column
-        }
-      }
-    }
-
-    return { grid: newGrid, expandedReels: expanded, multipliers };
-  }, [getVSMultiplier]);
-
-  // Main spin function
+  // Main spin function with reel-by-reel stopping
   const spin = useCallback(async () => {
     if (isSpinning || (betAmount > balance && !bonus.type)) return;
+
+    // Clear any pending intervals
+    spinIntervalsRef.current.forEach(t => clearInterval(t));
+    spinIntervalsRef.current = [];
 
     setIsSpinning(true);
     setWinAmount(0);
     setWinningPositions([]);
+    setExpandingReels([]);
     setExpandedReels([]);
     setActiveMultipliers(new Map());
 
-    // Deduct bet if not in bonus
+    // Deduct bet
     if (!bonus.type) {
       setBalance(balance - betAmount);
       recordBet(betAmount);
       setLastBet(betAmount);
-      setTotalWin(0);
     }
 
-    // Animate spinning
-    const spinDuration = 1500;
-    const spinInterval = 50;
-    const spinSteps = spinDuration / spinInterval;
-
-    for (let i = 0; i < spinSteps; i++) {
-      await new Promise(resolve => setTimeout(resolve, spinInterval));
-      setGrid(prev => {
-        // Keep sticky wilds in place during bonus
-        if (bonus.type === 'train' && bonus.stickyWilds.length > 0) {
-          const newGrid = prev.map((sym, idx) => 
-            bonus.stickyWilds.includes(idx) ? sym : generateSymbol(true, bonus.type)
-          );
-          return newGrid;
+    // Generate final symbols for each reel
+    const finalReelSymbols: Symbol[][] = [];
+    for (let col = 0; col < COLS; col++) {
+      const symbols: Symbol[] = [];
+      for (let row = 0; row < ROWS; row++) {
+        const pos = row * COLS + col;
+        if (bonus.type === 'train' && bonus.stickyWilds.includes(pos)) {
+          symbols.push(reels[col].symbols[row]);
+        } else {
+          symbols.push(generateSymbol(true, bonus.type));
         }
-        return prev.map(() => generateSymbol(true, bonus.type));
+      }
+      finalReelSymbols.push(symbols);
+    }
+
+    // Start all reels spinning
+    setReels(prev => prev.map(r => ({ ...r, isSpinning: true, hasStopped: false })));
+
+    // Animate each reel with spinning effect, stopping left to right
+    const stopDelays = [500, 800, 1100, 1400, 1700];
+
+    for (let col = 0; col < COLS; col++) {
+      const finalSymbols = finalReelSymbols[col];
+      
+      // Create spinning animation interval for this reel
+      const spinInterval = setInterval(() => {
+        setReels(prev => {
+          const newReels = [...prev];
+          if (newReels[col] && newReels[col].isSpinning) {
+            newReels[col] = {
+              ...newReels[col],
+              symbols: Array.from({ length: ROWS }, () => generateSymbol(true, bonus.type)),
+            };
+          }
+          return newReels;
+        });
+      }, 50);
+
+      spinIntervalsRef.current.push(spinInterval);
+
+      // Stop reel after delay
+      setTimeout(() => {
+        clearInterval(spinInterval);
+        setReels(prev => {
+          const newReels = [...prev];
+          newReels[col] = {
+            symbols: finalSymbols,
+            isSpinning: false,
+            hasStopped: true,
+          };
+          return newReels;
+        });
+      }, stopDelays[col]);
+    }
+
+    // Wait for all reels to stop
+    await new Promise(resolve => setTimeout(resolve, stopDelays[COLS - 1] + 300));
+
+    // Build final grid (row-major order for payline checking)
+    const buildGrid = (reelSyms: Symbol[][]): Symbol[] => {
+      const grid: Symbol[] = [];
+      for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS; col++) {
+          grid.push(reelSyms[col][row]);
+        }
+      }
+      return grid;
+    };
+
+    let finalGrid = buildGrid(finalReelSymbols);
+
+    // Find VS wilds and prepare expansion
+    const vsReels: number[] = [];
+    const multipliers = new Map<number, number>();
+
+    for (let col = 0; col < COLS; col++) {
+      for (let row = 0; row < ROWS; row++) {
+        const pos = row * COLS + col;
+        if (finalGrid[pos].type === 'vs') {
+          vsReels.push(col);
+          const mult = finalGrid[pos].multiplier || 2;
+          for (let r = 0; r < ROWS; r++) {
+            multipliers.set(r * COLS + col, mult);
+          }
+          break;
+        }
+      }
+    }
+
+    // Animate VS wild expansion
+    if (vsReels.length > 0) {
+      setExpandingReels(vsReels);
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      // Convert entire columns to wilds
+      const expandedSymbols = [...finalReelSymbols];
+      for (const col of vsReels) {
+        const mult = multipliers.get(col) || 2;
+        expandedSymbols[col] = Array.from({ length: ROWS }, () => ({
+          type: 'wild' as SymbolType,
+          id: Math.random().toString(36).substr(2, 9),
+          multiplier: mult,
+        }));
+      }
+
+      setReels(prev => {
+        const newReels = [...prev];
+        for (const col of vsReels) {
+          newReels[col] = { ...newReels[col], symbols: expandedSymbols[col] };
+        }
+        return newReels;
       });
+
+      finalGrid = buildGrid(expandedSymbols);
+      setExpandingReels([]);
+      setExpandedReels(vsReels);
+      setActiveMultipliers(multipliers);
+
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
-    // Generate final grid
-    let finalGrid: Symbol[];
-    if (bonus.type === 'train' && bonus.stickyWilds.length > 0) {
-      finalGrid = grid.map((sym, idx) => 
-        bonus.stickyWilds.includes(idx) ? sym : generateSymbol(true, bonus.type)
-      );
-    } else {
-      finalGrid = Array.from({ length: GRID_SIZE }, () => generateSymbol(true, bonus.type));
-    }
-
-    // Process VS wilds
-    const vsResult = processVSWilds(finalGrid);
-    finalGrid = vsResult.grid;
-    setExpandedReels(vsResult.expandedReels);
-    setActiveMultipliers(vsResult.multipliers);
-    setGrid(finalGrid);
-
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    // Check for wins
-    const { positions, totalPayout } = checkWins(finalGrid, vsResult.multipliers);
+    // Check wins
+    const { positions, payout } = checkWins(finalGrid, multipliers);
     setWinningPositions(positions);
 
-    const spinWin = totalPayout * betAmount;
+    const spinWin = Math.round(payout * betAmount * 100) / 100;
     setWinAmount(spinWin);
-    setTotalWin(prev => prev + spinWin);
 
-    if (spinWin > 0 && !bonus.type) {
-      setBalance(balance - betAmount + spinWin);
-    } else if (spinWin > 0 && bonus.type) {
+    if (spinWin > 0) {
       setBalance(balance + spinWin);
     }
 
     // Update bonus state
     if (bonus.type) {
       const newStickies = [...bonus.stickyWilds];
-      
-      // Train Robbery: collect sticky wilds
       if (bonus.type === 'train') {
-        finalGrid.forEach((sym, idx) => {
-          if ((sym.type === 'wild' || sym.isExpanded) && !newStickies.includes(idx)) {
+        finalGrid.forEach((s, idx) => {
+          if (s.type === 'wild' && !newStickies.includes(idx)) {
             newStickies.push(idx);
           }
         });
       }
 
-      setBonus(prev => ({
-        ...prev,
-        spinsRemaining: prev.spinsRemaining - 1,
-        stickyWilds: newStickies
-      }));
-
-      // Check if bonus ended
-      if (bonus.spinsRemaining <= 1) {
-        setBonus({
-          type: null,
-          spinsRemaining: 0,
-          stickyWilds: [],
-          collectedWilds: 0,
-          collectedMultiplier: 1,
-          phase: null,
-          showdownSpins: 0
-        });
+      const newSpins = bonus.spinsRemaining - 1;
+      if (newSpins <= 0) {
+        setBonus({ type: null, spinsRemaining: 0, stickyWilds: [], totalWin: 0 });
+      } else {
+        setBonus(prev => ({
+          ...prev,
+          spinsRemaining: newSpins,
+          stickyWilds: newStickies,
+          totalWin: prev.totalWin + spinWin,
+        }));
       }
     } else {
-      // Check for new bonus trigger
+      // Check for bonus trigger
       const triggeredBonus = checkScatters(finalGrid);
       if (triggeredBonus) {
         setShowBonusTrigger(triggeredBonus);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 2500));
         setShowBonusTrigger(null);
-        
         setBonus({
           type: triggeredBonus,
           spinsRemaining: 10,
           stickyWilds: [],
-          collectedWilds: 0,
-          collectedMultiplier: 1,
-          phase: triggeredBonus === 'dead' ? 'collect' : null,
-          showdownSpins: triggeredBonus === 'dead' ? 3 : 0
+          totalWin: 0,
         });
       }
     }
 
     setIsSpinning(false);
-  }, [isSpinning, betAmount, balance, bonus, setBalance, recordBet, grid, generateSymbol, processVSWilds, checkWins, checkScatters]);
+  }, [isSpinning, betAmount, balance, bonus, reels, setBalance, recordBet, generateSymbol, checkWins, checkScatters]);
 
-  // Rebet / All In
-  const rebet = useCallback(() => {
-    if (lastBet > 0 && lastBet <= balance && !isSpinning && !bonus.type) {
-      setBetAmount(lastBet);
-    }
-  }, [lastBet, balance, isSpinning, bonus.type]);
-
-  const allIn = useCallback(() => {
-    if (!isSpinning && !bonus.type) {
-      setBetAmount(Math.floor(balance));
-    }
-  }, [balance, isSpinning, bonus.type]);
-
-  // Buy Bonus - purchase bonus rounds directly
+  // Buy bonus function
   const buyBonus = useCallback((bonusType: 'train' | 'duel' | 'dead') => {
     const costs = { train: 80, duel: 200, dead: 400 };
     const cost = betAmount * costs[bonusType];
-    
     if (balance < cost || isSpinning || bonus.type) return;
-    
+
     setBalance(balance - cost);
     recordBet(cost);
     setLastBet(cost);
-    
-    // Initialize the bonus round based on type
-    if (bonusType === 'train') {
-      // Great Train Robbery - 10 spins with sticky wilds
-      setBonus({
-        type: 'train',
-        spinsRemaining: 10,
-        stickyWilds: [],
-        collectedWilds: 0,
-        collectedMultiplier: 1,
-        phase: null,
-        showdownSpins: 0
-      });
-    } else if (bonusType === 'duel') {
-      // Duel at Dawn - 10 spins with multiplier collection
-      setBonus({
-        type: 'duel',
-        spinsRemaining: 10,
-        stickyWilds: [],
-        collectedWilds: 0,
-        collectedMultiplier: 1,
-        phase: null,
-        showdownSpins: 0
-      });
-    } else {
-      // Dead Man's Hand - Collection then showdown
-      setBonus({
-        type: 'dead',
-        spinsRemaining: 10,
-        stickyWilds: [],
-        collectedWilds: 0,
-        collectedMultiplier: 1,
-        phase: 'collect',
-        showdownSpins: 3
-      });
-    }
-    
-    // Generate initial bonus grid with guaranteed scatter/wild presence
-    const newGrid: Symbol[] = [];
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const rand = Math.random();
-      const id = Math.random().toString(36).substr(2, 9);
-      let type: SymbolType;
-      
-      // Higher chance of wilds in bonus
-      if (rand < 0.15) {
-        type = Math.random() < 0.3 ? 'vs' : 'wild';
-      } else if (rand < 0.35) {
-        type = ['gun', 'bottle', 'moneybag'][Math.floor(Math.random() * 3)] as SymbolType;
-      } else {
-        type = ['A', 'K', 'Q', 'J', '10'][Math.floor(Math.random() * 5)] as SymbolType;
-      }
-      
-      newGrid.push({ 
-        type, 
-        id,
-        multiplier: type === 'vs' ? getVSMultiplier() : undefined, 
-        isExpanded: false,
-        isWild: type === 'wild' || type === 'vs'
-      });
-    }
-    setGrid(newGrid);
+    setShowBuyBonus(false);
+
+    setBonus({
+      type: bonusType,
+      spinsRemaining: 10,
+      stickyWilds: [],
+      totalWin: 0,
+    });
   }, [betAmount, balance, isSpinning, bonus.type, setBalance, recordBet]);
 
-  // Get symbol display
-  const getSymbolDisplay = (sym: Symbol, pos: number) => {
-    const config = SYMBOLS[sym.type];
-    const isWinning = winningPositions.includes(pos);
-    const hasMultiplier = activeMultipliers.has(pos);
-    
-    return (
-      <div
-        className={`relative aspect-square flex items-center justify-center text-xl sm:text-3xl md:text-4xl rounded-lg transition-all duration-300 ${
-          sym.isExpanded ? 'bg-gradient-to-br from-yellow-400/30 to-yellow-600/30 border-2 border-yellow-500' :
-          isWinning ? 'bg-gradient-to-br from-green-400/30 to-green-600/30 border-2 border-green-500 scale-110' :
-          `bg-gradient-to-br ${config.color} bg-opacity-20`
-        } ${isSpinning ? 'animate-pulse' : ''}`}
-      >
-        <span className={`${isWinning ? 'animate-bounce' : ''}`}>
-          {config.emoji}
-        </span>
-        {hasMultiplier && (
-          <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-bold px-1 rounded">
-            ×{activeMultipliers.get(pos)}
-          </div>
-        )}
-        {bonus.type === 'train' && bonus.stickyWilds.includes(pos) && (
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-xs">📌</div>
-        )}
-      </div>
-    );
-  };
-
   const bonusNames: Record<string, string> = {
-    train: '🚂 Great Train Robbery',
-    duel: '🤺 Duel at Dawn',
-    dead: '☠️ Dead Man\'s Hand'
+    train: 'GREAT TRAIN ROBBERY',
+    duel: 'DUEL AT DAWN',
+    dead: "DEAD MAN'S HAND",
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-950 via-red-950 to-gray-900 text-white">
-      {/* Header */}
-      <div className="bg-black/40 border-b border-amber-500/20 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => router.push('/casino')}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <span className="text-xl">←</span>
-            <span>Back to Casino</span>
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-4 py-2 rounded-lg border border-yellow-500/30">
-              <span className="text-yellow-400 font-bold">${balance.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Title */}
-      <div className="text-center py-2 sm:py-4">
-        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-400 via-red-500 to-amber-400 bg-clip-text text-transparent">
-          🤠 WANTED DEAD OR A WILD 🤠
-        </h1>
-        <p className="text-amber-300/60 text-xs sm:text-sm mt-1">15 Paylines | Max Win 12,500×</p>
+    <div className="min-h-screen bg-gradient-to-b from-orange-900 via-red-950 to-black text-white overflow-hidden">
+      {/* Desert Background with gradient overlay */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-orange-600/30 via-red-900/50 to-black" />
+        <div className="absolute bottom-0 left-0 w-1/3 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+        <div className="absolute bottom-0 right-0 w-1/4 h-1/3 bg-gradient-to-t from-black/80 to-transparent" />
       </div>
 
       {/* Bonus Trigger Overlay */}
       {showBonusTrigger && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="text-center animate-pulse">
-            <div className="text-6xl mb-4">
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 animate-pulse">
+          <div className="text-center">
+            <div className="text-8xl mb-6">
               {showBonusTrigger === 'train' ? '🚂' : showBonusTrigger === 'duel' ? '🤺' : '☠️'}
             </div>
-            <div className="text-4xl font-bold text-yellow-400 mb-2">
-              BONUS TRIGGERED!
+            <div className="text-5xl font-bold text-yellow-400 mb-4" style={{ textShadow: '0 0 20px rgba(255,200,0,0.8)' }}>
+              BONUS!
             </div>
-            <div className="text-2xl text-white">
+            <div className="text-3xl text-white font-bold">
               {bonusNames[showBonusTrigger]}
             </div>
-            <div className="text-lg text-amber-300 mt-2">10 Free Spins!</div>
+            <div className="text-xl text-amber-300 mt-4">10 FREE SPINS</div>
           </div>
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-2 sm:px-4 pb-4 sm:pb-8">
-        {/* Bonus Banner */}
-        {bonus.type && (
-          <div className="mb-4 p-3 bg-gradient-to-r from-purple-900/50 to-amber-900/50 rounded-xl border border-amber-500/30 text-center">
-            <div className="text-lg font-bold text-amber-400">{bonusNames[bonus.type]}</div>
-            <div className="text-sm text-white">
-              {bonus.spinsRemaining} Spins Remaining | Total Win: ${totalWin.toLocaleString()}
-            </div>
-            {bonus.type === 'train' && (
-              <div className="text-xs text-amber-300 mt-1">
-                Sticky Wilds: {bonus.stickyWilds.length}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Game Grid - Full Width */}
-        <div className="bg-gradient-to-br from-amber-900/30 to-red-900/30 rounded-xl sm:rounded-2xl p-2 sm:p-4 border border-amber-500/20">
-          {/* Expanded reel indicators */}
-          {expandedReels.length > 0 && (
-            <div className="grid grid-cols-5 gap-2 mb-2 max-w-lg mx-auto">
-              {[0, 1, 2, 3, 4].map(col => (
-                <div 
-                  key={col}
-                  className={`text-center text-xs py-1 rounded ${
-                    expandedReels.includes(col) 
-                      ? 'bg-yellow-500/30 text-yellow-400 font-bold' 
-                      : 'text-transparent'
-                  }`}
+      {/* Buy Bonus Modal */}
+      {showBuyBonus && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowBuyBonus(false)}>
+          <div className="bg-gradient-to-b from-amber-900 to-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 border-2 border-amber-600" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-amber-400 text-center mb-4">BUY BONUS</h2>
+            <div className="space-y-3">
+              {[
+                { type: 'train' as const, icon: '🚂', name: 'Great Train Robbery', mult: 80 },
+                { type: 'duel' as const, icon: '🤺', name: 'Duel at Dawn', mult: 200 },
+                { type: 'dead' as const, icon: '☠️', name: "Dead Man's Hand", mult: 400 },
+              ].map(b => (
+                <button
+                  key={b.type}
+                  onClick={() => buyBonus(b.type)}
+                  disabled={balance < betAmount * b.mult}
+                  className="w-full p-4 bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl border border-gray-600 hover:border-amber-500 disabled:opacity-50 transition-all flex items-center justify-between"
                 >
-                  {expandedReels.includes(col) ? `×${activeMultipliers.get(col * ROWS) || '?'}` : '-'}
-                </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{b.icon}</span>
+                    <span className="font-bold">{b.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-amber-400 font-bold">${(betAmount * b.mult).toLocaleString()}</div>
+                    <div className="text-xs text-gray-400">{b.mult}× bet</div>
+                  </div>
+                </button>
               ))}
             </div>
-          )}
-
-          {/* Main Grid */}
-          <div className="grid grid-cols-5 gap-1 sm:gap-2 max-w-sm sm:max-w-lg mx-auto">
-            {grid.map((sym, idx) => (
-              <div key={sym.id}>
-                {getSymbolDisplay(sym, idx)}
-              </div>
-            ))}
+            <button
+              onClick={() => setShowBuyBonus(false)}
+              className="w-full mt-4 py-2 text-gray-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
           </div>
+        </div>
+      )}
 
-          {/* Paylines indicator */}
-          <div className="mt-3 text-center text-xs text-amber-300/60">
-            15 Paylines • Left to Right
+      <div className="relative z-10 flex flex-col h-screen">
+        {/* Title */}
+        <div className="text-center py-1 sm:py-2 flex-shrink-0">
+          <h1 
+            className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-wider"
+            style={{ 
+              fontFamily: 'serif',
+              background: 'linear-gradient(180deg, #f5d78e 0%, #c9a227 50%, #8b6914 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            WANTED
+          </h1>
+          <div className="text-green-500 text-xs sm:text-lg font-bold tracking-widest" style={{ fontFamily: 'serif' }}>
+            DEAD OR A WILD
           </div>
         </div>
 
-        {/* Win Display */}
-        {winAmount > 0 && (
-          <div className="mt-4 bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-500/30 text-center">
-            <div className="text-sm text-green-400">WIN!</div>
-            <div className="text-3xl font-bold text-white">+${winAmount.toLocaleString()}</div>
+        {/* Bonus Banner */}
+        {bonus.type && (
+          <div className="mx-2 sm:mx-4 mb-1 sm:mb-2 p-1.5 sm:p-2 bg-gradient-to-r from-purple-900/80 to-amber-900/80 rounded-lg border border-amber-500/50 text-center flex-shrink-0 text-xs sm:text-base">
+            <span className="text-amber-400 font-bold">{bonusNames[bonus.type]}</span>
+            <span className="mx-1 sm:mx-2 text-white">|</span>
+            <span className="text-white">{bonus.spinsRemaining} SPINS</span>
+            <span className="mx-1 sm:mx-2 text-white">|</span>
+            <span className="text-green-400">WIN: ${bonus.totalWin.toLocaleString()}</span>
           </div>
         )}
 
-        {/* Controls Under Grid */}
-        <div className="mt-3 sm:mt-4 bg-black/40 backdrop-blur-lg rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-amber-500/20">
-          <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-4">
-            {/* Bet Controls */}
-            <div className="flex items-center gap-1 sm:gap-2">
+        {/* Main Slot Machine */}
+        <div className="flex-1 flex items-center justify-center px-1 sm:px-4 min-h-0 py-1">
+          <div className="w-full max-w-xl">
+            {/* Wooden Frame */}
+            <div 
+              className="rounded-lg p-1 sm:p-2"
+              style={{
+                background: 'linear-gradient(180deg, #5c4a32 0%, #3d2e1f 50%, #2a1f15 100%)',
+                boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.5)',
+              }}
+            >
+              {/* Inner dark area */}
+              <div className="bg-gray-950 rounded p-1.5 sm:p-3">
+                {/* Reels Container */}
+                <div className="grid grid-cols-5 gap-0.5 sm:gap-1.5">
+                  {reels.map((reel, colIndex) => (
+                    <div key={colIndex} className="relative">
+                      {/* Reel Column */}
+                      <div className="flex flex-col gap-0.5 sm:gap-1">
+                        {reel.symbols.map((symbol, rowIndex) => {
+                          const pos = rowIndex * COLS + colIndex;
+                          const isWinning = winningPositions.includes(pos);
+                          const isExpanding = expandingReels.includes(colIndex);
+                          const isExpanded = expandedReels.includes(colIndex);
+                          const multiplier = activeMultipliers.get(pos);
+                          const style = SYMBOL_STYLES[symbol.type];
+
+                          return (
+                            <div
+                              key={symbol.id + rowIndex}
+                              className={`
+                                relative aspect-square rounded-sm sm:rounded border-2 flex items-center justify-center
+                                transition-all duration-200
+                                ${isExpanded ? 'bg-gradient-to-br from-yellow-400 to-orange-500 border-yellow-300' : `${style.bg} ${style.border}`}
+                                ${isWinning ? 'ring-2 ring-green-400 scale-105 z-10' : ''}
+                                ${reel.isSpinning ? 'blur-[2px]' : ''}
+                              `}
+                              style={{
+                                boxShadow: isWinning 
+                                  ? '0 0 15px rgba(74,222,128,0.6)' 
+                                  : isExpanded 
+                                    ? '0 0 10px rgba(251,191,36,0.5)' 
+                                    : 'inset 0 1px 3px rgba(0,0,0,0.4)',
+                                transform: reel.isSpinning ? `translateY(${Math.sin(Date.now() / 50) * 2}px)` : 'none',
+                              }}
+                            >
+                              {/* Symbol Content */}
+                              <span 
+                                className={`
+                                  text-base sm:text-2xl md:text-3xl
+                                  ${symbol.type.length <= 2 && symbol.type !== '10' ? 'font-bold' : ''}
+                                  ${isExpanded ? 'text-white drop-shadow-lg' : ''}
+                                `}
+                                style={{ textShadow: isWinning ? '0 0 10px white' : 'none' }}
+                              >
+                                {isExpanded ? '⭐' : style.text}
+                              </span>
+
+                              {/* Multiplier Badge */}
+                              {multiplier && (
+                                <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-[6px] sm:text-[10px] font-bold px-0.5 sm:px-1 rounded shadow-lg">
+                                  ×{multiplier}
+                                </div>
+                              )}
+
+                              {/* Expanding Animation Overlay */}
+                              {isExpanding && (
+                                <div 
+                                  className="absolute inset-0 rounded bg-gradient-to-b from-yellow-400 via-orange-400 to-yellow-400"
+                                  style={{
+                                    animation: 'expandPulse 0.3s ease-in-out infinite',
+                                  }}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Win Display */}
+            {winAmount > 0 && !isSpinning && (
+              <div className="mt-2 sm:mt-3 text-center animate-bounce">
+                <div className="inline-block bg-gradient-to-r from-green-600 to-emerald-600 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full border-2 border-green-400">
+                  <span className="text-base sm:text-2xl font-bold text-white">
+                    WIN ${winAmount.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Control Bar - Matching real game layout */}
+        <div className="flex-shrink-0 bg-gradient-to-t from-gray-900 to-gray-800 border-t border-gray-700 px-2 sm:px-4 py-2 sm:py-3">
+          <div className="max-w-xl mx-auto flex items-center justify-between gap-1 sm:gap-2">
+            {/* Buy Bonus Button */}
+            <button
+              onClick={() => setShowBuyBonus(true)}
+              disabled={isSpinning || !!bonus.type}
+              className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-teal-600 to-teal-800 border-2 border-teal-400 flex items-center justify-center text-[8px] sm:text-xs font-bold text-white disabled:opacity-50 hover:scale-105 transition-transform flex-shrink-0"
+            >
+              BUY<br/>BONUS
+            </button>
+
+            {/* Back Button */}
+            <button
+              onClick={() => router.push('/casino')}
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors flex-shrink-0"
+            >
+              ≡
+            </button>
+
+            {/* Balance */}
+            <div className="text-center min-w-0 flex-1">
+              <div className="text-[8px] sm:text-xs text-gray-400 uppercase">Balance</div>
+              <div className="text-xs sm:text-lg font-bold text-white truncate">${balance.toLocaleString()}</div>
+            </div>
+
+            {/* Bet Amount */}
+            <div className="flex items-center gap-0.5 sm:gap-2 bg-gray-800 rounded-lg px-1.5 sm:px-3 py-1 flex-shrink-0">
               <button
-                onClick={() => setBetAmount(Math.max(10, betAmount / 2))}
+                onClick={() => setBetAmount(Math.max(1, betAmount / 2))}
                 disabled={isSpinning || !!bonus.type}
-                className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 hover:bg-red-600 disabled:opacity-50 rounded-full text-white font-bold text-lg sm:text-xl transition-all"
+                className="text-gray-400 hover:text-white disabled:opacity-50 text-base sm:text-xl px-1"
               >
-                -
+                ‹
               </button>
-              <div className="bg-white/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl min-w-20 sm:min-w-24 text-center">
-                <div className="text-white/70 text-[10px] sm:text-xs">BET</div>
-                <div className="text-white font-bold text-base sm:text-lg">${betAmount}</div>
+              <div className="text-center min-w-12 sm:min-w-20">
+                <div className="text-[8px] sm:text-xs text-gray-400 uppercase">Bet</div>
+                <div className="text-xs sm:text-base font-bold text-white">${betAmount.toFixed(2)}</div>
               </div>
               <button
                 onClick={() => setBetAmount(Math.min(balance, betAmount * 2))}
                 disabled={isSpinning || !!bonus.type}
-                className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 hover:bg-green-600 disabled:opacity-50 rounded-full text-white font-bold text-lg sm:text-xl transition-all"
+                className="text-gray-400 hover:text-white disabled:opacity-50 text-base sm:text-xl px-1"
               >
-                +
+                ›
               </button>
-            </div>
-
-            {/* All In and Rebet Buttons */}
-            <div className="flex gap-1 sm:gap-2">
-              <button
-                onClick={allIn}
-                disabled={isSpinning || !!bonus.type}
-                className="px-2 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:opacity-50 rounded-lg text-white font-bold text-sm sm:text-base transition-all"
-              >
-                💰 <span className="hidden sm:inline">All In</span>
-              </button>
-              <button
-                onClick={rebet}
-                disabled={isSpinning || !!bonus.type || lastBet === 0}
-                className="px-2 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 rounded-lg text-white font-bold text-sm sm:text-base transition-all"
-              >
-                🔄 <span className="hidden sm:inline">Rebet</span>
-              </button>
-            </div>
-
-            {/* Quick Bet Buttons */}
-            <div className="flex gap-1 sm:gap-2 flex-wrap justify-center">
-              {[100, 500, 1000, 5000].map(amount => (
-                <button
-                  key={amount}
-                  onClick={() => setBetAmount(amount)}
-                  disabled={isSpinning || !!bonus.type}
-                  className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
-                    betAmount === amount
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-white/10 text-white hover:bg-white/20'
-                  } disabled:opacity-50`}
-                >
-                  ${amount >= 1000 ? `${amount/1000}K` : amount}
-                </button>
-              ))}
             </div>
 
             {/* Spin Button */}
@@ -790,103 +703,37 @@ export default function WantedDeadOrWild() {
               onClick={spin}
               disabled={isSpinning || (betAmount > balance && !bonus.type)}
               className={`
-                px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-lg sm:text-xl transition-all transform hover:scale-105
+                w-12 h-12 sm:w-16 sm:h-16 rounded-full border-4 flex items-center justify-center flex-shrink-0
+                transition-all transform hover:scale-105 disabled:opacity-50 disabled:transform-none
                 ${bonus.type 
-                  ? 'bg-gradient-to-r from-purple-500 to-amber-500 animate-pulse' 
-                  : 'bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700'}
-                text-white shadow-lg disabled:opacity-50 disabled:transform-none
+                  ? 'bg-gradient-to-br from-purple-500 to-amber-500 border-purple-400' 
+                  : 'bg-gradient-to-br from-gray-700 to-gray-900 border-gray-500 hover:border-white'}
               `}
             >
-              {isSpinning ? '🎰' : bonus.type ? `🎁 FREE (${bonus.spinsRemaining})` : '🎰 SPIN'}
+              {isSpinning ? (
+                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-5 h-5 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+            </button>
+
+            {/* Autoplay Placeholder */}
+            <button className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors flex-shrink-0">
+              ⊙
             </button>
           </div>
         </div>
-
-        {/* Buy Bonus Section */}
-        {!bonus.type && (
-          <div className="mt-3 sm:mt-4 bg-gradient-to-r from-amber-900/30 to-red-900/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-amber-500/20">
-            <div className="text-center mb-2 sm:mb-3">
-              <h3 className="text-base sm:text-lg font-bold text-amber-400">🎁 Buy Bonus</h3>
-              <p className="text-[10px] sm:text-xs text-gray-400">Skip straight to the action!</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {/* Train Robbery - 80x */}
-              <button
-                onClick={() => buyBonus('train')}
-                disabled={isSpinning || balance < betAmount * 80}
-                className="p-2 sm:p-4 bg-gradient-to-br from-gray-700/50 to-gray-900/50 rounded-lg sm:rounded-xl border border-gray-600 hover:border-amber-500 transition-all disabled:opacity-50 group"
-              >
-                <div className="text-xl sm:text-3xl mb-1 sm:mb-2">🚂</div>
-                <div className="font-bold text-white text-xs sm:text-base group-hover:text-amber-400">Train</div>
-                <div className="text-[10px] sm:text-xs text-gray-400 hidden sm:block">Sticky Wilds</div>
-                <div className="mt-1 sm:mt-2 text-amber-400 font-bold text-xs sm:text-base">${(betAmount * 80).toLocaleString()}</div>
-                <div className="text-[10px] sm:text-xs text-gray-500">80×</div>
-              </button>
-
-              {/* Duel at Dawn - 200x */}
-              <button
-                onClick={() => buyBonus('duel')}
-                disabled={isSpinning || balance < betAmount * 200}
-                className="p-2 sm:p-4 bg-gradient-to-br from-orange-700/50 to-red-900/50 rounded-lg sm:rounded-xl border border-orange-600 hover:border-amber-500 transition-all disabled:opacity-50 group"
-              >
-                <div className="text-xl sm:text-3xl mb-1 sm:mb-2">🤺</div>
-                <div className="font-bold text-white text-xs sm:text-base group-hover:text-amber-400">Duel</div>
-                <div className="text-[10px] sm:text-xs text-gray-400 hidden sm:block">More VS Wilds</div>
-                <div className="mt-1 sm:mt-2 text-amber-400 font-bold text-xs sm:text-base">${(betAmount * 200).toLocaleString()}</div>
-                <div className="text-[10px] sm:text-xs text-gray-500">200×</div>
-              </button>
-
-              {/* Dead Man's Hand - 400x */}
-              <button
-                onClick={() => buyBonus('dead')}
-                disabled={isSpinning || balance < betAmount * 400}
-                className="p-2 sm:p-4 bg-gradient-to-br from-purple-700/50 to-black/50 rounded-lg sm:rounded-xl border border-purple-600 hover:border-amber-500 transition-all disabled:opacity-50 group"
-              >
-                <div className="text-xl sm:text-3xl mb-1 sm:mb-2">☠️</div>
-                <div className="font-bold text-white text-xs sm:text-base group-hover:text-amber-400">Dead</div>
-                <div className="text-[10px] sm:text-xs text-gray-400 hidden sm:block">Collect & Showdown</div>
-                <div className="mt-1 sm:mt-2 text-amber-400 font-bold text-xs sm:text-base">${(betAmount * 400).toLocaleString()}</div>
-                <div className="text-[10px] sm:text-xs text-gray-500">400×</div>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Feature Info */}
-        <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2 sm:gap-3 text-center">
-          <div className="bg-gray-800/50 rounded-lg sm:rounded-xl p-2 sm:p-3 border border-gray-700/50">
-            <div className="text-lg sm:text-2xl mb-0.5 sm:mb-1">🚂</div>
-            <div className="text-[10px] sm:text-xs text-gray-400">Train</div>
-            <div className="text-[10px] sm:text-xs text-amber-400">Sticky Wilds</div>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg sm:rounded-xl p-2 sm:p-3 border border-gray-700/50">
-            <div className="text-lg sm:text-2xl mb-0.5 sm:mb-1">🤺</div>
-            <div className="text-[10px] sm:text-xs text-gray-400">Duel</div>
-            <div className="text-[10px] sm:text-xs text-amber-400">VS Wilds</div>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg sm:rounded-xl p-2 sm:p-3 border border-gray-700/50">
-            <div className="text-lg sm:text-2xl mb-0.5 sm:mb-1">☠️</div>
-            <div className="text-[10px] sm:text-xs text-gray-400">Dead</div>
-            <div className="text-[10px] sm:text-xs text-amber-400">Showdown</div>
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="mt-3 sm:mt-4 flex flex-wrap justify-center gap-2 sm:gap-4 text-[10px] sm:text-xs">
-          <div className="flex items-center gap-1">
-            <span>⭐</span>
-            <span className="text-gray-400">Wild</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span>⚔️</span>
-            <span className="text-gray-400">VS Wild (Expands)</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span>🚂🤺☠️</span>
-            <span className="text-gray-400">3+ = Bonus</span>
-          </div>
-        </div>
       </div>
+
+      {/* Custom CSS for animations */}
+      <style jsx>{`
+        @keyframes expandPulse {
+          0%, 100% { opacity: 0.7; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+      `}</style>
     </div>
   );
 }
