@@ -177,39 +177,92 @@ export default function LimboGame() {
   const displayNumber = animatingNumber ?? currentResult;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900/20 to-gray-900 text-white">
-      {/* Header */}
-      <div className="bg-black/40 border-b border-indigo-500/20 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => router.push('/casino')}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <span className="text-xl">←</span>
-            <span>Back to Casino</span>
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-4 py-2 rounded-lg border border-yellow-500/30">
-              <span className="text-yellow-400 font-bold">${balance.toLocaleString()}</span>
-            </div>
-          </div>
+    <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-indigo-900/20 to-gray-900 text-white overflow-hidden">
+      {/* Compact Header */}
+      <div className="flex-shrink-0 bg-black/40 border-b border-indigo-500/20 px-2 py-1.5 sm:py-2 flex items-center justify-between">
+        <button onClick={() => router.push('/casino')} className="text-gray-400 hover:text-white text-sm">
+          ← Back
+        </button>
+        <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          ⚡ LIMBO ⚡
+        </h1>
+        <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-2 py-1 rounded-lg border border-yellow-500/30">
+          <span className="text-yellow-400 font-bold text-sm">${balance.toLocaleString()}</span>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
-        {/* Title */}
-        <div className="text-center mb-4 sm:mb-8">
-          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            ⚡ LIMBO ⚡
-          </h1>
-          <p className="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">Set your target multiplier and beat the odds!</p>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
+      {/* Scrollable Main Area */}
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4">
+        <div className="max-w-5xl mx-auto grid lg:grid-cols-3 gap-3 sm:gap-4">
           {/* Left Panel - Controls */}
-          <div className="space-y-3 sm:space-y-4 order-2 lg:order-1">
+          <div className="space-y-2 sm:space-y-3 order-2 lg:order-1">
+            {/* Bet + Target Row on Mobile */}
+            <div className="grid grid-cols-2 gap-2 lg:hidden">
+              {/* Bet Amount Compact */}
+              <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-700/50">
+                <label className="block text-xs text-gray-400 mb-1">Bet Amount</label>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setBetAmount(Math.max(10, betAmount / 2))} disabled={isPlaying}
+                    className="px-2 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600 disabled:opacity-50">½</button>
+                  <input type="number" value={betAmount}
+                    onChange={(e) => setBetAmount(Math.max(10, parseInt(e.target.value) || 10))}
+                    disabled={isPlaying}
+                    className="flex-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-center text-sm" />
+                  <button onClick={() => setBetAmount(Math.min(balance, betAmount * 2))} disabled={isPlaying}
+                    className="px-2 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600 disabled:opacity-50">2×</button>
+                </div>
+              </div>
+              {/* Target Multiplier Compact */}
+              <div className="bg-gray-800/50 rounded-lg p-2 border border-gray-700/50">
+                <label className="block text-xs text-gray-400 mb-1">Target Mult</label>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setTargetMultiplier(Math.max(MIN_MULTIPLIER, targetMultiplier - 0.5))} disabled={isPlaying}
+                    className="px-2 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600 disabled:opacity-50">−</button>
+                  <input type="number" step="0.01" value={targetMultiplier}
+                    onChange={(e) => { const val = parseFloat(e.target.value); if (!isNaN(val)) setTargetMultiplier(Math.max(MIN_MULTIPLIER, Math.min(MAX_MULTIPLIER, val))); }}
+                    disabled={isPlaying}
+                    className="flex-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-center text-sm font-bold" />
+                  <button onClick={() => setTargetMultiplier(Math.min(MAX_MULTIPLIER, targetMultiplier + 0.5))} disabled={isPlaying}
+                    className="px-2 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600 disabled:opacity-50">+</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions Row Mobile */}
+            <div className="flex gap-2 lg:hidden">
+              <button onClick={rebet} disabled={isPlaying || lastBet === 0}
+                className="flex-1 px-2 py-2 bg-blue-600/50 rounded-lg hover:bg-blue-600 disabled:opacity-50 text-xs">
+                Rebet ${lastBet}
+              </button>
+              <button onClick={allIn} disabled={isPlaying}
+                className="flex-1 px-2 py-2 bg-red-600/50 rounded-lg hover:bg-red-600 disabled:opacity-50 text-xs">
+                All In
+              </button>
+              <button onClick={play} disabled={isPlaying || betAmount > balance || betAmount <= 0}
+                className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${
+                  !isPlaying && betAmount <= balance && betAmount > 0
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500'
+                    : 'bg-gray-700 text-gray-500'
+                }`}>
+                ⚡ BET
+              </button>
+            </div>
+
+            {/* Quick Multipliers Mobile */}
+            <div className="grid grid-cols-5 gap-1 lg:hidden">
+              {[1.5, 2, 3, 5, 10].map(mult => (
+                <button key={mult} onClick={() => setTargetMultiplier(mult)} disabled={isPlaying}
+                  className={`py-1.5 rounded text-xs font-semibold transition-all ${
+                    targetMultiplier === mult ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                  }`}>
+                  {mult}×
+                </button>
+              ))}
+            </div>
+
+            {/* Desktop Controls - Hidden on Mobile */}
             {/* Bet Amount */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            <div className="hidden lg:block bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
               <label className="block text-sm text-gray-400 mb-2">Bet Amount</label>
               <div className="flex items-center gap-2">
                 <button
@@ -252,8 +305,8 @@ export default function LimboGame() {
               </div>
             </div>
 
-            {/* Target Multiplier */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+            {/* Target Multiplier - Desktop */}
+            <div className="hidden lg:block bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
               <label className="block text-sm text-gray-400 mb-2">Target Multiplier</label>
               <div className="flex items-center gap-2 mb-3">
                 <button
@@ -304,8 +357,8 @@ export default function LimboGame() {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 space-y-3">
+            {/* Stats - Desktop Only */}
+            <div className="hidden lg:block bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-400">Win Chance</span>
                 <span className={`font-bold ${getWinChance(targetMultiplier) > 50 ? 'text-green-400' : 'text-yellow-400'}`}>
@@ -326,11 +379,11 @@ export default function LimboGame() {
               </div>
             </div>
 
-            {/* Play Button */}
+            {/* Play Button - Desktop Only */}
             <button
               onClick={play}
               disabled={isPlaying || betAmount > balance || betAmount <= 0}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+              className={`hidden lg:block w-full py-4 rounded-xl font-bold text-lg transition-all ${
                 !isPlaying && betAmount <= balance && betAmount > 0
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg shadow-indigo-500/30'
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'

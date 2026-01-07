@@ -977,133 +977,137 @@ export default function CSBetting() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 p-2">
-      <div className="max-w-[1400px] mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-2">
-          <button onClick={() => { checkAndReload(); router.push('/casino'); }} 
-            className="text-gray-400 hover:text-white text-sm">
-            ← Back
-          </button>
-          <div className="flex items-center gap-6 text-xl font-bold">
-            <span className="text-orange-400">T {tScore}</span>
-            <span className="text-gray-500">:</span>
-            <span className="text-blue-400">{ctScore} CT</span>
-            <span className="text-gray-400 text-sm">Round {round}</span>
-            <span className="text-white flex items-center gap-1">
-              {bombPlanted ? '💣' : '⏱️'} {bombPlanted ? bombTimer : time}s
-            </span>
+    <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900 overflow-hidden">
+      {/* Compact Header */}
+      <div className="flex-shrink-0 bg-black/50 border-b border-gray-700 px-2 py-1.5 flex items-center justify-between">
+        <button onClick={() => { checkAndReload(); router.push('/casino'); }} 
+          className="text-gray-400 hover:text-white text-xs sm:text-sm">
+          ← Back
+        </button>
+        <div className="flex items-center gap-2 sm:gap-4 text-sm sm:text-lg font-bold">
+          <span className="text-orange-400">T {tScore}</span>
+          <span className="text-gray-500">:</span>
+          <span className="text-blue-400">{ctScore} CT</span>
+          <span className="text-gray-400 text-xs sm:text-sm">R{round}</span>
+          <span className="text-white flex items-center gap-1 text-xs sm:text-sm">
+            {bombPlanted ? '💣' : '⏱️'} {bombPlanted ? bombTimer : time}s
+          </span>
+        </div>
+        <div className="text-green-400 font-bold text-xs sm:text-sm">${balance.toLocaleString()}</div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-2 p-2 overflow-hidden">
+        {/* Game Canvas Container - Scales to fit */}
+        <div className="flex-1 relative min-h-0 flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center">
+            <canvas ref={canvasRef} width={MAP_W} height={MAP_H}
+              className="rounded-xl border-2 border-gray-700 bg-gray-900 max-w-full max-h-full object-contain"
+              style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%' }} />
           </div>
-          <div className="text-green-400 font-bold">${balance.toLocaleString()}</div>
+          
+          {/* Kill feed */}
+          <div className="absolute top-2 right-2 text-right">
+            {kills.slice(0, 3).map((k, i) => (
+              <div key={i} className="bg-black/70 px-1.5 py-0.5 rounded text-xs text-white mb-1">
+                {k}
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="flex gap-4">
-          {/* Game Canvas */}
-          <div className="relative">
-            <canvas ref={canvasRef} width={MAP_W} height={MAP_H}
-              className="rounded-xl border-2 border-gray-700 bg-gray-900" />
-            
-            {/* Kill feed */}
-            <div className="absolute top-2 right-2 text-right">
-              {kills.map((k, i) => (
-                <div key={i} className="bg-black/70 px-2 py-1 rounded text-sm text-white mb-1">
-                  {k}
-                </div>
-              ))}
+        {/* Betting Panel */}
+        <div className="flex-shrink-0 lg:w-64 xl:w-72">
+          {phase === 'bet' && (
+            <div className="bg-gray-800/90 rounded-xl p-3 border border-gray-700">
+              <h2 className="text-base sm:text-lg font-bold text-white mb-2 text-center">Round {round}</h2>
+              
+              <div className="mb-2">
+                <label className="text-gray-400 text-xs">Bet Amount</label>
+                <select value={bet} onChange={(e) => setBet(Number(e.target.value))}
+                  className="w-full bg-gray-700 text-white rounded-lg p-1.5 text-sm mt-1">
+                  {[500, 1000, 2500, 5000, 10000, 25000].map(v => (
+                    <option key={v} value={v} disabled={v > balance}>${v.toLocaleString()}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 mb-2">
+                <button onClick={() => startRound('T', bet)}
+                  disabled={bet > balance}
+                  className="py-2 bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg text-white font-bold text-sm hover:opacity-90 disabled:opacity-50 transition">
+                  🔥 T (1.5x)
+                </button>
+                <button onClick={() => startRound('CT', bet)}
+                  disabled={bet > balance}
+                  className="py-2 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg text-white font-bold text-sm hover:opacity-90 disabled:opacity-50 transition">
+                  🛡️ CT (2.65x)
+                </button>
+              </div>
+
+              <button onClick={() => startRound(null, 0)}
+                className="w-full py-1.5 bg-gray-700 rounded-lg text-gray-300 text-sm hover:bg-gray-600 transition">
+                Just Watch
+              </button>
             </div>
-          </div>
+          )}
 
-          {/* Betting Panel */}
-          <div className="w-72 flex-shrink-0">
-            {phase === 'bet' && (
-              <div className="bg-gray-800/90 rounded-xl p-4 border border-gray-700">
-                <h2 className="text-xl font-bold text-white mb-4 text-center">Round {round} - Who Wins?</h2>
-                
-                <div className="mb-4">
-                  <label className="text-gray-400 text-sm">Bet Amount</label>
-                  <select value={bet} onChange={(e) => setBet(Number(e.target.value))}
-                    className="w-full bg-gray-700 text-white rounded-lg p-2 mt-1">
-                    {[500, 1000, 2500, 5000, 10000, 25000].map(v => (
-                      <option key={v} value={v} disabled={v > balance}>${v.toLocaleString()}</option>
-                    ))}
-                  </select>
+          {phase === 'play' && (
+            <div className="bg-gray-800/90 rounded-xl p-3 border border-gray-700">
+              <h2 className="text-base font-bold text-white mb-2 text-center">Round in Progress</h2>
+              {betOn !== null && (
+                <div className="text-center">
+                  <p className="text-gray-400 text-xs">Your bet:</p>
+                  <p className={`text-lg font-bold ${betOn === 'T' ? 'text-orange-400' : 'text-blue-400'}`}>
+                    ${bet.toLocaleString()} on {betOn}
+                  </p>
                 </div>
-
-                <div className="space-y-2 mb-4">
-                  <button onClick={() => startRound('T', bet)}
-                    disabled={bet > balance}
-                    className="w-full py-3 bg-gradient-to-r from-orange-600 to-orange-500 rounded-lg text-white font-bold hover:opacity-90 disabled:opacity-50 transition">
-                    🔥 T Wins (1.5x)
-                  </button>
-                  <button onClick={() => startRound('CT', bet)}
-                    disabled={bet > balance}
-                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg text-white font-bold hover:opacity-90 disabled:opacity-50 transition">
-                    🛡️ CT Wins (2.65x)
-                  </button>
+              )}
+              
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-orange-500/20 rounded p-1.5 text-center">
+                  <div className="text-orange-400 font-bold">T Alive</div>
+                  <div className="text-white">{bots.filter(b => b.team === 'T' && b.alive).length}/5</div>
                 </div>
-
-                <button onClick={() => startRound(null, 0)}
-                  className="w-full py-2 bg-gray-700 rounded-lg text-gray-300 hover:bg-gray-600 transition">
-                  Just Watch
-                </button>
-              </div>
-            )}
-
-            {phase === 'play' && (
-              <div className="bg-gray-800/90 rounded-xl p-4 border border-gray-700">
-                <h2 className="text-xl font-bold text-white mb-2 text-center">Round in Progress</h2>
-                {betOn !== null && (
-                  <div className="text-center">
-                    <p className="text-gray-400">Your bet:</p>
-                    <p className={`text-xl font-bold ${betOn === 'T' ? 'text-orange-400' : 'text-blue-400'}`}>
-                      ${bet.toLocaleString()} on {betOn} ({betOn === 'T' ? '1.5x' : '2.65x'})
-                    </p>
-                  </div>
-                )}
-                
-                <div className="mt-4 space-y-2">
-                  <div className="text-sm text-gray-400">
-                    T Alive: {bots.filter(b => b.team === 'T' && b.alive).length}/5
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    CT Alive: {bots.filter(b => b.team === 'CT' && b.alive).length}/5
-                  </div>
-                  {bombPlanted && (
-                    <div className="text-red-400 font-bold animate-pulse">
-                      💣 BOMB PLANTED! {bombTimer}s
-                    </div>
-                  )}
+                <div className="bg-blue-500/20 rounded p-1.5 text-center">
+                  <div className="text-blue-400 font-bold">CT Alive</div>
+                  <div className="text-white">{bots.filter(b => b.team === 'CT' && b.alive).length}/5</div>
                 </div>
               </div>
-            )}
+              {bombPlanted && (
+                <div className="mt-2 text-red-400 font-bold text-sm animate-pulse text-center">
+                  💣 BOMB PLANTED! {bombTimer}s
+                </div>
+              )}
+            </div>
+          )}
 
-            {phase === 'end' && (
-              <div className="bg-gray-800/90 rounded-xl p-4 border border-gray-700">
-                <h2 className="text-xl font-bold text-white mb-2 text-center">Round Over</h2>
-                <p className="text-center text-lg mb-4">{result}</p>
-                
-                {betResult && (
-                  <div className={`text-center text-2xl font-bold mb-4 ${betResult.won ? 'text-green-400' : 'text-red-400'}`}>
-                    {betResult.won ? `+$${Math.floor(betResult.amt * betResult.payout).toLocaleString()}` : `-$${betResult.amt.toLocaleString()}`}
-                  </div>
-                )}
+          {phase === 'end' && (
+            <div className="bg-gray-800/90 rounded-xl p-3 border border-gray-700">
+              <h2 className="text-base font-bold text-white mb-1 text-center">Round Over</h2>
+              <p className="text-center text-sm mb-2">{result}</p>
+              
+              {betResult && (
+                <div className={`text-center text-xl font-bold mb-2 ${betResult.won ? 'text-green-400' : 'text-red-400'}`}>
+                  {betResult.won ? `+$${Math.floor(betResult.amt * betResult.payout).toLocaleString()}` : `-$${betResult.amt.toLocaleString()}`}
+                </div>
+              )}
 
-                {matchOver ? (
-                  <div className="text-center mb-4">
-                    <p className="text-2xl font-bold text-yellow-400">
-                      🏆 {winner === 'T' ? 'TERRORISTS' : 'COUNTER-TERRORISTS'} WIN!
-                    </p>
-                    <p className="text-gray-400">Final: {tScore} - {ctScore}</p>
-                  </div>
-                ) : null}
+              {matchOver && (
+                <div className="text-center mb-2">
+                  <p className="text-lg font-bold text-yellow-400">
+                    🏆 {winner === 'T' ? 'T' : 'CT'} WIN!
+                  </p>
+                  <p className="text-gray-400 text-sm">{tScore} - {ctScore}</p>
+                </div>
+              )}
 
-                <button onClick={nextRound}
-                  className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-white font-bold hover:opacity-90 transition">
-                  {matchOver ? 'New Match' : 'Next Round →'}
-                </button>
-              </div>
-            )}
-          </div>
+              <button onClick={nextRound}
+                className="w-full py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-white font-bold text-sm hover:opacity-90 transition">
+                {matchOver ? 'New Match' : 'Next Round →'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

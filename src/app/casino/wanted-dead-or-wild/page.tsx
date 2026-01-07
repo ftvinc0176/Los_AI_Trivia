@@ -121,6 +121,9 @@ export default function WantedDeadOrWild() {
     totalWin: 0,
   });
   const [showBonusTrigger, setShowBonusTrigger] = useState<BonusType>(null);
+  const [showBonusComplete, setShowBonusComplete] = useState(false);
+  const [bonusFinalWin, setBonusFinalWin] = useState(0);
+  const [bonusCost, setBonusCost] = useState(0);
 
   const spinIntervalsRef = useRef<NodeJS.Timeout[]>([]);
 
@@ -404,14 +407,24 @@ export default function WantedDeadOrWild() {
       }
 
       const newSpins = bonus.spinsRemaining - 1;
+      const newTotalWin = bonus.totalWin + spinWin;
+      
       if (newSpins <= 0) {
+        // Bonus complete - show summary popup
+        setBonusFinalWin(newTotalWin);
+        setShowBonusComplete(true);
+        setTimeout(() => {
+          setShowBonusComplete(false);
+          setBonusFinalWin(0);
+          setBonusCost(0);
+        }, 4000);
         setBonus({ type: null, spinsRemaining: 0, stickyWilds: [], totalWin: 0 });
       } else {
         setBonus(prev => ({
           ...prev,
           spinsRemaining: newSpins,
           stickyWilds: newStickies,
-          totalWin: prev.totalWin + spinWin,
+          totalWin: newTotalWin,
         }));
       }
     } else {
@@ -442,6 +455,7 @@ export default function WantedDeadOrWild() {
     setBalance(balance - cost);
     recordBet(cost);
     setLastBet(cost);
+    setBonusCost(cost);
     setShowBuyBonus(false);
 
     setBonus({
@@ -481,6 +495,32 @@ export default function WantedDeadOrWild() {
               {bonusNames[showBonusTrigger]}
             </div>
             <div className="text-xl text-amber-300 mt-4">10 FREE SPINS</div>
+          </div>
+        </div>
+      )}
+
+      {/* Bonus Complete Popup */}
+      {showBonusComplete && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+          <div className="text-center p-6 sm:p-8">
+            <div className="text-3xl sm:text-5xl font-bold text-amber-400 mb-4 animate-pulse">
+              🤠 BONUS COMPLETE! 🤠
+            </div>
+            <div className="text-4xl sm:text-6xl font-black text-white mb-4">
+              ${bonusFinalWin.toFixed(2)}
+            </div>
+            {bonusCost > 0 && (
+              <div className={`text-xl sm:text-2xl font-bold ${bonusFinalWin >= bonusCost ? 'text-green-400' : 'text-red-400'}`}>
+                {bonusFinalWin >= bonusCost ? (
+                  <>📈 {(((bonusFinalWin - bonusCost) / bonusCost) * 100).toFixed(0)}% ROI</>
+                ) : (
+                  <>📉 {(((bonusCost - bonusFinalWin) / bonusCost) * 100).toFixed(0)}% Loss</>
+                )}
+              </div>
+            )}
+            <div className="text-sm sm:text-base text-gray-400 mt-2">
+              {bonusCost > 0 ? `Bonus Cost: $${bonusCost.toFixed(0)}` : 'Free Spins Triggered'}
+            </div>
           </div>
         </div>
       )}

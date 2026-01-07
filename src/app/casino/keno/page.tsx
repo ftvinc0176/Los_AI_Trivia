@@ -242,303 +242,153 @@ export default function KenoGame() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 text-white">
-      {/* Header */}
-      <div className="bg-black/40 border-b border-purple-500/20 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 text-white overflow-hidden">
+      {/* Compact Header */}
+      <div className="flex-shrink-0 bg-black/40 border-b border-purple-500/20 px-2 sm:px-4 py-2">
+        <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/casino')}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:text-white text-sm"
           >
-            <span className="text-xl">←</span>
-            <span>Back to Casino</span>
+            ← Back
           </button>
-          <div className="flex items-center gap-4">
-            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-4 py-2 rounded-lg border border-yellow-500/30">
-              <span className="text-yellow-400 font-bold">${balance.toLocaleString()}</span>
-            </div>
-          </div>
+          <span className="text-purple-400 font-bold text-sm sm:text-base">KENO</span>
+          <div className="text-yellow-400 font-bold text-sm">${balance.toLocaleString()}</div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
-        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Left Panel - Controls */}
-          <div className="space-y-3 sm:space-y-4 order-2 lg:order-1">
-            {/* Bet Amount */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-              <label className="block text-sm text-gray-400 mb-2">Bet Amount</label>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setBetAmount(Math.max(10, betAmount / 2))}
-                  disabled={isPlaying}
-                  className="px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 disabled:opacity-50"
-                >
-                  ½
-                </button>
-                <input
-                  type="number"
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(Math.max(10, parseInt(e.target.value) || 10))}
-                  disabled={isPlaying}
-                  className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-center"
-                />
-                <button
-                  onClick={() => setBetAmount(Math.min(balance, betAmount * 2))}
-                  disabled={isPlaying}
-                  className="px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 disabled:opacity-50"
-                >
-                  2×
-                </button>
+      {/* Main Content - Scrollable only if needed */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 p-2 sm:p-4 min-h-0 overflow-auto">
+        {/* Game Board - Primary Focus */}
+        <div className="flex-1 flex flex-col min-h-0 order-1 lg:order-2">
+          {/* Result Display */}
+          {gamePhase === 'result' && (
+            <div className={`flex-shrink-0 mb-2 p-2 sm:p-3 rounded-xl text-center ${
+              winAmount > 0 
+                ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30' 
+                : 'bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/30'
+            }`}>
+              {winAmount > 0 ? (
+                <div className="text-lg sm:text-xl font-bold text-green-400">
+                  🎉 WIN! {multiplier}× = +${winAmount.toLocaleString()}
+                </div>
+              ) : (
+                <div className="text-base text-red-400">No Win - {hits.length}/{selectedNumbers.length} hits</div>
+              )}
+            </div>
+          )}
+
+          {/* Drawing Progress */}
+          {gamePhase === 'drawing' && (
+            <div className="flex-shrink-0 mb-2 p-2 bg-gray-800/50 rounded-xl border border-gray-700/50">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-400">Drawing...</span>
+                <span className="text-purple-400 font-mono">{currentDrawIndex}/{DRAW_COUNT}</span>
               </div>
-              <div className="flex gap-2 mt-2">
+              <div className="w-full bg-gray-700 rounded-full h-1.5 mt-1">
+                <div 
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 h-1.5 rounded-full transition-all"
+                  style={{ width: `${(currentDrawIndex / DRAW_COUNT) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Numbers Grid - Fills available space */}
+          <div className="flex-1 bg-gray-800/30 rounded-xl p-2 border border-gray-700/50 min-h-0">
+            <div className="grid grid-cols-8 gap-1 sm:gap-1.5 h-full auto-rows-fr">
+              {Array.from({ length: TOTAL_NUMBERS }, (_, i) => i + 1).map(num => (
                 <button
-                  onClick={rebet}
-                  disabled={isPlaying || lastBet === 0}
-                  className="flex-1 px-3 py-2 bg-blue-600/50 rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
-                >
-                  Rebet (${lastBet})
-                </button>
-                <button
-                  onClick={allIn}
+                  key={num}
+                  onClick={() => toggleNumber(num)}
                   disabled={isPlaying}
-                  className="flex-1 px-3 py-2 bg-red-600/50 rounded-lg hover:bg-red-600 disabled:opacity-50 text-sm"
+                  className={`aspect-square rounded-md sm:rounded-lg font-bold text-xs sm:text-sm transition-all ${getCellColor(num)}`}
                 >
-                  All In
+                  {num}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Stats Row */}
+          <div className="flex-shrink-0 mt-2 grid grid-cols-4 gap-1 sm:gap-2">
+            <div className="bg-gray-800/50 rounded-lg p-1.5 sm:p-2 text-center border border-gray-700/50">
+              <div className="text-[9px] sm:text-xs text-gray-500">Selected</div>
+              <div className="text-sm sm:text-lg font-bold text-purple-400">{selectedNumbers.length}</div>
+            </div>
+            <div className="bg-gray-800/50 rounded-lg p-1.5 sm:p-2 text-center border border-gray-700/50">
+              <div className="text-[9px] sm:text-xs text-gray-500">Drawn</div>
+              <div className="text-sm sm:text-lg font-bold text-blue-400">{drawnNumbers.length}</div>
+            </div>
+            <div className="bg-gray-800/50 rounded-lg p-1.5 sm:p-2 text-center border border-gray-700/50">
+              <div className="text-[9px] sm:text-xs text-gray-500">Hits</div>
+              <div className="text-sm sm:text-lg font-bold text-green-400">{hits.length}</div>
+            </div>
+            <div className="bg-gray-800/50 rounded-lg p-1.5 sm:p-2 text-center border border-gray-700/50">
+              <div className="text-[9px] sm:text-xs text-gray-500">Mult</div>
+              <div className="text-sm sm:text-lg font-bold text-yellow-400">{multiplier > 0 ? `${multiplier}×` : '-'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Controls Panel - Compact on mobile */}
+        <div className="flex-shrink-0 lg:w-72 space-y-2 order-2 lg:order-1">
+          {/* Bet + Risk in one row on mobile */}
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+            {/* Bet Amount */}
+            <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 border border-gray-700/50">
+              <label className="block text-xs text-gray-400 mb-1">Bet</label>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setBetAmount(Math.max(10, betAmount / 2))} disabled={isPlaying}
+                  className="px-2 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50">½</button>
+                <input type="number" value={betAmount} onChange={(e) => setBetAmount(Math.max(10, parseInt(e.target.value) || 10))}
+                  disabled={isPlaying} className="flex-1 w-full min-w-0 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-center text-sm" />
+                <button onClick={() => setBetAmount(Math.min(balance, betAmount * 2))} disabled={isPlaying}
+                  className="px-2 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50">2×</button>
               </div>
             </div>
 
             {/* Risk Level */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-              <label className="block text-sm text-gray-400 mb-2">Risk Level</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['classic', 'low', 'medium', 'high'] as RiskLevel[]).map(level => (
-                  <button
-                    key={level}
-                    onClick={() => !isPlaying && setRiskLevel(level)}
-                    disabled={isPlaying}
-                    className={`py-2 rounded-lg font-semibold capitalize transition-all ${
-                      riskLevel === level
-                        ? `bg-gradient-to-r ${RISK_COLORS[level]} text-white shadow-lg`
-                        : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
-                    }`}
-                  >
+            <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 border border-gray-700/50">
+              <label className="block text-xs text-gray-400 mb-1">Risk</label>
+              <div className="grid grid-cols-2 gap-1">
+                {(['low', 'medium', 'high', 'classic'] as RiskLevel[]).map(level => (
+                  <button key={level} onClick={() => !isPlaying && setRiskLevel(level)} disabled={isPlaying}
+                    className={`py-1 rounded text-xs font-semibold capitalize transition-all ${
+                      riskLevel === level ? `bg-gradient-to-r ${RISK_COLORS[level]} text-white` : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                    }`}>
                     {level}
                   </button>
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* Auto Pick */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-              <label className="block text-sm text-gray-400 mb-2">Auto Pick ({autoPickCount} numbers)</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={autoPickCount}
-                  onChange={(e) => setAutoPickCount(parseInt(e.target.value))}
-                  disabled={isPlaying}
-                  className="flex-1"
-                />
-                <button
-                  onClick={autoPick}
-                  disabled={isPlaying}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold hover:opacity-90 disabled:opacity-50"
-                >
-                  Auto Pick
-                </button>
-              </div>
-              <button
-                onClick={clearSelection}
-                disabled={isPlaying}
-                className="w-full mt-2 py-2 bg-gray-700/50 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-50"
-              >
-                Clear All
+          {/* Auto Pick */}
+          <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 border border-gray-700/50">
+            <div className="flex items-center gap-2">
+              <input type="range" min="1" max="10" value={autoPickCount} onChange={(e) => setAutoPickCount(parseInt(e.target.value))}
+                disabled={isPlaying} className="flex-1" />
+              <button onClick={autoPick} disabled={isPlaying}
+                className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-xs font-semibold hover:opacity-90 disabled:opacity-50">
+                Pick {autoPickCount}
+              </button>
+              <button onClick={clearSelection} disabled={isPlaying}
+                className="px-2 py-1.5 bg-gray-700 rounded-lg text-xs text-gray-400 hover:text-white disabled:opacity-50">
+                Clear
               </button>
             </div>
-
-            {/* Play Button */}
-            <button
-              onClick={play}
-              disabled={selectedNumbers.length === 0 || isPlaying || betAmount > balance}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-                selectedNumbers.length > 0 && !isPlaying && betAmount <= balance
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/30'
-                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              {isPlaying ? 'Drawing...' : `Play (${selectedNumbers.length} picks)`}
-            </button>
-
-            {/* Current Payout Preview */}
-            {selectedNumbers.length > 0 && (
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-400">Potential Payouts</span>
-                  <button
-                    onClick={() => setShowPaytable(!showPaytable)}
-                    className="text-xs text-purple-400 hover:text-purple-300"
-                  >
-                    {showPaytable ? 'Hide' : 'Show'} Full Paytable
-                  </button>
-                </div>
-                <div className="grid grid-cols-5 gap-1 text-xs">
-                  {Array.from({ length: selectedNumbers.length + 1 }, (_, i) => i).map(hits => {
-                    const payout = getPayoutPreview(hits);
-                    if (payout === 0 && hits < selectedNumbers.length) return null;
-                    return (
-                      <div key={hits} className={`text-center p-1 rounded ${payout > 0 ? 'bg-green-900/30' : 'bg-gray-900/30'}`}>
-                        <div className="text-gray-500">{hits} hit{hits !== 1 ? 's' : ''}</div>
-                        <div className={payout > 0 ? 'text-green-400 font-bold' : 'text-gray-600'}>
-                          {payout > 0 ? `${payout}×` : '-'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Center - Game Board */}
-          <div className="lg:col-span-2 order-1 lg:order-2">
-            {/* Result Display */}
-            {gamePhase === 'result' && (
-              <div className={`mb-4 p-4 rounded-xl text-center ${
-                winAmount > 0 
-                  ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30' 
-                  : 'bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/30'
-              }`}>
-                {winAmount > 0 ? (
-                  <>
-                    <div className="text-2xl font-bold text-green-400">
-                      🎉 WIN! {multiplier}× 🎉
-                    </div>
-                    <div className="text-3xl font-bold text-white mt-1">
-                      +${winAmount.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-400 mt-1">
-                      {hits.length} of {selectedNumbers.length} hits
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-xl text-red-400">No Win</div>
-                    <div className="text-sm text-gray-400 mt-1">
-                      {hits.length} of {selectedNumbers.length} hits - needed more matches
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Drawing Progress */}
-            {gamePhase === 'drawing' && (
-              <div className="mb-4 p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-400">Drawing numbers...</span>
-                  <span className="text-purple-400 font-mono">{currentDrawIndex}/{DRAW_COUNT}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-150"
-                    style={{ width: `${(currentDrawIndex / DRAW_COUNT) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Numbers Grid */}
-            <div className="bg-gray-800/30 rounded-2xl p-2 sm:p-4 border border-gray-700/50">
-              <div className="grid grid-cols-5 sm:grid-cols-8 gap-1 sm:gap-2">
-                {Array.from({ length: TOTAL_NUMBERS }, (_, i) => i + 1).map(num => (
-                  <button
-                    key={num}
-                    onClick={() => toggleNumber(num)}
-                    disabled={isPlaying}
-                    className={`aspect-square rounded-lg font-bold text-sm sm:text-lg transition-all duration-200 ${getCellColor(num)}`}
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Stats Row */}
-            <div className="mt-3 sm:mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
-                <div className="text-[10px] sm:text-xs text-gray-500">Selected</div>
-                <div className="text-lg sm:text-xl font-bold text-purple-400">{selectedNumbers.length}</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
-                <div className="text-[10px] sm:text-xs text-gray-500">Drawn</div>
-                <div className="text-lg sm:text-xl font-bold text-blue-400">{drawnNumbers.length}</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
-                <div className="text-[10px] sm:text-xs text-gray-500">Hits</div>
-                <div className="text-lg sm:text-xl font-bold text-green-400">{hits.length}</div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
-                <div className="text-[10px] sm:text-xs text-gray-500">Multiplier</div>
-                <div className="text-lg sm:text-xl font-bold text-yellow-400">{multiplier > 0 ? `${multiplier}×` : '-'}</div>
-              </div>
-            </div>
-
-            {/* Full Paytable */}
-            {showPaytable && (
-              <div className="mt-4 bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-                <h3 className="text-lg font-bold text-center mb-3 capitalize">{riskLevel} Risk Paytable</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="py-2 px-2 text-left text-gray-400">Picks</th>
-                        {[...Array(11)].map((_, i) => (
-                          <th key={i} className="py-2 px-2 text-center text-gray-400">{i} hits</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(picks => (
-                        <tr key={picks} className="border-b border-gray-800">
-                          <td className="py-2 px-2 font-bold text-purple-400">{picks}</td>
-                          {[...Array(11)].map((_, hits) => {
-                            const payout = PAYOUT_TABLES[riskLevel][picks]?.[hits] || 0;
-                            return (
-                              <td key={hits} className={`py-2 px-2 text-center ${
-                                payout > 0 ? 'text-green-400' : 'text-gray-700'
-                              }`}>
-                                {payout > 0 ? `${payout}×` : '-'}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Legend */}
-            <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gradient-to-br from-purple-500 to-pink-500" />
-                <span className="text-gray-400">Your Selection</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gradient-to-br from-gray-500 to-gray-700" />
-                <span className="text-gray-400">Drawn (Miss)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gradient-to-br from-green-400 to-green-600" />
-                <span className="text-gray-400">Hit!</span>
-              </div>
-            </div>
-          </div>
+          {/* Play Button */}
+          <button onClick={play} disabled={selectedNumbers.length === 0 || isPlaying || betAmount > balance}
+            className={`w-full py-3 rounded-xl font-bold text-base transition-all ${
+              selectedNumbers.length > 0 && !isPlaying && betAmount <= balance
+                ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/30'
+                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            }`}>
+            {isPlaying ? 'Drawing...' : `Play (${selectedNumbers.length} picks)`}
+          </button>
         </div>
       </div>
     </div>

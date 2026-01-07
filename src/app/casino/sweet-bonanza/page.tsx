@@ -114,10 +114,14 @@ export default function SweetBonanza() {
   const [bigWinAmount, setBigWinAmount] = useState(0)
   const [autoPlay, setAutoPlay] = useState(false)
   const [columnsRevealed, setColumnsRevealed] = useState<boolean[]>([true, true, true, true, true, true])
+  const [bonusTotalWin, setBonusTotalWin] = useState(0)
+  const [bonusCost, setBonusCost] = useState(0)
+  const [showBonusComplete, setShowBonusComplete] = useState(false)
   
   const spinTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const autoPlayRef = useRef<boolean>(false)
   const columnTimeoutsRef = useRef<NodeJS.Timeout[]>([])
+  const bonusTotalRef = useRef(0)
 
   // Generate random symbol
   const generateRandomSymbol = useCallback((includeSpecial = false): SymbolType => {
@@ -319,9 +323,25 @@ export default function SweetBonanza() {
       // Handle free spins
       if (freeSpins > 0) {
         const newFreeSpins = freeSpins - 1
-        setFreeSpins(newFreeSpins)
-        if (newFreeSpins > 0 && autoPlayRef.current) {
-          spinTimeoutRef.current = setTimeout(() => spin(), 1000)
+        // Track bonus total
+        bonusTotalRef.current += currentTotalWin
+        setBonusTotalWin(bonusTotalRef.current)
+        
+        if (newFreeSpins <= 0) {
+          // Bonus complete - show summary
+          setFreeSpins(0)
+          setShowBonusComplete(true)
+          setTimeout(() => {
+            setShowBonusComplete(false)
+            bonusTotalRef.current = 0
+            setBonusTotalWin(0)
+            setBonusCost(0)
+          }, 4000)
+        } else {
+          setFreeSpins(newFreeSpins)
+          if (autoPlayRef.current) {
+            spinTimeoutRef.current = setTimeout(() => spin(), 1000)
+          }
         }
       } else {
         // Auto play
@@ -404,6 +424,9 @@ export default function SweetBonanza() {
     if (balance >= cost) {
       setBalance(balance - cost)
       recordBet(cost)
+      setBonusCost(cost)
+      bonusTotalRef.current = 0
+      setBonusTotalWin(0)
       setFreeSpins(10)
       setFreeSpinMultiplier(1)
       setMessage('🎰 BONUS BOUGHT! 10 FREE SPINS! 🎰')
@@ -638,6 +661,32 @@ export default function SweetBonanza() {
             </div>
             <div className="text-xl sm:text-2xl text-white mt-4">
               {bigWinAmount >= betAmount * 50 ? '🍬 SWEET! 🍬' : '✨ TASTY WIN! ✨'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bonus Complete Popup */}
+      {showBonusComplete && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+          <div className="text-center p-6 sm:p-8">
+            <div className="text-3xl sm:text-5xl font-bold text-pink-400 mb-4 animate-pulse">
+              🍭 BONUS COMPLETE! 🍭
+            </div>
+            <div className="text-4xl sm:text-6xl font-black text-white mb-4">
+              ${bonusTotalWin.toFixed(2)}
+            </div>
+            {bonusCost > 0 && (
+              <div className={`text-xl sm:text-2xl font-bold ${bonusTotalWin >= bonusCost ? 'text-green-400' : 'text-red-400'}`}>
+                {bonusTotalWin >= bonusCost ? (
+                  <>📈 {(((bonusTotalWin - bonusCost) / bonusCost) * 100).toFixed(0)}% ROI</>
+                ) : (
+                  <>📉 {(((bonusCost - bonusTotalWin) / bonusCost) * 100).toFixed(0)}% Loss</>
+                )}
+              </div>
+            )}
+            <div className="text-sm sm:text-base text-gray-400 mt-2">
+              {bonusCost > 0 ? `Bonus Cost: $${bonusCost.toFixed(0)}` : 'Free Spins Triggered'}
             </div>
           </div>
         </div>
