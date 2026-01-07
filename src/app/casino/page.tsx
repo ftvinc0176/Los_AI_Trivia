@@ -413,6 +413,66 @@ export default function Casino() {
                     </button>
                   </div>
                 </div>
+
+                {/* Keno */}
+                <div className="group relative bg-black/40 backdrop-blur-xl rounded-2xl p-5 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-1">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="text-4xl">🎱🔢</div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Keno</h2>
+                        <p className="text-white/40 text-sm">Pick your lucky numbers</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => router.push('/casino/keno')}
+                      className="w-full py-2 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 hover:to-purple-600/30 text-white rounded-lg font-medium text-sm transition-all border border-purple-500/30"
+                    >
+                      🎱 Play Keno
+                    </button>
+                  </div>
+                </div>
+
+                {/* Limbo */}
+                <div className="group relative bg-black/40 backdrop-blur-xl rounded-2xl p-5 border border-indigo-500/20 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-1">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="text-4xl">⚡🎯</div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Limbo</h2>
+                        <p className="text-white/40 text-sm">Beat the multiplier</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => router.push('/casino/limbo')}
+                      className="w-full py-2 bg-gradient-to-r from-indigo-500/30 to-indigo-600/20 hover:from-indigo-500/50 hover:to-indigo-600/30 text-white rounded-lg font-medium text-sm transition-all border border-indigo-500/30"
+                    >
+                      ⚡ Play Limbo
+                    </button>
+                  </div>
+                </div>
+
+                {/* Wanted Dead or a Wild */}
+                <div className="group relative bg-black/40 backdrop-blur-xl rounded-2xl p-5 border border-amber-500/20 hover:border-amber-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-1">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="text-4xl">🤠⭐</div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">Wanted Dead or Wild</h2>
+                        <p className="text-white/40 text-sm">Wild West slots</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => router.push('/casino/wanted-dead-or-wild')}
+                      className="w-full py-2 bg-gradient-to-r from-amber-500/30 to-amber-600/20 hover:from-amber-500/50 hover:to-amber-600/30 text-white rounded-lg font-medium text-sm transition-all border border-amber-500/30"
+                    >
+                      🤠 Play Wild West
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">
