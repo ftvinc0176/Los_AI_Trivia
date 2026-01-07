@@ -261,10 +261,10 @@ export default function KenoGame() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid lg:grid-cols-3 gap-6">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Panel - Controls */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4 order-2 lg:order-1">
             {/* Bet Amount */}
             <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
               <label className="block text-sm text-gray-400 mb-2">Bet Amount</label>
@@ -404,7 +404,7 @@ export default function KenoGame() {
           </div>
 
           {/* Center - Game Board */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 order-1 lg:order-2">
             {/* Result Display */}
             {gamePhase === 'result' && (
               <div className={`mb-4 p-4 rounded-xl text-center ${
@@ -452,14 +452,14 @@ export default function KenoGame() {
             )}
 
             {/* Numbers Grid */}
-            <div className="bg-gray-800/30 rounded-2xl p-4 border border-gray-700/50">
-              <div className="grid grid-cols-8 gap-2">
+            <div className="bg-gray-800/30 rounded-2xl p-2 sm:p-4 border border-gray-700/50">
+              <div className="grid grid-cols-5 sm:grid-cols-8 gap-1 sm:gap-2">
                 {Array.from({ length: TOTAL_NUMBERS }, (_, i) => i + 1).map(num => (
                   <button
                     key={num}
                     onClick={() => toggleNumber(num)}
                     disabled={isPlaying}
-                    className={`aspect-square rounded-lg font-bold text-lg transition-all duration-200 ${getCellColor(num)}`}
+                    className={`aspect-square rounded-lg font-bold text-sm sm:text-lg transition-all duration-200 ${getCellColor(num)}`}
                   >
                     {num}
                   </button>
@@ -468,22 +468,22 @@ export default function KenoGame() {
             </div>
 
             {/* Stats Row */}
-            <div className="mt-4 grid grid-cols-4 gap-3">
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Selected</div>
-                <div className="text-xl font-bold text-purple-400">{selectedNumbers.length}</div>
+            <div className="mt-3 sm:mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Selected</div>
+                <div className="text-lg sm:text-xl font-bold text-purple-400">{selectedNumbers.length}</div>
               </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Drawn</div>
-                <div className="text-xl font-bold text-blue-400">{drawnNumbers.length}</div>
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Drawn</div>
+                <div className="text-lg sm:text-xl font-bold text-blue-400">{drawnNumbers.length}</div>
               </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Hits</div>
-                <div className="text-xl font-bold text-green-400">{hits.length}</div>
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Hits</div>
+                <div className="text-lg sm:text-xl font-bold text-green-400">{hits.length}</div>
               </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Multiplier</div>
-                <div className="text-xl font-bold text-yellow-400">{multiplier > 0 ? `${multiplier}×` : '-'}</div>
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Multiplier</div>
+                <div className="text-lg sm:text-xl font-bold text-yellow-400">{multiplier > 0 ? `${multiplier}×` : '-'}</div>
               </div>
             </div>
 

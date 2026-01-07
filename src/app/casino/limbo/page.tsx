@@ -196,18 +196,18 @@ export default function LimboGame() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
         {/* Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+        <div className="text-center mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             ⚡ LIMBO ⚡
           </h1>
-          <p className="text-gray-400 mt-2">Set your target multiplier and beat the odds!</p>
+          <p className="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">Set your target multiplier and beat the odds!</p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Panel - Controls */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4 order-2 lg:order-1">
             {/* Bet Amount */}
             <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
               <label className="block text-sm text-gray-400 mb-2">Bet Amount</label>
@@ -341,9 +341,9 @@ export default function LimboGame() {
           </div>
 
           {/* Center - Main Game Display */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 order-1 lg:order-2">
             {/* Result Display */}
-            <div className={`relative bg-gray-800/50 rounded-2xl p-8 border transition-all duration-300 ${
+            <div className={`relative bg-gray-800/50 rounded-2xl p-4 sm:p-8 border transition-all duration-300 ${
               showWin ? 'border-green-500/50 shadow-lg shadow-green-500/20' :
               showLoss ? 'border-red-500/50 shadow-lg shadow-red-500/20' :
               'border-gray-700/50'
@@ -372,9 +372,9 @@ export default function LimboGame() {
                 </div>
 
                 {/* Result display */}
-                <div className="mb-6">
-                  <span className="text-gray-400 text-sm">Result</span>
-                  <div className={`text-6xl font-bold transition-all duration-100 ${
+                <div className="mb-4 sm:mb-6">
+                  <span className="text-gray-400 text-xs sm:text-sm">Result</span>
+                  <div className={`text-4xl sm:text-6xl font-bold transition-all duration-100 ${
                     displayNumber !== null 
                       ? (displayNumber >= targetMultiplier ? 'text-green-400' : 'text-red-400')
                       : 'text-gray-600'
@@ -482,28 +482,28 @@ export default function LimboGame() {
             </div>
 
             {/* Statistics */}
-            <div className="mt-4 grid grid-cols-4 gap-3">
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Games</div>
-                <div className="text-xl font-bold text-white">{gameHistory.length}</div>
+            <div className="mt-3 sm:mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Games</div>
+                <div className="text-lg sm:text-xl font-bold text-white">{gameHistory.length}</div>
               </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Wins</div>
-                <div className="text-xl font-bold text-green-400">
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Wins</div>
+                <div className="text-lg sm:text-xl font-bold text-green-400">
                   {gameHistory.filter(g => g.won).length}
                 </div>
               </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Win Rate</div>
-                <div className="text-xl font-bold text-yellow-400">
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Win Rate</div>
+                <div className="text-lg sm:text-xl font-bold text-yellow-400">
                   {gameHistory.length > 0 
                     ? ((gameHistory.filter(g => g.won).length / gameHistory.length) * 100).toFixed(1) 
                     : 0}%
                 </div>
               </div>
-              <div className="bg-gray-800/50 rounded-xl p-3 text-center border border-gray-700/50">
-                <div className="text-xs text-gray-500">Net Profit</div>
-                <div className={`text-xl font-bold ${
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center border border-gray-700/50">
+                <div className="text-[10px] sm:text-xs text-gray-500">Net Profit</div>
+                <div className={`text-lg sm:text-xl font-bold ${
                   gameHistory.reduce((sum, g) => sum + g.profit, 0) >= 0 ? 'text-green-400' : 'text-red-400'
                 }`}>
                   ${gameHistory.reduce((sum, g) => sum + g.profit, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
