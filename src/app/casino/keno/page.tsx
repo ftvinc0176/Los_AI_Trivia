@@ -161,6 +161,7 @@ export default function KenoGame() {
     if (isDrawn) {
       // Drawn but not selected - show as MISS with red tint
       return 'bg-red-900/40 text-red-400 border-red-700/50';
+    }
     // Default
     return 'bg-slate-700/80 text-slate-300 border-slate-600 hover:bg-slate-600';
   };

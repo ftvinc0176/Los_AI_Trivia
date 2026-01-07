@@ -40,7 +40,7 @@ export default function VideoPoker() {
   const { balance, setBalance, recordBet, checkAndReload } = useCasino();
   
   const [betAmount, setBetAmount] = useState(500000);
-  const [gamePhase, setGamePhase] = useState<'betting' | 'holding' | 'result'>('betting');
+  const [gamePhase, setGamePhase] = useState<'betting' | 'holding' | 'drawing' | 'result'>('betting');
   const [hand, setHand] = useState<(Card | null)[]>([null, null, null, null, null]);
   const [heldCards, setHeldCards] = useState<boolean[]>([false, false, false, false, false]);
   const [deck, setDeck] = useState<Card[]>([]);
@@ -158,28 +158,44 @@ export default function VideoPoker() {
     });
   };
 
-  // Draw - replace non-held cards
-  const draw = () => {
+  // Draw - replace non-held cards with animation
+  const draw = async () => {
     if (gamePhase !== 'holding') return;
+    
+    setGamePhase('drawing');
     
     const currentDeck = [...deckRef.current];
     let deckIndex = 0;
     
-    const newHand = hand.map((card, i) => {
+    // Build final hand but reveal one card at a time
+    const finalHand: (Card | null)[] = hand.map((card, i) => {
       if (heldCards[i] && card) {
-        return card; // Keep held card
+        return card;
       } else {
-        // Draw new card from deck
         const newCard = currentDeck[deckIndex];
         deckIndex++;
         return newCard;
       }
     });
     
-    setHand(newHand);
+    // First, flip non-held cards face down
+    const faceDownHand = hand.map((card, i) => heldCards[i] ? card : null);
+    setHand(faceDownHand);
+    
+    // Reveal each non-held card one by one with delay
+    let currentHand = [...faceDownHand];
+    for (let i = 0; i < 5; i++) {
+      if (!heldCards[i]) {
+        await new Promise(r => setTimeout(r, 500));
+        currentHand[i] = finalHand[i];
+        setHand([...currentHand]);
+      }
+    }
+    
+    await new Promise(r => setTimeout(r, 200));
     
     // Evaluate the final hand
-    const validCards = newHand.filter((c): c is Card => c !== null);
+    const validCards = finalHand.filter((c): c is Card => c !== null);
     const result = evaluateHand(validCards);
     setHandResult(result);
     
@@ -350,21 +366,22 @@ export default function VideoPoker() {
 
           {/* Action Button */}
           <button
-            onClick={gamePhase === 'betting' ? deal : gamePhase === 'holding' ? draw : newGame}
-            disabled={gamePhase === 'betting' && (betAmount > balance || betAmount <= 0)}
+            onClick={gamePhase === 'betting' ? deal : gamePhase === 'holding' ? draw : gamePhase === 'result' ? newGame : undefined}
+            disabled={(gamePhase === 'betting' && (betAmount > balance || betAmount <= 0)) || gamePhase === 'drawing'}
             className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${
-              (gamePhase === 'betting' && (betAmount > balance || betAmount <= 0))
+              ((gamePhase === 'betting' && (betAmount > balance || betAmount <= 0)) || gamePhase === 'drawing')
                 ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                 : 'bg-green-500 hover:bg-green-400 text-white'
             }`}
           >
-            {gamePhase === 'betting' ? 'Deal' : gamePhase === 'holding' ? 'Draw' : 'New Game'}
+            {gamePhase === 'betting' ? 'Deal' : gamePhase === 'holding' ? 'Draw' : gamePhase === 'drawing' ? 'Drawing...' : 'New Game'}
           </button>
 
           {/* Instructions */}
           <div className="text-slate-500 text-xs text-center">
             {gamePhase === 'betting' && 'Click Deal to start.'}
             {gamePhase === 'holding' && 'Click cards to HOLD, then Draw.'}
+            {gamePhase === 'drawing' && 'Revealing cards...'}
             {gamePhase === 'result' && 'Click New Game to play again.'}
           </div>
         </div>
