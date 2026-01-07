@@ -546,7 +546,9 @@ app.prepare().then(() => {
   // ============================================
   
   socket.on('fpsJoin', ({ name, team }) => {
-    console.log(`FPS Player joined: ${name} on team ${team}, socket: ${socket.id}`);\n    \n    fpsPlayers.set(socket.id, {
+    console.log(`FPS Player joined: ${name} on team ${team}, socket: ${socket.id}`);
+    
+    fpsPlayers.set(socket.id, {
       name,
       team,
       position: [0, 0, 0],
