@@ -35,6 +35,7 @@ export default function Craps() {
   const [point, setPoint] = useState<number | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
   const [betAmount, setBetAmount] = useState(500);
+  const [lastBetAmount, setLastBetAmount] = useState(500);
   const [selectedBet, setSelectedBet] = useState<BetType | null>(null);
   const [rolling, setRolling] = useState(false);
   const [message, setMessage] = useState('Place your bets!');
@@ -361,6 +362,7 @@ export default function Craps() {
     
     setBalance(balance - betAmount);
     recordBet(betAmount); // Track wager for leaderboard
+    setLastBetAmount(betAmount);
     setMessage(`$${betAmount} on ${formatBetName(type)}`);
   };
 
@@ -793,6 +795,20 @@ export default function Craps() {
             <div className="flex flex-col gap-2">
               {/* Bet Amount Selection */}
               <div className="flex gap-1 sm:gap-2">
+                <button
+                  onClick={() => setBetAmount(balance)}
+                  disabled={balance < 500}
+                  className="px-2 sm:px-3 py-1 sm:py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:opacity-50 text-white rounded-lg font-bold text-xs sm:text-sm transition-all"
+                >
+                  💰 All
+                </button>
+                <button
+                  onClick={() => setBetAmount(lastBetAmount)}
+                  disabled={balance < lastBetAmount}
+                  className="px-2 sm:px-3 py-1 sm:py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 text-white rounded-lg font-bold text-xs sm:text-sm transition-all"
+                >
+                  🔄
+                </button>
                 {[500, 1000, 2500, 5000, 10000].map(amount => (
                   <button
                     key={amount}

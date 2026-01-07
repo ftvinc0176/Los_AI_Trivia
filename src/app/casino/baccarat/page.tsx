@@ -37,6 +37,7 @@ function BaccaratGame() {
   const [myPlayerId, setMyPlayerId] = useState('');
   const [balance, setBalance] = useState(casinoBalance);
   const [betAmount, setBetAmount] = useState('');
+  const [lastBet, setLastBet] = useState<{type: 'player' | 'banker' | 'tie', amount: string} | null>(null);
   const [selectedBet, setSelectedBet] = useState<'player' | 'banker' | 'tie' | null>(null);
   const [myBet, setMyBet] = useState<{ type: 'player' | 'banker' | 'tie'; amount: number } | null>(null);
   const [publicLobbies, setPublicLobbies] = useState<Array<{ roomId: string; playerCount: number; maxPlayers: number }>>([]);
@@ -206,6 +207,7 @@ function BaccaratGame() {
     setBalance(prev => prev - amount);
     recordBet(amount); // Track wager for leaderboard
     setMyBet({ type: selectedBet, amount });
+    setLastBet({ type: selectedBet, amount: betAmount });
     
     // Start dealing
     dealCards(amount, selectedBet);
@@ -628,6 +630,19 @@ function BaccaratGame() {
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 text-center text-2xl"
             />
             <div className="grid grid-cols-4 gap-2 mt-3">
+              <button
+                onClick={() => setBetAmount(balance.toString())}
+                className="col-span-2 py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-lg font-bold transition-all"
+              >
+                💰 All In
+              </button>
+              <button
+                onClick={() => lastBet && setBetAmount(lastBet.amount)}
+                disabled={!lastBet || parseInt(lastBet?.amount || '0') > balance}
+                className="col-span-2 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 text-white rounded-lg font-bold transition-all"
+              >
+                🔄 Rebet
+              </button>
               {[500, 1000, 2500, 5000, 10000, 25000].map(amt => (
                 <button
                   key={amt}

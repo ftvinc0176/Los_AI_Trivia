@@ -111,6 +111,7 @@ export default function MadameDestinyMegaways() {
   const [grid, setGrid] = useState<Symbol[][]>([]);
   const [reelSizes, setReelSizes] = useState<number[]>([4, 4, 4, 4, 4, 4]);
   const [betAmount, setBetAmount] = useState(500);
+  const [lastBet, setLastBet] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isTumbling, setIsTumbling] = useState(false);
   const [message, setMessage] = useState('Gaze into your destiny...');
@@ -843,6 +844,22 @@ export default function MadameDestinyMegaways() {
               title="2x Free Spins chance for +25% bet"
             >
               {anteBet ? '⚡ Ante ON' : '⚡ Ante'}
+            </button>
+
+            {/* All In and Rebet Buttons */}
+            <button
+              onClick={() => setBetAmount(balance)}
+              disabled={isSpinning || isTumbling || isFreeSpinMode || balance < 500}
+              className="px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:opacity-50 rounded-xl text-white font-bold transition-all"
+            >
+              💰 All In
+            </button>
+            <button
+              onClick={() => setBetAmount(lastBet)}
+              disabled={isSpinning || isTumbling || isFreeSpinMode || balance < lastBet}
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 rounded-xl text-white font-bold transition-all"
+            >
+              🔄 Rebet
             </button>
 
             {/* Spin Button */}

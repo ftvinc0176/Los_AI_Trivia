@@ -124,6 +124,7 @@ export default function SweetBonanza() {
   
   const [grid, setGrid] = useState<Symbol[][]>([]);
   const [betAmount, setBetAmount] = useState(500);
+  const [lastBet, setLastBet] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const [isTumbling, setIsTumbling] = useState(false);
   const [message, setMessage] = useState('Place your bet and spin!');
@@ -197,6 +198,7 @@ export default function SweetBonanza() {
       }
       setBalance(balance - betAmount);
       recordBet(betAmount); // Track wager for leaderboard
+      setLastBet(betAmount);
     } else {
       setFreeSpins(prev => prev - 1);
     }
@@ -603,6 +605,24 @@ export default function SweetBonanza() {
                 className="w-10 h-10 bg-green-500 hover:bg-green-600 disabled:opacity-50 rounded-full text-white font-bold text-xl transition-all"
               >
                 +
+              </button>
+            </div>
+
+            {/* All In and Rebet Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBetAmount(balance)}
+                disabled={isSpinning || isTumbling || isFreeSpinMode || balance < 20}
+                className="px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:opacity-50 rounded-lg text-white font-bold transition-all"
+              >
+                💰 All In
+              </button>
+              <button
+                onClick={() => setBetAmount(lastBet)}
+                disabled={isSpinning || isTumbling || isFreeSpinMode || balance < lastBet}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 rounded-lg text-white font-bold transition-all"
+              >
+                🔄 Rebet
               </button>
             </div>
 
