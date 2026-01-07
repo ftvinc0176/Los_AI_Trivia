@@ -159,9 +159,8 @@ export default function KenoGame() {
       return 'bg-purple-600 text-white border-purple-500';
     }
     if (isDrawn) {
-      // Drawn but not selected - dark gray
-      return 'bg-slate-600/50 text-slate-400 border-slate-600';
-    }
+      // Drawn but not selected - show as MISS with red tint
+      return 'bg-red-900/40 text-red-400 border-red-700/50';
     // Default
     return 'bg-slate-700/80 text-slate-300 border-slate-600 hover:bg-slate-600';
   };
@@ -191,8 +190,8 @@ export default function KenoGame() {
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:flex-row p-2 gap-2 min-h-0 overflow-hidden">
+      {/* Main Content - constrained for desktop */}
+      <div className="flex-1 flex flex-col lg:flex-row p-2 gap-2 min-h-0 overflow-hidden max-w-6xl mx-auto w-full">
         
         {/* Controls - Left on desktop, bottom on mobile */}
         <div className="lg:w-44 flex-shrink-0 flex flex-col gap-1.5 order-2 lg:order-1">
@@ -262,19 +261,25 @@ export default function KenoGame() {
         </div>
 
         {/* Game Grid */}
-        <div className="flex-1 flex flex-col min-h-0 order-1 lg:order-2">
+        <div className="flex-1 flex flex-col min-h-0 order-1 lg:order-2 lg:max-h-[calc(100vh-120px)]">
           {/* 8x5 Grid */}
           <div className="flex-1 grid grid-cols-8 grid-rows-5 gap-1 min-h-0">
-            {Array.from({ length: 40 }, (_, i) => i + 1).map(num => (
-              <button
-                key={num}
-                onClick={() => toggleNumber(num)}
-                disabled={isPlaying}
-                className={`rounded border text-sm sm:text-base font-bold transition-all ${getCellStyle(num)} disabled:cursor-default`}
-              >
-                {num}
-              </button>
-            ))}
+            {Array.from({ length: 40 }, (_, i) => i + 1).map(num => {
+              const isMiss = drawnNumbers.includes(num) && !selectedNumbers.includes(num);
+              return (
+                <button
+                  key={num}
+                  onClick={() => toggleNumber(num)}
+                  disabled={isPlaying}
+                  className={`relative rounded border text-sm sm:text-base font-bold transition-all ${getCellStyle(num)} disabled:cursor-default`}
+                >
+                  {num}
+                  {isMiss && (
+                    <span className="absolute inset-0 flex items-center justify-center text-red-500 text-2xl sm:text-3xl font-bold opacity-80">✕</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Payout Row */}
