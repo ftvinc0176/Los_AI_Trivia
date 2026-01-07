@@ -248,6 +248,10 @@ export default function Casino() {
                         <span className="text-2xl sm:text-3xl mb-1">🤠</span>
                         <span className="text-[10px] sm:text-xs text-white font-medium">Wanted</span>
                       </button>
+                      <button onClick={() => router.push('/casino/video-poker')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-red-500/20 hover:border-red-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🃏</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">V.Poker</span>
+                      </button>
                     </>
                   ) : (
                     <>
@@ -489,6 +493,20 @@ export default function Casino() {
                           </div>
                         </div>
                         <button onClick={() => router.push('/casino/wanted-dead-or-wild')} className="w-full py-1.5 bg-gradient-to-r from-amber-500/30 to-amber-600/20 hover:from-amber-500/50 text-white rounded-lg font-medium text-xs transition-all border border-amber-500/30">🤠 Play Wild West</button>
+                      </div>
+                    </div>
+
+                    {/* Video Poker */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-red-500/20 hover:border-red-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🃏♠️</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Video Poker</h2>
+                            <p className="text-white/40 text-xs">Jacks or Better</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/video-poker')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🃏 Play Video Poker</button>
                       </div>
                     </div>
                   </>
