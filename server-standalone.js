@@ -2947,13 +2947,22 @@ async function startBaccaratDeal(roomId) {
 
   // Calculate winnings
   room.players.forEach(player => {
-    if (player.bet && player.bet.type === winner) {
-      if (winner === 'player') {
-        player.winnings = player.bet.amount * 2;
-      } else if (winner === 'banker') {
-        player.winnings = Math.floor(player.bet.amount * 1.95);
+    if (!player.bet) return;
+    
+    if (winner === 'tie') {
+      // Tie: return bet unless they bet on tie
+      if (player.bet.type === 'tie') {
+        player.winnings = player.bet.amount * 9; // 8:1 payout for tie bet
       } else {
-        player.winnings = player.bet.amount * 9;
+        player.winnings = player.bet.amount; // Return bet (push)
+      }
+      player.balance += player.winnings;
+    } else if (player.bet.type === winner) {
+      // Won the bet
+      if (winner === 'player') {
+        player.winnings = player.bet.amount * 2; // 1:1 payout
+      } else if (winner === 'banker') {
+        player.winnings = Math.floor(player.bet.amount * 1.95); // 0.95:1 payout (5% commission)
       }
       player.balance += player.winnings;
     }

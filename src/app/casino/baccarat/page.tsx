@@ -318,15 +318,22 @@ function BaccaratGame() {
 
     // Calculate winnings
     let win = 0;
-    if (betType === result) {
+    if (result === 'tie') {
+      // Tie: return bet unless they bet on tie
+      if (betType === 'tie') {
+        win = betAmt * 9; // 8:1 payout for tie bet
+      } else {
+        win = betAmt; // Return bet (push)
+      }
+      setBalance(prev => prev + win);
+      setWinnings(win);
+    } else if (betType === result) {
+      // Won the bet
       if (result === 'player') {
         win = betAmt * 2; // 1:1 payout
       } else if (result === 'banker') {
         win = Math.floor(betAmt * 1.95); // 0.95:1 payout (5% commission)
-      } else {
-        win = betAmt * 9; // 8:1 payout for tie
       }
-      const profit = win - betAmt;
       setBalance(prev => prev + win);
       setWinnings(win);
     }
