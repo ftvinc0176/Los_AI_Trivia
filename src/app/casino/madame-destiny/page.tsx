@@ -537,8 +537,8 @@ export default function MadameDestinyMegaways() {
     setShowBonusWheel(true);
   };
 
-  const adjustBet = (amount: number) => {
-    const newBet = Math.max(500, Math.min(50000, betAmount + amount));
+  const adjustBet = (direction: 'up' | 'down') => {
+    const newBet = direction === 'up' ? betAmount * 2 : Math.max(1, betAmount / 2);
     setBetAmount(Math.round(newBet * 100) / 100);
   };
 
@@ -869,7 +869,7 @@ export default function MadameDestinyMegaways() {
           {/* Bet Amount */}
           <div className="flex items-center gap-1 sm:gap-2 bg-purple-900/80 rounded-lg px-2 sm:px-3 py-1 flex-shrink-0">
             <button
-              onClick={() => adjustBet(-20)}
+              onClick={() => adjustBet('down')}
               disabled={isSpinning || isTumbling || isFreeSpinMode}
               className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-purple-600 flex items-center justify-center text-white hover:bg-purple-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
             >
@@ -881,7 +881,7 @@ export default function MadameDestinyMegaways() {
               {anteBet && <div className="text-yellow-400 text-[8px] sm:text-xs">+25%</div>}
             </div>
             <button
-              onClick={() => adjustBet(20)}
+              onClick={() => adjustBet('up')}
               disabled={isSpinning || isTumbling || isFreeSpinMode}
               className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-purple-600 flex items-center justify-center text-white hover:bg-purple-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
             >
@@ -971,4 +971,4 @@ export default function MadameDestinyMegaways() {
       )}
     </div>
   );
-}
+}

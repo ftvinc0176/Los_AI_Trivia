@@ -180,6 +180,7 @@ export default function WildBooster() {
   const [wildBoostMultiplier, setWildBoostMultiplier] = useState(1)
   const [showBonusChoice, setShowBonusChoice] = useState(false)
   const [bonusScatters, setBonusScatters] = useState(0)
+  const [currentScatters, setCurrentScatters] = useState(0) // Track scatters on current grid
   const [bonus, setBonus] = useState<BonusState>({
     active: false,
     type: null,
@@ -367,6 +368,7 @@ export default function WildBooster() {
     // Check for wins
     const wins = checkWins(newReels)
     const scatters = countScatters(newReels)
+    setCurrentScatters(scatters) // Track current scatter count
 
     // Check for wild boost (any wild in winning line)
     let wildBoost = 1
@@ -380,6 +382,7 @@ export default function WildBooster() {
         setWildBoostMultiplier(wildBoost)
         setShowWildBoost(true)
         await new Promise(r => setTimeout(r, 1500))
+        setShowWildBoost(false)
       }
     }
 
@@ -514,6 +517,7 @@ export default function WildBooster() {
   const renderSymbol = (cell: ReelCell, colIdx: number, rowIdx: number) => {
     const config = SYMBOLS[cell.symbol]
     const isSpecial = cell.symbol === 'wild' || cell.symbol === 'scatter'
+    const isScatter = cell.symbol === 'scatter'
     
     return (
       <div
@@ -523,7 +527,9 @@ export default function WildBooster() {
           rounded-lg border-2 transition-all duration-200
           ${cell.isSpinning ? 'animate-pulse bg-gray-800' : ''}
           ${cell.isWinning ? 'border-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse' : 'border-gray-700/50'}
-          ${isSpecial ? 'bg-gradient-to-br ' + config.gradient : 'bg-gray-800/80'}
+          ${isScatter ? 'bg-gradient-to-br from-purple-600 via-pink-500 to-purple-600 border-purple-400 shadow-lg shadow-purple-500/50' : ''}
+          ${cell.symbol === 'wild' ? 'bg-gradient-to-br ' + config.gradient : ''}
+          ${!isSpecial ? 'bg-gray-800/80' : ''}
         `}
       >
         {cell.isRevealed && !cell.isSpinning && (
@@ -533,6 +539,15 @@ export default function WildBooster() {
                     style={{ textShadow: '0 0 10px #ef4444' }}>
                 7
               </span>
+            ) : isScatter ? (
+              <div className="flex flex-col items-center">
+                <span className="text-2xl sm:text-3xl md:text-4xl drop-shadow-lg animate-pulse" style={{ textShadow: '0 0 15px #a855f7' }}>
+                  💠
+                </span>
+                <span className="text-[8px] sm:text-[10px] font-bold text-white bg-purple-600/80 px-1 rounded absolute bottom-1">
+                  SCATTER
+                </span>
+              </div>
             ) : (
               <span className="text-2xl sm:text-3xl md:text-4xl drop-shadow-lg">
                 {config.emoji}
@@ -595,7 +610,7 @@ export default function WildBooster() {
 
       {/* Main Game Area */}
       <div className="flex-1 flex items-center justify-center p-2 sm:p-4 overflow-hidden relative z-10">
-        <div className="flex items-stretch gap-2 max-w-4xl w-full h-full max-h-[500px]">
+        <div className="flex items-stretch gap-2 max-w-5xl w-full h-full max-h-[650px]">
           
           {/* Left Panel - Wild Boost */}
           <div className="hidden sm:flex flex-col items-center justify-center w-20 bg-gradient-to-b from-red-900/80 to-red-950/80 rounded-xl border-2 border-yellow-600/50 p-2">
@@ -624,11 +639,37 @@ export default function WildBooster() {
             </div>
 
             {/* Win Display */}
-            {lastWin > 0 && (
+            {lastWin > 0 ? (
               <div className="text-center py-2 animate-bounce">
                 <span className="text-xl sm:text-2xl font-bold text-yellow-400 drop-shadow-lg">
                   🎉 WIN ${lastWin.toFixed(2)} 🎉
                 </span>
+              </div>
+            ) : (
+              /* Scatter Progress Indicator */
+              <div className="py-2 flex flex-col items-center justify-center">
+                <div className="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-xl border border-purple-500/30">
+                  <div className="flex items-center gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <div 
+                        key={i}
+                        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center border-2 transition-all ${
+                          currentScatters > i 
+                            ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-yellow-400 animate-pulse shadow-lg shadow-purple-500/50' 
+                            : 'bg-gray-800/50 border-gray-600'
+                        }`}
+                      >
+                        <span className="text-lg sm:text-xl">{currentScatters > i ? '💠' : '◇'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-center ml-2">
+                    <div className="text-xs text-gray-400">SCATTERS</div>
+                    <div className="text-sm font-bold text-purple-300">
+                      {currentScatters}/3 = <span className="text-yellow-400">FREE SPINS!</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -759,7 +800,7 @@ export default function WildBooster() {
             {/* Bet Controls */}
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setBetAmount(Math.max(0.2, betAmount - (betAmount >= 10 ? 5 : betAmount >= 1 ? 0.5 : 0.2)))}
+                onClick={() => setBetAmount(Math.max(1, betAmount / 2))}
                 disabled={isSpinning || bonus.active}
                 className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 text-sm"
               >
@@ -770,7 +811,7 @@ export default function WildBooster() {
                 <div className="font-bold text-yellow-400">${betAmount.toFixed(2)}</div>
               </div>
               <button
-                onClick={() => setBetAmount(Math.min(100, betAmount + (betAmount >= 10 ? 5 : betAmount >= 1 ? 0.5 : 0.2)))}
+                onClick={() => setBetAmount(betAmount * 2)}
                 disabled={isSpinning || bonus.active}
                 className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 text-sm"
               >

@@ -594,7 +594,7 @@ export default function SweetBonanza() {
           {/* Bet Amount */}
           <div className="flex items-center gap-1 sm:gap-2 bg-purple-900/80 rounded-lg px-2 sm:px-3 py-1 flex-shrink-0">
             <button
-              onClick={() => setBetAmount(Math.max(1, betAmount - 5))}
+              onClick={() => setBetAmount(Math.max(1, betAmount / 2))}
               disabled={isSpinning || freeSpins > 0}
               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-pink-600 flex items-center justify-center text-white hover:bg-pink-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
             >
@@ -605,7 +605,7 @@ export default function SweetBonanza() {
               <div className="text-sm sm:text-lg font-bold text-white">${betAmount.toFixed(2)}</div>
             </div>
             <button
-              onClick={() => setBetAmount(Math.min(balance, betAmount + 5))}
+              onClick={() => setBetAmount(betAmount * 2)}
               disabled={isSpinning || freeSpins > 0}
               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-pink-600 flex items-center justify-center text-white hover:bg-pink-500 disabled:opacity-50 text-lg sm:text-xl font-bold"
             >
