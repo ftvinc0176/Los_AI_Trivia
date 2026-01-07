@@ -318,15 +318,19 @@ function BaccaratGame() {
 
     // Calculate winnings
     let win = 0;
+    let isPush = false;
     if (result === 'tie') {
       // Tie: return bet unless they bet on tie
       if (betType === 'tie') {
         win = betAmt * 9; // 8:1 payout for tie bet
+        setBalance(prev => prev + win);
       } else {
-        win = betAmt; // Return bet (push)
+        // Push - return bet
+        win = betAmt;
+        setBalance(prev => prev + betAmt);
+        isPush = true;
       }
-      setBalance(prev => prev + win);
-      setWinnings(win);
+      setWinnings(isPush ? 0 : win);
     } else if (betType === result) {
       // Won the bet
       if (result === 'player') {
@@ -336,6 +340,8 @@ function BaccaratGame() {
       }
       setBalance(prev => prev + win);
       setWinnings(win);
+    } else {
+      setWinnings(0);
     }
   };
 
@@ -719,7 +725,13 @@ function BaccaratGame() {
             {/* Results */}
             {gameState === 'results' && (
               <div className="mt-8 text-center">
-                {winnings > 0 ? (
+                {winner === 'tie' && myBet && myBet.type !== 'tie' ? (
+                  <div className="bg-yellow-500/20 rounded-xl p-4 mb-4">
+                    <div className="text-yellow-400 text-2xl font-bold">
+                      🤝 Push! Bet Returned ${myBet.amount.toLocaleString()}
+                    </div>
+                  </div>
+                ) : winnings > 0 ? (
                   <div className="bg-green-500/20 rounded-xl p-4 mb-4">
                     <div className="text-green-400 text-2xl font-bold">
                       🎉 You Won ${winnings.toLocaleString()}!
