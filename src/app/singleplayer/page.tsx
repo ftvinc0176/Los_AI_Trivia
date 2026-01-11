@@ -53,6 +53,7 @@ export default function SinglePlayer() {
     setLoadingRemainingQuestions(true);
     
     try {
+      // Use Gemini 2.5 Flash for question generation (via /api/generate-questions)
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,12 +62,11 @@ export default function SinglePlayer() {
           progressive: true,
           categories: CATEGORIES,
           questionNumber: questions.length + 1,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          model: 'gemini-2.5-flash' // Explicitly request Gemini 2.5 Flash
         }),
       });
-      
       const data = await response.json();
-      
       if (data.questions && data.questions.length === 2) {
         setQuestions(prev => [...prev, ...data.questions]);
       }
@@ -128,6 +128,7 @@ export default function SinglePlayer() {
     
     try {
       // Generate only first 4 questions initially for fast game start
+      // Use Gemini 2.5 Flash for initial question generation (via /api/generate-questions)
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,16 +137,14 @@ export default function SinglePlayer() {
           progressive: true,
           categories: CATEGORIES,
           questionNumber: 1,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          model: 'gemini-2.5-flash' // Explicitly request Gemini 2.5 Flash
         }),
       });
-      
       const data = await response.json();
-      
       if (!data.questions || data.questions.length !== 2) {
         throw new Error('Invalid questions received');
       }
-      
       setQuestions(data.questions);
       setGameState('playing');
       // Start loading next 2 questions in background immediately
@@ -192,6 +191,7 @@ export default function SinglePlayer() {
       setLoadingHint(true);
       try {
         const currentQ = questions[currentQuestion];
+        // Use Gemini 2.5 Flash for hint generation (via /api/generate-hint)
         const response = await fetch('/api/generate-hint', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -199,12 +199,11 @@ export default function SinglePlayer() {
           body: JSON.stringify({ 
             question: currentQ.question,
             options: currentQ.options,
-            correctAnswer: currentQ.correctAnswer
+            correctAnswer: currentQ.correctAnswer,
+            model: 'gemini-2.5-flash' // Explicitly request Gemini 2.5 Flash
           }),
         });
-        
         const data = await response.json();
-        
         if (data.hint) {
           setAiHint(data.hint);
         } else {
