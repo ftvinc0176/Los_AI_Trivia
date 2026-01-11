@@ -509,6 +509,20 @@ export default function Casino() {
                         <button onClick={() => router.push('/casino/video-poker')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🃏 Play Video Poker</button>
                       </div>
                     </div>
+
+                    {/* Fever Fortune Slot (Custom) */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-yellow-400 hover:border-yellow-500 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🎰🔥</div>
+                          <div>
+                            <h2 className="text-base font-bold text-yellow-300">Fever Fortune Slot</h2>
+                            <p className="text-yellow-200/80 text-xs">Custom slot with bonus</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/custom-slot')} className="w-full py-1.5 bg-gradient-to-r from-yellow-400/30 to-orange-400/20 hover:from-yellow-400/50 text-white rounded-lg font-medium text-xs transition-all border border-yellow-400/30">🎰 Play Fever Slot</button>
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <>
