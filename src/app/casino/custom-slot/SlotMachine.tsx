@@ -20,7 +20,7 @@ function getRandomSymbol() {
   return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
 }
 
-function calculateWin(reels) {
+function calculateWin(reels: Array<Array<{ name: string; color: string; payout: number }>>) {
   // Simple: 3+ matching symbols left-to-right
   let win = 0;
   let matchSymbol = reels[0][0].name;
