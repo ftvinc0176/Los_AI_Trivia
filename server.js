@@ -45,6 +45,17 @@ app.prepare().then(() => {
   const fpsPlayers = new Map();
   const fpsTeamCounts = { T: 0, CT: 0 };
 
+  // Wavelength lobbies Map
+  const wavelengthLobbies = new Map();
+  const WAVELENGTH_CONCEPTS = [
+    ['Hot', 'Cold'], ['Good', 'Bad'], ['Old', 'New'], ['Big', 'Small'],
+    ['Fast', 'Slow'], ['Loud', 'Quiet'], ['Easy', 'Hard'], ['Cheap', 'Expensive'],
+    ['Famous', 'Unknown'], ['Healthy', 'Unhealthy'], ['Beautiful', 'Ugly'],
+    ['Dangerous', 'Safe'], ['Common', 'Rare'], ['Boring', 'Exciting'],
+    ['Real', 'Fictional'], ['Ancient', 'Modern'], ['Natural', 'Artificial'],
+    ['Light', 'Heavy'], ['Simple', 'Complex'], ['Formal', 'Casual'],
+  ];
+
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
@@ -258,6 +269,244 @@ app.prepare().then(() => {
           timeLeft: room.timeLeft,
           showAnswer: room.showAnswer,
         });
+      }
+    });
+  });
+
+  // ==================== WAVELENGTH SOCKET HANDLERS ====================
+  
+  io.on('connection', (socket) => {
+    // Wavelength: Create Lobby
+    socket.on('wavelength:createLobby', ({ playerName, isPrivate }) => {
+      const lobbyId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const pair = WAVELENGTH_CONCEPTS[Math.floor(Math.random() * WAVELENGTH_CONCEPTS.length)];
+      const randomSwap = Math.random() > 0.5;
+      
+      const lobby = {
+        id: lobbyId,
+        host: socket.id,
+        players: [{
+          id: socket.id,
+          name: playerName,
+          score: 0,
+        }],
+        isPrivate,
+        phase: 'waiting', // waiting, psychic, guessing, reveal, results
+        round: 1,
+        maxRounds: 5,
+        psychicId: socket.id,
+        targetAngle: Math.floor(Math.random() * 160) + 10,
+        needleAngle: 90,
+        clue: '',
+        leftConcept: randomSwap ? pair[1] : pair[0],
+        rightConcept: randomSwap ? pair[0] : pair[1],
+      };
+      
+      wavelengthLobbies.set(lobbyId, lobby);
+      socket.join(`wavelength:${lobbyId}`);
+      socket.wavelengthLobbyId = lobbyId;
+      
+      socket.emit('wavelength:lobbyUpdate', lobby);
+      io.emit('wavelength:lobbiesUpdate', Array.from(wavelengthLobbies.values()).filter(l => !l.isPrivate && l.phase === 'waiting'));
+    });
+    
+    // Wavelength: Get Public Lobbies
+    socket.on('wavelength:getLobbies', () => {
+      const publicLobbies = Array.from(wavelengthLobbies.values()).filter(l => !l.isPrivate && l.phase === 'waiting' && l.players.length < 2);
+      socket.emit('wavelength:lobbiesUpdate', publicLobbies);
+    });
+    
+    // Wavelength: Join Lobby
+    socket.on('wavelength:joinLobby', ({ lobbyId, playerName }) => {
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby || lobby.players.length >= 2 || lobby.phase !== 'waiting') {
+        socket.emit('wavelength:error', { message: 'Cannot join lobby' });
+        return;
+      }
+      
+      lobby.players.push({
+        id: socket.id,
+        name: playerName,
+        score: 0,
+      });
+      
+      socket.join(`wavelength:${lobbyId}`);
+      socket.wavelengthLobbyId = lobbyId;
+      
+      io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+      io.emit('wavelength:lobbiesUpdate', Array.from(wavelengthLobbies.values()).filter(l => !l.isPrivate && l.phase === 'waiting' && l.players.length < 2));
+    });
+    
+    // Wavelength: Start Game
+    socket.on('wavelength:startGame', ({ lobbyId }) => {
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby || lobby.host !== socket.id || lobby.players.length < 2) return;
+      
+      // Set up first round
+      const pair = WAVELENGTH_CONCEPTS[Math.floor(Math.random() * WAVELENGTH_CONCEPTS.length)];
+      const randomSwap = Math.random() > 0.5;
+      
+      lobby.phase = 'psychic';
+      lobby.round = 1;
+      lobby.psychicId = lobby.players[0].id;
+      lobby.targetAngle = Math.floor(Math.random() * 160) + 10;
+      lobby.needleAngle = 90;
+      lobby.clue = '';
+      lobby.leftConcept = randomSwap ? pair[1] : pair[0];
+      lobby.rightConcept = randomSwap ? pair[0] : pair[1];
+      
+      io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+    });
+    
+    // Wavelength: Submit Clue
+    socket.on('wavelength:submitClue', ({ lobbyId, clue }) => {
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby || lobby.psychicId !== socket.id || lobby.phase !== 'psychic') return;
+      
+      lobby.clue = clue;
+      lobby.phase = 'guessing';
+      
+      io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+    });
+    
+    // Wavelength: Update Needle
+    socket.on('wavelength:updateNeedle', ({ lobbyId, angle }) => {
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby || lobby.phase !== 'guessing') return;
+      // Only non-psychic can move needle
+      if (socket.id === lobby.psychicId) return;
+      
+      lobby.needleAngle = angle;
+      io.to(`wavelength:${lobbyId}`).emit('wavelength:needleUpdate', { angle });
+    });
+    
+    // Wavelength: Lock In Guess
+    socket.on('wavelength:lockGuess', ({ lobbyId }) => {
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby || lobby.phase !== 'guessing') return;
+      
+      // Calculate score
+      const diff = Math.abs(lobby.needleAngle - lobby.targetAngle);
+      let points = 0;
+      if (diff <= 9) points = 4;
+      else if (diff <= 18) points = 3;
+      else if (diff <= 27) points = 2;
+      
+      // Add points to both players (team game)
+      lobby.players.forEach(p => {
+        p.score += points;
+      });
+      
+      lobby.phase = 'reveal';
+      lobby.lastPoints = points;
+      
+      io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+    });
+    
+    // Wavelength: Next Round
+    socket.on('wavelength:nextRound', ({ lobbyId }) => {
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby || lobby.host !== socket.id) return;
+      
+      if (lobby.round >= lobby.maxRounds) {
+        lobby.phase = 'results';
+        io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+        return;
+      }
+      
+      // New round - swap psychic
+      const pair = WAVELENGTH_CONCEPTS[Math.floor(Math.random() * WAVELENGTH_CONCEPTS.length)];
+      const randomSwap = Math.random() > 0.5;
+      
+      lobby.round++;
+      lobby.phase = 'psychic';
+      // Swap psychic between the two players
+      const currentPsychicIndex = lobby.players.findIndex(p => p.id === lobby.psychicId);
+      lobby.psychicId = lobby.players[(currentPsychicIndex + 1) % lobby.players.length].id;
+      lobby.targetAngle = Math.floor(Math.random() * 160) + 10;
+      lobby.needleAngle = 90;
+      lobby.clue = '';
+      lobby.leftConcept = randomSwap ? pair[1] : pair[0];
+      lobby.rightConcept = randomSwap ? pair[0] : pair[1];
+      
+      io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+    });
+    
+    // Wavelength: Play Again
+    socket.on('wavelength:playAgain', ({ lobbyId }) => {
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby || lobby.host !== socket.id) return;
+      
+      const pair = WAVELENGTH_CONCEPTS[Math.floor(Math.random() * WAVELENGTH_CONCEPTS.length)];
+      const randomSwap = Math.random() > 0.5;
+      
+      // Reset scores and game
+      lobby.players.forEach(p => p.score = 0);
+      lobby.phase = 'psychic';
+      lobby.round = 1;
+      lobby.psychicId = lobby.players[0].id;
+      lobby.targetAngle = Math.floor(Math.random() * 160) + 10;
+      lobby.needleAngle = 90;
+      lobby.clue = '';
+      lobby.leftConcept = randomSwap ? pair[1] : pair[0];
+      lobby.rightConcept = randomSwap ? pair[0] : pair[1];
+      
+      io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+    });
+    
+    // Wavelength: Leave Lobby
+    socket.on('wavelength:leaveLobby', () => {
+      const lobbyId = socket.wavelengthLobbyId;
+      if (!lobbyId) return;
+      
+      const lobby = wavelengthLobbies.get(lobbyId);
+      if (!lobby) return;
+      
+      lobby.players = lobby.players.filter(p => p.id !== socket.id);
+      socket.leave(`wavelength:${lobbyId}`);
+      socket.wavelengthLobbyId = null;
+      
+      if (lobby.players.length === 0) {
+        wavelengthLobbies.delete(lobbyId);
+      } else {
+        if (lobby.host === socket.id) {
+          lobby.host = lobby.players[0].id;
+        }
+        if (lobby.psychicId === socket.id) {
+          lobby.psychicId = lobby.players[0].id;
+        }
+        // Return to waiting if game was in progress
+        lobby.phase = 'waiting';
+        io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+      }
+      
+      io.emit('wavelength:lobbiesUpdate', Array.from(wavelengthLobbies.values()).filter(l => !l.isPrivate && l.phase === 'waiting' && l.players.length < 2));
+    });
+    
+    // Handle wavelength disconnect in main disconnect handler
+    socket.on('disconnect', () => {
+      const lobbyId = socket.wavelengthLobbyId;
+      if (lobbyId) {
+        const lobby = wavelengthLobbies.get(lobbyId);
+        if (lobby) {
+          lobby.players = lobby.players.filter(p => p.id !== socket.id);
+          
+          if (lobby.players.length === 0) {
+            wavelengthLobbies.delete(lobbyId);
+          } else {
+            if (lobby.host === socket.id) {
+              lobby.host = lobby.players[0].id;
+            }
+            if (lobby.psychicId === socket.id) {
+              lobby.psychicId = lobby.players[0].id;
+            }
+            lobby.phase = 'waiting';
+            io.to(`wavelength:${lobbyId}`).emit('wavelength:lobbyUpdate', lobby);
+            io.to(`wavelength:${lobbyId}`).emit('wavelength:playerLeft', { playerId: socket.id });
+          }
+          
+          io.emit('wavelength:lobbiesUpdate', Array.from(wavelengthLobbies.values()).filter(l => !l.isPrivate && l.phase === 'waiting' && l.players.length < 2));
+        }
       }
     });
   });
