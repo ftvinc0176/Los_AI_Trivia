@@ -1,751 +1,1002 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useCasino } from '../CasinoContext'
 import { useRouter } from 'next/navigation'
+import * as PIXI from 'pixi.js'
 
-// =============================================
-// ELDRITCH DUNGEON - Print Studios Recreation
-// 8x8 Cluster Pays | RTP 96.10% | Very High Vol
-// Max Win: 20,000x | Bet: 0.10 - 50.00
-// =============================================
+// =====================================================================
+// ELDRITCH DUNGEON - Pixi.js Game Engine Implementation
+// Print Studios Recreation | 8x8 Cluster Pays | 96.10% RTP
+// Very High Volatility | Max Win: 20,000x | Bet: 0.10 - 50.00
+// =====================================================================
 
-type SymbolType = 'highRed' | 'highBlue' | 'highGreen' | 'highPurple' | 'midSkull' | 'midEye' | 'lowRune1' | 'lowRune2' | 'lowRune3' | 'lowRune4' | 'wild' | 'warrior'
+// Game Constants
+const GAME_WIDTH = 1920
+const GAME_HEIGHT = 1080
+const GRID_SIZE = 8
+const CELL_SIZE = 80
+const GRID_OFFSET_X = 700
+const GRID_OFFSET_Y = 150
+
+// Symbol Types
+type SymbolType = 'runeOrange' | 'runePurple' | 'runeBlue' | 'runeGreen' | 'portrait1' | 'portrait2' | 'potion' | 'tome' | 'wild' | 'warrior'
 type HeroType = 'arcanist' | 'ranger' | 'mauler'
 type EnemyType = 'nightwing' | 'elderwing' | 'nightfang' | 'elderfang'
-type GamePhase = 'idle' | 'spinning' | 'cascading' | 'battle' | 'spectralEffect' | 'treasureHall' | 'oldOne'
+type GamePhase = 'idle' | 'spinning' | 'cascading' | 'battle' | 'treasureHall' | 'oldOne'
 
+// Symbol Configuration
 interface SymbolConfig {
+  color: number
+  tier: 'low' | 'high' | 'special'
   label: string
-  tier: 'high' | 'mid' | 'low' | 'special'
-  gradient: string
-  glow: string
   payouts: Record<number, number>
 }
 
-// Paytable designed for 96.10% RTP with very high volatility
 const SYMBOLS: Record<SymbolType, SymbolConfig> = {
-  highRed:    { label: 'R', tier: 'high', gradient: 'from-red-500 via-red-600 to-red-900', glow: 'shadow-red-500/50', payouts: { 5: 1, 8: 4, 12: 20, 20: 100, 30: 500 } },
-  highBlue:   { label: 'B', tier: 'high', gradient: 'from-blue-400 via-blue-600 to-blue-900', glow: 'shadow-blue-500/50', payouts: { 5: 1, 8: 4, 12: 20, 20: 100, 30: 500 } },
-  highGreen:  { label: 'G', tier: 'high', gradient: 'from-emerald-400 via-emerald-600 to-emerald-900', glow: 'shadow-emerald-500/50', payouts: { 5: 0.8, 8: 3, 12: 15, 20: 75, 30: 400 } },
-  highPurple: { label: 'P', tier: 'high', gradient: 'from-purple-400 via-purple-600 to-purple-900', glow: 'shadow-purple-500/50', payouts: { 5: 0.8, 8: 3, 12: 15, 20: 75, 30: 400 } },
-  midSkull:   { label: 'S', tier: 'mid', gradient: 'from-gray-300 via-gray-500 to-gray-800', glow: 'shadow-gray-400/50', payouts: { 5: 0.5, 8: 2, 12: 8, 20: 40, 30: 200 } },
-  midEye:     { label: 'E', tier: 'mid', gradient: 'from-violet-400 via-violet-600 to-violet-900', glow: 'shadow-violet-500/50', payouts: { 5: 0.5, 8: 2, 12: 8, 20: 40, 30: 200 } },
-  lowRune1:   { label: '1', tier: 'low', gradient: 'from-slate-500 via-slate-700 to-slate-900', glow: 'shadow-slate-500/30', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
-  lowRune2:   { label: '2', tier: 'low', gradient: 'from-zinc-500 via-zinc-700 to-zinc-900', glow: 'shadow-zinc-500/30', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
-  lowRune3:   { label: '3', tier: 'low', gradient: 'from-stone-500 via-stone-700 to-stone-900', glow: 'shadow-stone-500/30', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
-  lowRune4:   { label: '4', tier: 'low', gradient: 'from-neutral-500 via-neutral-700 to-neutral-900', glow: 'shadow-neutral-500/30', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
-  wild:       { label: 'W', tier: 'special', gradient: 'from-yellow-300 via-amber-500 to-orange-600', glow: 'shadow-yellow-400/70', payouts: { 5: 10, 8: 50, 12: 250, 20: 1000, 30: 5000 } },
-  warrior:    { label: '+', tier: 'special', gradient: 'from-amber-400 via-orange-500 to-red-700', glow: 'shadow-orange-500/70', payouts: {} }
+  runeOrange: { color: 0xF97316, tier: 'low', label: 'O', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
+  runePurple: { color: 0xA855F7, tier: 'low', label: 'P', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
+  runeBlue:   { color: 0x3B82F6, tier: 'low', label: 'B', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
+  runeGreen:  { color: 0x22C55E, tier: 'low', label: 'G', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 15, 30: 75 } },
+  portrait1:  { color: 0xEF4444, tier: 'high', label: 'H1', payouts: { 5: 1, 8: 4, 12: 20, 20: 100, 30: 500 } },
+  portrait2:  { color: 0x8B5CF6, tier: 'high', label: 'H2', payouts: { 5: 0.8, 8: 3, 12: 15, 20: 75, 30: 400 } },
+  potion:     { color: 0x06B6D4, tier: 'high', label: 'PT', payouts: { 5: 0.6, 8: 2, 12: 10, 20: 50, 30: 250 } },
+  tome:       { color: 0x78350F, tier: 'high', label: 'TM', payouts: { 5: 0.5, 8: 1.5, 12: 8, 20: 40, 30: 200 } },
+  wild:       { color: 0xFBBF24, tier: 'special', label: 'W', payouts: { 5: 10, 8: 50, 12: 250, 20: 1000, 30: 5000 } },
+  warrior:    { color: 0xF59E0B, tier: 'special', label: '+', payouts: {} }
 }
 
-const REGULAR_SYMBOLS: SymbolType[] = ['highRed', 'highBlue', 'highGreen', 'highPurple', 'midSkull', 'midEye', 'lowRune1', 'lowRune2', 'lowRune3', 'lowRune4']
+const REGULAR_SYMBOLS: SymbolType[] = ['runeOrange', 'runePurple', 'runeBlue', 'runeGreen', 'portrait1', 'portrait2', 'potion', 'tome']
 
-// Weighted symbol distribution for RTP control
+// Symbol weights for RTP control
 const SYMBOL_WEIGHTS: Record<SymbolType, number> = {
-  highRed: 8, highBlue: 8, highGreen: 10, highPurple: 10,
-  midSkull: 14, midEye: 14,
-  lowRune1: 18, lowRune2: 18, lowRune3: 18, lowRune4: 18,
+  runeOrange: 16, runePurple: 16, runeBlue: 16, runeGreen: 16,
+  portrait1: 8, portrait2: 10, potion: 12, tome: 14,
   wild: 0, warrior: 0
 }
 
-const HEROES: Record<HeroType, { 
+// Hero Configuration
+interface HeroConfig {
   name: string
   title: string
+  color: number
   baseStats: { vitality: number; force: number; crit: number; guard: number }
-  color: string
-  accent: string
   ability: string
-}> = {
-  arcanist: { 
-    name: 'Arcanist', title: 'Master of Arcane', 
+}
+
+const HEROES: Record<HeroType, HeroConfig> = {
+  arcanist: {
+    name: 'Arcanist', title: 'Master of Arcane', color: 0x7C3AED,
     baseStats: { vitality: 100, force: 15, crit: 15, guard: 5 },
-    color: 'from-purple-600 to-indigo-900', accent: 'purple',
-    ability: 'Arcane Blast: +25% crit damage'
+    ability: '+25% Crit Damage'
   },
-  ranger: { 
-    name: 'Ranger', title: 'Swift Hunter',
+  ranger: {
+    name: 'Ranger', title: 'Swift Hunter', color: 0x059669,
     baseStats: { vitality: 80, force: 20, crit: 25, guard: 3 },
-    color: 'from-green-600 to-teal-900', accent: 'green',
-    ability: 'Quick Shot: Double attack chance'
+    ability: 'Double Attack Chance'
   },
-  mauler: { 
-    name: 'Mauler', title: 'Brutal Warrior',
+  mauler: {
+    name: 'Mauler', title: 'Brutal Warrior', color: 0xDC2626,
     baseStats: { vitality: 150, force: 25, crit: 5, guard: 10 },
-    color: 'from-red-600 to-orange-900', accent: 'red',
-    ability: 'Berserker: Damage increases as HP drops'
+    ability: 'Berserker Rage'
   }
 }
 
-const ENEMIES: Record<EnemyType, {
+// Enemy Configuration
+interface EnemyConfig {
   name: string
   hp: number
   damage: number
   reward: { type: 'transform' | 'wilds'; count: number }
-  tier: 'normal' | 'elite'
-}> = {
-  nightwing:  { name: 'Nightwing', hp: 30, damage: 8, reward: { type: 'transform', count: 10 }, tier: 'normal' },
-  elderwing:  { name: 'Elderwing', hp: 50, damage: 12, reward: { type: 'transform', count: 19 }, tier: 'elite' },
-  nightfang:  { name: 'Nightfang', hp: 40, damage: 10, reward: { type: 'wilds', count: 4 }, tier: 'normal' },
-  elderfang:  { name: 'Elderfang', hp: 60, damage: 15, reward: { type: 'wilds', count: 10 }, tier: 'elite' }
+  color: number
 }
 
-interface GridCell {
-  id: string
-  symbol: SymbolType
-  isWinning: boolean
-  isCascading: boolean
-  isNew: boolean
-  isTransformed: boolean
-  multiplier?: number
+const ENEMIES: Record<EnemyType, EnemyConfig> = {
+  nightwing:  { name: 'Nightwing', hp: 30, damage: 8, reward: { type: 'transform', count: 10 }, color: 0x1F2937 },
+  elderwing:  { name: 'Elderwing', hp: 50, damage: 12, reward: { type: 'transform', count: 19 }, color: 0x4C1D95 },
+  nightfang:  { name: 'Nightfang', hp: 40, damage: 10, reward: { type: 'wilds', count: 4 }, color: 0x7F1D1D },
+  elderfang:  { name: 'Elderfang', hp: 60, damage: 15, reward: { type: 'wilds', count: 10 }, color: 0x9D174D }
 }
 
-interface TreasureCoin {
-  id: string
-  value: number
-  size: 1 | 2 | 3 | 4
+// =====================================================================
+// GAME ENGINE CLASSES
+// =====================================================================
+
+// Particle System for effects
+class ParticleEffect {
+  container: PIXI.Container
+  particles: PIXI.Graphics[] = []
+  
+  constructor(parent: PIXI.Container, x: number, y: number, color: number, count: number) {
+    this.container = new PIXI.Container()
+    this.container.position.set(x, y)
+    parent.addChild(this.container)
+    
+    for (let i = 0; i < count; i++) {
+      const particle = new PIXI.Graphics()
+      particle.beginFill(color, 0.8)
+      particle.drawCircle(0, 0, 3 + Math.random() * 4)
+      particle.endFill()
+      
+      const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5
+      const speed = 2 + Math.random() * 4
+      ;(particle as unknown as Record<string, number>).vx = Math.cos(angle) * speed
+      ;(particle as unknown as Record<string, number>).vy = Math.sin(angle) * speed
+      ;(particle as unknown as Record<string, number>).life = 1
+      
+      this.particles.push(particle)
+      this.container.addChild(particle)
+    }
+  }
+  
+  update(delta: number): boolean {
+    let alive = false
+    for (const p of this.particles) {
+      const data = p as unknown as Record<string, number>
+      data.life -= delta * 0.02
+      if (data.life > 0) {
+        alive = true
+        p.x += data.vx
+        p.y += data.vy
+        data.vy += 0.1 // gravity
+        p.alpha = data.life
+        p.scale.set(data.life)
+      }
+    }
+    if (!alive) {
+      this.container.destroy({ children: true })
+    }
+    return alive
+  }
+}
+
+// Symbol Sprite Class
+class SymbolSprite {
+  container: PIXI.Container
+  background: PIXI.Graphics
+  label: PIXI.Text
+  symbolType: SymbolType
   row: number
   col: number
+  targetY: number = 0
+  velocity: number = 0
+  isDropping: boolean = false
+  isWinning: boolean = false
+  winPulse: number = 0
+  
+  constructor(symbolType: SymbolType, row: number, col: number) {
+    this.symbolType = symbolType
+    this.row = row
+    this.col = col
+    
+    this.container = new PIXI.Container()
+    
+    // Stone tile background
+    this.background = new PIXI.Graphics()
+    this.drawBackground()
+    this.container.addChild(this.background)
+    
+    // Symbol label
+    const config = SYMBOLS[symbolType]
+    this.label = new PIXI.Text({
+      text: config.label,
+      style: {
+        fontFamily: 'Arial Black',
+        fontSize: 28,
+        fill: 0xFFFFFF,
+        fontWeight: 'bold'
+      }
+    })
+    this.label.anchor.set(0.5)
+    this.label.position.set(CELL_SIZE / 2, CELL_SIZE / 2)
+    this.container.addChild(this.label)
+    
+    this.updatePosition()
+  }
+  
+  drawBackground() {
+    const config = SYMBOLS[this.symbolType]
+    this.background.clear()
+    
+    // Stone tile effect
+    this.background.beginFill(0x2D2D2D)
+    this.background.drawRoundedRect(2, 2, CELL_SIZE - 4, CELL_SIZE - 4, 8)
+    this.background.endFill()
+    
+    // Inner colored area
+    this.background.beginFill(config.color, 0.8)
+    this.background.drawRoundedRect(6, 6, CELL_SIZE - 12, CELL_SIZE - 12, 6)
+    this.background.endFill()
+    
+    // Highlight
+    this.background.beginFill(0xFFFFFF, 0.1)
+    this.background.drawRoundedRect(6, 6, CELL_SIZE - 12, 20, 6)
+    this.background.endFill()
+    
+    // Border
+    this.background.lineStyle(2, 0x4A4A4A)
+    this.background.drawRoundedRect(2, 2, CELL_SIZE - 4, CELL_SIZE - 4, 8)
+  }
+  
+  updatePosition() {
+    this.container.x = GRID_OFFSET_X + this.col * CELL_SIZE
+    this.container.y = GRID_OFFSET_Y + this.row * CELL_SIZE
+  }
+  
+  setSymbol(symbolType: SymbolType) {
+    this.symbolType = symbolType
+    const config = SYMBOLS[symbolType]
+    this.label.text = config.label
+    this.drawBackground()
+  }
+  
+  startDrop(targetRow: number, delay: number) {
+    this.container.y = GRID_OFFSET_Y - (CELL_SIZE * 2) - (delay * CELL_SIZE)
+    this.targetY = GRID_OFFSET_Y + targetRow * CELL_SIZE
+    this.row = targetRow
+    this.isDropping = true
+    this.velocity = 0
+  }
+  
+  update(delta: number): boolean {
+    if (this.isDropping) {
+      this.velocity += 0.8 * delta // Gravity
+      this.container.y += this.velocity
+      
+      if (this.container.y >= this.targetY) {
+        this.container.y = this.targetY
+        this.isDropping = false
+        this.velocity = 0
+        // Bounce effect
+        this.container.scale.y = 0.9
+        return true // Signal landing
+      }
+    }
+    
+    // Bounce recovery
+    if (this.container.scale.y < 1) {
+      this.container.scale.y += 0.05 * delta
+      if (this.container.scale.y > 1) this.container.scale.y = 1
+    }
+    
+    // Win pulse effect
+    if (this.isWinning) {
+      this.winPulse += delta * 0.1
+      const scale = 1 + Math.sin(this.winPulse) * 0.1
+      this.container.scale.set(scale)
+      this.background.alpha = 0.7 + Math.sin(this.winPulse) * 0.3
+    }
+    
+    return false
+  }
+  
+  setWinning(winning: boolean) {
+    this.isWinning = winning
+    if (!winning) {
+      this.container.scale.set(1)
+      this.background.alpha = 1
+      this.winPulse = 0
+    }
+  }
+  
+  destroy() {
+    this.container.destroy({ children: true })
+  }
 }
 
-interface TreasureCell {
-  unlocked: boolean
-  hasKey: boolean
-  coin: TreasureCoin | null
+// Hero Character Class
+class HeroCharacter {
+  container: PIXI.Container
+  body: PIXI.Graphics
+  breathOffset: number = 0
+  hero: HeroType
+  isAttacking: boolean = false
+  attackFrame: number = 0
+  
+  constructor(hero: HeroType) {
+    this.hero = hero
+    this.container = new PIXI.Container()
+    this.container.position.set(200, 400)
+    
+    
+    this.body = new PIXI.Graphics()
+    this.draw()
+    this.container.addChild(this.body)
+    
+    // Name label
+    const config = HEROES[hero]
+    const nameText = new PIXI.Text({
+      text: config.name,
+      style: {
+        fontFamily: 'Arial Black',
+        fontSize: 24,
+        fill: config.color,
+        fontWeight: 'bold'
+      }
+    })
+    nameText.anchor.set(0.5)
+    nameText.position.set(0, 180)
+    this.container.addChild(nameText)
+    
+    // Title
+    const titleText = new PIXI.Text({
+      text: config.title,
+      style: {
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: 0x888888
+      }
+    })
+    titleText.anchor.set(0.5)
+    titleText.position.set(0, 205)
+    this.container.addChild(titleText)
+  }
+  
+  draw() {
+    const config = HEROES[this.hero]
+    this.body.clear()
+    
+    // Shadow
+    this.body.beginFill(0x000000, 0.3)
+    this.body.drawEllipse(0, 160, 60, 20)
+    this.body.endFill()
+    
+    // Body
+    this.body.beginFill(config.color)
+    this.body.drawRoundedRect(-50, -100, 100, 200, 20)
+    this.body.endFill()
+    
+    // Head
+    this.body.beginFill(0xFFDBBD)
+    this.body.drawCircle(0, -120, 40)
+    this.body.endFill()
+    
+    // Eyes
+    this.body.beginFill(0x000000)
+    this.body.drawCircle(-15, -125, 5)
+    this.body.drawCircle(15, -125, 5)
+    this.body.endFill()
+    
+    // Weapon based on class
+    this.body.beginFill(0x808080)
+    if (this.hero === 'arcanist') {
+      // Staff
+      this.body.drawRect(55, -80, 8, 160)
+      this.body.beginFill(0x7C3AED)
+      this.body.drawCircle(59, -90, 15)
+    } else if (this.hero === 'ranger') {
+      // Bow
+      this.body.drawRect(55, -60, 6, 120)
+    } else {
+      // Axe
+      this.body.drawRect(55, -60, 10, 100)
+      this.body.beginFill(0xA0A0A0)
+      this.body.moveTo(55, -50)
+      this.body.lineTo(85, -30)
+      this.body.lineTo(85, 10)
+      this.body.lineTo(55, 30)
+    }
+    this.body.endFill()
+  }
+  
+  update(delta: number) {
+    // Idle breathing animation
+    this.breathOffset += delta * 0.03
+    this.body.y = Math.sin(this.breathOffset) * 3
+    
+    // Attack animation
+    if (this.isAttacking) {
+      this.attackFrame += delta
+      this.container.x = 200 + Math.sin(this.attackFrame * 0.5) * 30
+      if (this.attackFrame > 20) {
+        this.isAttacking = false
+        this.attackFrame = 0
+        this.container.x = 200
+      }
+    }
+  }
+  
+  attack() {
+    this.isAttacking = true
+    this.attackFrame = 0
+  }
+  
+  setHero(hero: HeroType) {
+    this.hero = hero
+    this.draw()
+    // Update name and title
+    const config = HEROES[hero]
+    const children = this.container.children
+    if (children.length >= 3) {
+      (children[1] as PIXI.Text).text = config.name
+      ;(children[1] as PIXI.Text).style.fill = config.color
+      ;(children[2] as PIXI.Text).text = config.title
+    }
+  }
 }
 
-interface PowerRelic {
-  vitality: number
-  force: number
-  crit: number
-  guard: number
-}
-
-interface BattleState {
-  enemy: EnemyType
-  enemyHp: number
-  enemyMaxHp: number
-  heroHp: number
-  heroMaxHp: number
-  log: string[]
-  turn: number
-  isPlayerTurn: boolean
-}
-
-interface GameState {
-  phase: GamePhase
-  grid: GridCell[][]
-  cascadeLevel: number
-  totalWin: number
-  spinWin: number
-  pendingReward: { type: 'transform' | 'wilds'; count: number } | null
-}
-
-// Coin values for Treasure Hall
-const COIN_VALUES = [1, 2, 3, 5, 8, 10, 15, 20, 25, 50, 100, 250, 500, 1000]
-const COIN_WEIGHTS = [25, 20, 15, 12, 10, 8, 5, 3, 2, 1, 0.5, 0.3, 0.15, 0.05]
-
+// Main Game Component
 export default function EldritchDungeon() {
   const { balance, setBalance, recordBet } = useCasino()
   const router = useRouter()
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const appRef = useRef<PIXI.Application | null>(null)
+  const gameRef = useRef<GameEngine | null>(null)
   
-  // Core state
-  const [gameState, setGameState] = useState<GameState>({
-    phase: 'idle',
-    grid: [],
-    cascadeLevel: 0,
-    totalWin: 0,
-    spinWin: 0,
-    pendingReward: null
-  })
-  
+  // Game State
+  const [phase, setPhase] = useState<GamePhase>('idle')
   const [betAmount, setBetAmount] = useState(1)
-  const [autoPlay, setAutoPlay] = useState(false)
-  const [turboMode, setTurboMode] = useState(false)
-  
-  // Hero & Stats
+  const [totalWin, setTotalWin] = useState(0)
+  const [message, setMessage] = useState('')
   const [selectedHero, setSelectedHero] = useState<HeroType>('arcanist')
-  const [heroUnlocks, setHeroUnlocks] = useState<Record<HeroType, boolean>>({ arcanist: true, ranger: false, mauler: false })
-  const [powerRelics, setPowerRelics] = useState<PowerRelic>({ vitality: 0, force: 0, crit: 0, guard: 0 })
-  const [totalRelicsCollected, setTotalRelicsCollected] = useState(0)
-  
-  // Battle state
-  const [battleState, setBattleState] = useState<BattleState | null>(null)
-  
-  // Treasure Hall state
-  const [treasureGrid, setTreasureGrid] = useState<TreasureCell[][]>([])
-  const [treasureLives, setTreasureLives] = useState(3)
-  const [treasureTotal, setTreasureTotal] = useState(0)
-  const [treasureMultiplier, setTreasureMultiplier] = useState(1)
-  const [oldOneDefeated, setOldOneDefeated] = useState(false)
-  
-  // UI state
+  const [heroUnlocks, setHeroUnlocks] = useState({ arcanist: true, ranger: false, mauler: false })
+  const [powerRelics, setPowerRelics] = useState({ vitality: 0, force: 0, crit: 0, guard: 0 })
   const [showPaytable, setShowPaytable] = useState(false)
   const [showHeroSelect, setShowHeroSelect] = useState(false)
-  const [showFeatureBuy, setShowFeatureBuy] = useState(false)
-  const [showBigWin, setShowBigWin] = useState(false)
-  const [bigWinAmount, setBigWinAmount] = useState(0)
-  const [message, setMessage] = useState('')
+  const [autoPlay, setAutoPlay] = useState(false)
   
-  // Session stats
-  const [sessionSpins, setSessionSpins] = useState(0)
-  const [sessionWins, setSessionWins] = useState(0)
+  // Battle State
+  const [battleState, setBattleState] = useState<{
+    enemy: EnemyType
+    enemyHp: number
+    heroHp: number
+    log: string[]
+  } | null>(null)
+  
+  // Treasure Hall State
+  const [treasureState, setTreasureState] = useState<{
+    lives: number
+    total: number
+    multiplier: number
+    grid: Array<Array<{ unlocked: boolean; coin: number | null }>>
+  } | null>(null)
   
   const autoPlayRef = useRef(false)
-  const animationSpeed = turboMode ? 150 : 350
-
-  // ============== SYMBOL GENERATION ==============
-  const getWeightedSymbol = useCallback((includeSpecials = false): SymbolType => {
-    const rand = Math.random()
+  
+  // Game Engine Class
+  class GameEngine {
+    app: PIXI.Application
+    gridContainer: PIXI.Container
+    effectsContainer: PIXI.Container
+    uiContainer: PIXI.Container
+    symbols: SymbolSprite[][] = []
+    hero: HeroCharacter
+    particles: ParticleEffect[] = []
+    dustParticles: PIXI.Graphics[] = []
+    torchLights: PIXI.Graphics[] = []
     
-    if (includeSpecials) {
-      if (rand < 0.008) return 'wild' // 0.8% wild
-      if (rand < 0.015) return 'warrior' // 0.7% warrior
+    gridData: SymbolType[][] = []
+    isAnimating: boolean = false
+    
+    constructor(app: PIXI.Application) {
+      this.app = app
+      
+      // Background
+      const bg = new PIXI.Graphics()
+      bg.beginFill(0x0A0A0A)
+      bg.drawRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
+      bg.endFill()
+      app.stage.addChild(bg)
+      
+      // Dungeon background elements
+      this.createDungeonBackground()
+      
+      // Containers
+      this.gridContainer = new PIXI.Container()
+      this.effectsContainer = new PIXI.Container()
+      this.uiContainer = new PIXI.Container()
+      
+      app.stage.addChild(this.gridContainer)
+      app.stage.addChild(this.effectsContainer)
+      app.stage.addChild(this.uiContainer)
+      
+      // Grid background
+      this.createGridBackground()
+      
+      
+      // Initialize grid
+      this.initializeGrid()
+      
+      // Hero
+      this.hero = new HeroCharacter(selectedHero)
+      app.stage.addChild(this.hero.container)
+      
+      // Game loop
+      app.ticker.add((ticker) => this.update(ticker.deltaTime))
     }
     
-    const totalWeight = Object.entries(SYMBOL_WEIGHTS)
-      .filter(([sym]) => REGULAR_SYMBOLS.includes(sym as SymbolType))
-      .reduce((sum, [, w]) => sum + w, 0)
-    
-    let cumulative = 0
-    const roll = Math.random() * totalWeight
-    
-    for (const sym of REGULAR_SYMBOLS) {
-      cumulative += SYMBOL_WEIGHTS[sym]
-      if (roll <= cumulative) return sym
-    }
-    
-    return 'lowRune1'
-  }, [])
-
-  const createCell = useCallback((row: number, col: number, includeSpecials = true): GridCell => ({
-    id: `${row}-${col}-${Date.now()}-${Math.random()}`,
-    symbol: getWeightedSymbol(includeSpecials),
-    isWinning: false,
-    isCascading: false,
-    isNew: false,
-    isTransformed: false
-  }), [getWeightedSymbol])
-
-  // ============== GRID INITIALIZATION ==============
-  const initializeGrid = useCallback((): GridCell[][] => {
-    const grid: GridCell[][] = []
-    for (let row = 0; row < 8; row++) {
-      const rowCells: GridCell[] = []
-      for (let col = 0; col < 8; col++) {
-        rowCells.push(createCell(row, col, true))
+    createDungeonBackground() {
+      // Dark stone walls
+      const walls = new PIXI.Graphics()
+      walls.beginFill(0x1A1A1A)
+      walls.drawRect(0, 0, 500, GAME_HEIGHT)
+      walls.endFill()
+      
+      // Stone texture effect
+      for (let i = 0; i < 50; i++) {
+        walls.beginFill(0x222222, 0.5)
+        walls.drawRect(
+          Math.random() * 480,
+          Math.random() * GAME_HEIGHT,
+          20 + Math.random() * 40,
+          10 + Math.random() * 20
+        )
+        walls.endFill()
       }
-      grid.push(rowCells)
-    }
-    return grid
-  }, [createCell])
-
-  useEffect(() => {
-    setGameState(prev => ({ ...prev, grid: initializeGrid() }))
-  }, [initializeGrid])
-
-  useEffect(() => { autoPlayRef.current = autoPlay }, [autoPlay])
-
-  // ============== CLUSTER FINDING (DFS) ==============
-  const findClusters = useCallback((grid: GridCell[][]): { symbol: SymbolType; cells: [number, number][] }[] => {
-    const visited = new Set<string>()
-    const clusters: { symbol: SymbolType; cells: [number, number][] }[] = []
-    
-    const dfs = (row: number, col: number, targetSymbol: SymbolType, cluster: [number, number][]) => {
-      const key = `${row},${col}`
-      if (visited.has(key)) return
-      if (row < 0 || row >= 8 || col < 0 || col >= 8) return
+      this.app.stage.addChild(walls)
       
-      const cell = grid[row][col]
-      const isMatch = cell.symbol === targetSymbol || cell.symbol === 'wild'
-      if (!isMatch) return
-      
-      visited.add(key)
-      cluster.push([row, col])
-      
-      // Only horizontal and vertical adjacency (not diagonal)
-      dfs(row - 1, col, targetSymbol, cluster)
-      dfs(row + 1, col, targetSymbol, cluster)
-      dfs(row, col - 1, targetSymbol, cluster)
-      dfs(row, col + 1, targetSymbol, cluster)
-    }
-    
-    // Find all clusters
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        const key = `${row},${col}`
-        const cell = grid[row][col]
+      // Torches
+      for (let i = 0; i < 3; i++) {
+        const torch = new PIXI.Graphics()
+        torch.beginFill(0x8B4513)
+        torch.drawRect(-5, 0, 10, 40)
+        torch.endFill()
+        torch.position.set(100 + i * 150, 100 + i * 200)
+        this.app.stage.addChild(torch)
         
-        if (!visited.has(key) && cell.symbol !== 'wild' && cell.symbol !== 'warrior') {
-          const cluster: [number, number][] = []
-          dfs(row, col, cell.symbol, cluster)
+        const flame = new PIXI.Graphics()
+        flame.beginFill(0xFF6600, 0.8)
+        flame.drawEllipse(0, -20, 15, 25)
+        flame.endFill()
+        flame.position.set(100 + i * 150, 100 + i * 200)
+        this.app.stage.addChild(flame)
+        this.torchLights.push(flame)
+      }
+      
+      // Floating dust particles
+      for (let i = 0; i < 30; i++) {
+        const dust = new PIXI.Graphics()
+        dust.beginFill(0xFFFFFF, 0.3)
+        dust.drawCircle(0, 0, 1 + Math.random() * 2)
+        dust.endFill()
+        dust.position.set(Math.random() * GAME_WIDTH, Math.random() * GAME_HEIGHT)
+        ;(dust as unknown as Record<string, number>).vx = (Math.random() - 0.5) * 0.5
+        ;(dust as unknown as Record<string, number>).vy = -0.2 - Math.random() * 0.3
+        this.app.stage.addChild(dust)
+        this.dustParticles.push(dust)
+      }
+    }
+    
+    createGridBackground() {
+      const gridBg = new PIXI.Graphics()
+      
+      // Outer frame
+      gridBg.beginFill(0x2D2D2D)
+      gridBg.drawRoundedRect(
+        GRID_OFFSET_X - 20,
+        GRID_OFFSET_Y - 20,
+        GRID_SIZE * CELL_SIZE + 40,
+        GRID_SIZE * CELL_SIZE + 40,
+        15
+      )
+      gridBg.endFill()
+      
+      // Inner area
+      gridBg.beginFill(0x1A1A1A)
+      gridBg.drawRoundedRect(
+        GRID_OFFSET_X - 10,
+        GRID_OFFSET_Y - 10,
+        GRID_SIZE * CELL_SIZE + 20,
+        GRID_SIZE * CELL_SIZE + 20,
+        10
+      )
+      gridBg.endFill()
+      
+      // Grid lines
+      gridBg.lineStyle(1, 0x333333)
+      for (let i = 0; i <= GRID_SIZE; i++) {
+        gridBg.moveTo(GRID_OFFSET_X + i * CELL_SIZE, GRID_OFFSET_Y)
+        gridBg.lineTo(GRID_OFFSET_X + i * CELL_SIZE, GRID_OFFSET_Y + GRID_SIZE * CELL_SIZE)
+        gridBg.moveTo(GRID_OFFSET_X, GRID_OFFSET_Y + i * CELL_SIZE)
+        gridBg.lineTo(GRID_OFFSET_X + GRID_SIZE * CELL_SIZE, GRID_OFFSET_Y + i * CELL_SIZE)
+      }
+      
+      this.gridContainer.addChild(gridBg)
+    }
+    
+    getWeightedSymbol(includeSpecials: boolean = false): SymbolType {
+      const rand = Math.random()
+      if (includeSpecials) {
+        if (rand < 0.008) return 'wild'
+        if (rand < 0.015) return 'warrior'
+      }
+      
+      const totalWeight = Object.entries(SYMBOL_WEIGHTS)
+        .filter(([sym]) => REGULAR_SYMBOLS.includes(sym as SymbolType))
+        .reduce((sum, [, w]) => sum + w, 0)
+      
+      let cumulative = 0
+      const roll = Math.random() * totalWeight
+      
+      for (const sym of REGULAR_SYMBOLS) {
+        cumulative += SYMBOL_WEIGHTS[sym]
+        if (roll <= cumulative) return sym
+      }
+      
+      return 'runeOrange'
+    }
+    
+    initializeGrid() {
+      this.gridData = []
+      this.symbols = []
+      
+      for (let row = 0; row < GRID_SIZE; row++) {
+        this.gridData[row] = []
+        this.symbols[row] = []
+        
+        for (let col = 0; col < GRID_SIZE; col++) {
+          const symbolType = this.getWeightedSymbol(true)
+          this.gridData[row][col] = symbolType
           
-          if (cluster.length >= 5) {
-            clusters.push({ symbol: cell.symbol, cells: cluster })
+          const sprite = new SymbolSprite(symbolType, row, col)
+          this.symbols[row][col] = sprite
+          this.gridContainer.addChild(sprite.container)
+        }
+      }
+    }
+    
+    update(delta: number) {
+      // Update hero
+      this.hero.update(delta)
+      
+      // Update symbols
+      for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+          this.symbols[row][col]?.update(delta)
+        }
+      }
+      
+      // Update particles
+      this.particles = this.particles.filter(p => p.update(delta))
+      
+      // Update dust
+      for (const dust of this.dustParticles) {
+        const data = dust as unknown as Record<string, number>
+        dust.x += data.vx
+        dust.y += data.vy
+        if (dust.y < -10) {
+          dust.y = GAME_HEIGHT + 10
+          dust.x = Math.random() * GAME_WIDTH
+        }
+        if (dust.x < -10) dust.x = GAME_WIDTH + 10
+        if (dust.x > GAME_WIDTH + 10) dust.x = -10
+      }
+      
+      // Update torch flames
+      for (const flame of this.torchLights) {
+        flame.scale.x = 0.9 + Math.sin(Date.now() * 0.01 + flame.x) * 0.2
+        flame.scale.y = 0.9 + Math.cos(Date.now() * 0.015 + flame.y) * 0.15
+        flame.alpha = 0.7 + Math.sin(Date.now() * 0.02) * 0.3
+      }
+    }
+    
+    async spin(): Promise<{ win: number; battleTriggered: EnemyType | null }> {
+      this.isAnimating = true
+      
+      // Generate new symbols and drop them
+      for (let col = 0; col < GRID_SIZE; col++) {
+        for (let row = 0; row < GRID_SIZE; row++) {
+          const symbolType = this.getWeightedSymbol(true)
+          this.gridData[row][col] = symbolType
+          this.symbols[row][col].setSymbol(symbolType)
+          this.symbols[row][col].startDrop(row, (GRID_SIZE - row) + col * 0.3)
+        }
+      }
+      
+      // Wait for drops
+      await new Promise(r => setTimeout(r, 800))
+      
+      // Process cascades
+      let totalWin = 0
+      let battleTriggered: EnemyType | null = null
+      let cascadeCount = 0
+      
+      while (true) {
+        const clusters = this.findClusters()
+        if (clusters.length === 0) break
+        
+        cascadeCount++
+        const winAmount = this.calculateWin(clusters)
+        totalWin += winAmount
+        
+        // Check for warrior trigger
+        if (!battleTriggered) {
+          battleTriggered = this.checkWarriorTrigger(clusters)
+        }
+        
+        // Mark winning symbols
+        const winningCells = new Set<string>()
+        for (const cluster of clusters) {
+          for (const [row, col] of cluster.cells) {
+            winningCells.add(`${row},${col}`)
+            this.symbols[row][col].setWinning(true)
+            
+            // Particle effect
+            const effect = new ParticleEffect(
+              this.effectsContainer,
+              GRID_OFFSET_X + col * CELL_SIZE + CELL_SIZE / 2,
+              GRID_OFFSET_Y + row * CELL_SIZE + CELL_SIZE / 2,
+              SYMBOLS[cluster.symbol].color,
+              15
+            )
+            this.particles.push(effect)
           }
         }
-      }
-    }
-    
-    return clusters
-  }, [])
-
-  // ============== CHECK FOR WARRIOR TRIGGER ==============
-  const checkWarriorBattle = useCallback((grid: GridCell[][], winningCells: Set<string>): boolean => {
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        if (grid[row][col].symbol === 'warrior') {
-          // Check if any adjacent cell is a winning cell
-          const adjacents = [
-            [row - 1, col], [row + 1, col],
-            [row, col - 1], [row, col + 1]
-          ]
-          for (const [ar, ac] of adjacents) {
-            if (winningCells.has(`${ar},${ac}`)) {
-              return true
-            }
-          }
-        }
-      }
-    }
-    return false
-  }, [])
-
-  // ============== CALCULATE WIN ==============
-  const calculateClusterWin = useCallback((clusters: { symbol: SymbolType; cells: [number, number][] }[]): number => {
-    let total = 0
-    for (const cluster of clusters) {
-      const config = SYMBOLS[cluster.symbol]
-      const size = cluster.cells.length
-      
-      // Find appropriate payout tier
-      let payout = 0
-      if (size >= 30) payout = config.payouts[30] || config.payouts[20] || 0
-      else if (size >= 20) payout = config.payouts[20] || 0
-      else if (size >= 12) payout = config.payouts[12] || 0
-      else if (size >= 8) payout = config.payouts[8] || 0
-      else if (size >= 5) payout = config.payouts[5] || 0
-      
-      total += payout * betAmount
-    }
-    return total
-  }, [betAmount])
-
-  // ============== CASCADE LOGIC ==============
-  const performCascade = useCallback(async (currentGrid: GridCell[][]): Promise<GridCell[][]> => {
-    const newGrid = currentGrid.map(row => row.map(cell => ({ ...cell, isCascading: false, isNew: false })))
-    
-    // For each column, remove cascading cells and drop new ones from top
-    for (let col = 0; col < 8; col++) {
-      const remaining: GridCell[] = []
-      for (let row = 7; row >= 0; row--) {
-        if (!newGrid[row][col].isWinning) {
-          remaining.push({ ...newGrid[row][col], isWinning: false })
-        }
-      }
-      
-      // Fill from bottom up
-      const needed = 8 - remaining.length
-      for (let row = 7; row >= 0; row--) {
-        if (row >= needed) {
-          newGrid[row][col] = remaining[7 - row]
-        } else {
-          newGrid[row][col] = { ...createCell(row, col, true), isNew: true }
-        }
-      }
-    }
-    
-    return newGrid
-  }, [createCell])
-
-  // ============== APPLY SPECTRAL EFFECT ==============
-  const applySpectralEffect = useCallback((grid: GridCell[][], reward: { type: 'transform' | 'wilds'; count: number }): GridCell[][] => {
-    const newGrid = grid.map(row => row.map(cell => ({ ...cell })))
-    
-    if (reward.type === 'transform') {
-      // Pick a random high-paying symbol to transform to
-      const targetSymbol = ['highRed', 'highBlue', 'highGreen', 'highPurple'][Math.floor(Math.random() * 4)] as SymbolType
-      
-      // Get all non-special positions
-      const positions: [number, number][] = []
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-          if (newGrid[row][col].symbol !== 'wild' && newGrid[row][col].symbol !== 'warrior') {
-            positions.push([row, col])
-          }
-        }
-      }
-      
-      // Shuffle and take required count
-      const shuffled = positions.sort(() => Math.random() - 0.5).slice(0, reward.count)
-      for (const [row, col] of shuffled) {
-        newGrid[row][col] = { ...newGrid[row][col], symbol: targetSymbol, isTransformed: true }
-      }
-    } else {
-      // Add wilds
-      const positions: [number, number][] = []
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-          if (newGrid[row][col].symbol !== 'wild' && newGrid[row][col].symbol !== 'warrior') {
-            positions.push([row, col])
-          }
-        }
-      }
-      
-      const shuffled = positions.sort(() => Math.random() - 0.5).slice(0, reward.count)
-      for (const [row, col] of shuffled) {
-        newGrid[row][col] = { ...newGrid[row][col], symbol: 'wild', isTransformed: true }
-      }
-    }
-    
-    return newGrid
-  }, [])
-
-  // ============== BATTLE SYSTEM ==============
-  const getHeroStats = useCallback(() => {
-    const base = HEROES[selectedHero].baseStats
-    return {
-      vitality: base.vitality + powerRelics.vitality,
-      force: base.force + powerRelics.force,
-      crit: base.crit + powerRelics.crit,
-      guard: base.guard + powerRelics.guard
-    }
-  }, [selectedHero, powerRelics])
-
-  const startBattle = useCallback((enemyType: EnemyType) => {
-    const enemy = ENEMIES[enemyType]
-    const stats = getHeroStats()
-    
-    setBattleState({
-      enemy: enemyType,
-      enemyHp: enemy.hp,
-      enemyMaxHp: enemy.hp,
-      heroHp: stats.vitality,
-      heroMaxHp: stats.vitality,
-      log: [`A ${enemy.name} emerges from the shadows!`],
-      turn: 1,
-      isPlayerTurn: true
-    })
-    
-    setGameState(prev => ({ ...prev, phase: 'battle' }))
-  }, [getHeroStats])
-
-  const processBattleTurn = useCallback(() => {
-    if (!battleState) return
-    
-    const stats = getHeroStats()
-    const enemy = ENEMIES[battleState.enemy]
-    
-    setBattleState(prev => {
-      if (!prev) return null
-      
-      let newState = { ...prev }
-      const newLog = [...prev.log]
-      
-      if (prev.isPlayerTurn) {
-        // Player attacks
-        const isCrit = Math.random() * 100 < stats.crit
-        let damage = stats.force
         
-        // Arcanist bonus
-        if (selectedHero === 'arcanist' && isCrit) damage *= 1.25
-        // Mauler bonus
-        if (selectedHero === 'mauler') {
-          const hpPercent = prev.heroHp / prev.heroMaxHp
-          damage *= 1 + (1 - hpPercent) * 0.5
-        }
-        // Ranger double attack
-        const doubleAttack = selectedHero === 'ranger' && Math.random() < 0.3
-        
-        damage = Math.floor(damage * (isCrit ? 2 : 1))
-        newState.enemyHp = Math.max(0, prev.enemyHp - damage)
-        newLog.push(`You deal ${damage} damage${isCrit ? ' (CRITICAL!)' : ''}${doubleAttack ? ' x2!' : ''}`)
-        
-        if (doubleAttack && newState.enemyHp > 0) {
-          const secondDamage = Math.floor(stats.force * 0.8)
-          newState.enemyHp = Math.max(0, newState.enemyHp - secondDamage)
-          newLog.push(`Quick Shot: +${secondDamage} damage!`)
+        // Hero attack animation
+        if (totalWin > 0) {
+          this.hero.attack()
         }
         
-        if (newState.enemyHp <= 0) {
-          newLog.push(`Victory! ${enemy.name} defeated!`)
-          newState.isPlayerTurn = false
-        } else {
-          newState.isPlayerTurn = false
-        }
-      } else {
-        // Enemy attacks
-        const blocked = Math.random() * 100 < stats.guard * 2
-        const damage = blocked ? Math.floor(enemy.damage * 0.3) : enemy.damage
-        newState.heroHp = Math.max(0, prev.heroHp - damage)
-        newLog.push(`${enemy.name} attacks for ${damage} damage${blocked ? ' (BLOCKED!)' : ''}`)
+        await new Promise(r => setTimeout(r, 500))
         
-        if (newState.heroHp <= 0) {
-          newLog.push('You have fallen...')
-        } else {
-          newState.turn++
-          newState.isPlayerTurn = true
-        }
+        // Cascade
+        await this.cascade(winningCells)
+        
+        await new Promise(r => setTimeout(r, 300))
       }
       
-      return { ...newState, log: newLog }
-    })
-  }, [battleState, getHeroStats, selectedHero])
-
-  // Battle turn automation
-  useEffect(() => {
-    if (!battleState || gameState.phase !== 'battle') return
-    
-    const timeout = setTimeout(() => {
-      if (battleState.enemyHp <= 0) {
-        // Victory - apply reward and continue to treasure hall
-        const enemy = ENEMIES[battleState.enemy]
-        setGameState(prev => ({ ...prev, phase: 'spectralEffect', pendingReward: enemy.reward }))
-        setBattleState(null)
-        setMessage(`${enemy.name} defeated! ${enemy.reward.type === 'transform' ? `${enemy.reward.count} symbols transform!` : `${enemy.reward.count} Wilds added!`}`)
-        
-        // Unlock heroes based on battles won
-        if (!heroUnlocks.ranger && Math.random() < 0.3) {
-          setHeroUnlocks(prev => ({ ...prev, ranger: true }))
-          setMessage(prev => prev + ' RANGER UNLOCKED!')
-        }
-        if (!heroUnlocks.mauler && heroUnlocks.ranger && Math.random() < 0.2) {
-          setHeroUnlocks(prev => ({ ...prev, mauler: true }))
-          setMessage(prev => prev + ' MAULER UNLOCKED!')
-        }
-        
-        setTimeout(() => startTreasureHall(), 2000)
-      } else if (battleState.heroHp <= 0) {
-        // Defeat
-        setBattleState(null)
-        setGameState(prev => ({ ...prev, phase: 'idle' }))
-        setMessage('Battle lost... The dungeon claims another soul.')
-      } else {
-        processBattleTurn()
-      }
-    }, 1200)
-    
-    return () => clearTimeout(timeout)
-  }, [battleState, gameState.phase, processBattleTurn, heroUnlocks])
-
-  // ============== TREASURE HALL ==============
-  const startTreasureHall = useCallback(() => {
-    // Initialize 8x8 grid with 6 unlocked center positions
-    const grid: TreasureCell[][] = []
-    for (let row = 0; row < 8; row++) {
-      const rowCells: TreasureCell[] = []
-      for (let col = 0; col < 8; col++) {
-        // Unlock center 2x3 area
-        const isCenter = (row >= 3 && row <= 4) && (col >= 2 && col <= 4)
-        rowCells.push({ unlocked: isCenter, hasKey: false, coin: null })
-      }
-      rowCells.push()
-      grid.push(rowCells)
+      this.isAnimating = false
+      return { win: totalWin, battleTriggered }
     }
     
-    setTreasureGrid(grid)
-    setTreasureLives(3)
-    setTreasureTotal(0)
-    setTreasureMultiplier(1)
-    setOldOneDefeated(false)
-    setGameState(prev => ({ ...prev, phase: 'treasureHall' }))
-    setMessage('Welcome to the Treasure Hall!')
-  }, [])
-
-  const getRandomCoinValue = useCallback((): number => {
-    const totalWeight = COIN_WEIGHTS.reduce((a, b) => a + b, 0)
-    let roll = Math.random() * totalWeight
-    for (let i = 0; i < COIN_VALUES.length; i++) {
-      roll -= COIN_WEIGHTS[i]
-      if (roll <= 0) return COIN_VALUES[i]
-    }
-    return COIN_VALUES[0]
-  }, [])
-
-  const processTreasureSpin = useCallback(() => {
-    let landedSomething = false
-    
-    setTreasureGrid(prev => {
-      const newGrid = prev.map(row => row.map(cell => ({ ...cell })))
+    findClusters(): { symbol: SymbolType; cells: [number, number][] }[] {
+      const visited = new Set<string>()
+      const clusters: { symbol: SymbolType; cells: [number, number][] }[] = []
       
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-          const cell = newGrid[row][col]
-          if (cell.unlocked && !cell.coin && !cell.hasKey) {
-            const rand = Math.random()
-            if (rand < 0.12) {
-              // Coin lands
-              cell.coin = {
-                id: `coin-${row}-${col}-${Date.now()}`,
-                value: getRandomCoinValue(),
-                size: 1,
-                row, col
-              }
-              landedSomething = true
-            } else if (rand < 0.15) {
-              // Key lands
-              cell.hasKey = true
-              landedSomething = true
+      const dfs = (row: number, col: number, targetSymbol: SymbolType, cluster: [number, number][]) => {
+        const key = `${row},${col}`
+        if (visited.has(key) || row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return
+        
+        const cell = this.gridData[row][col]
+        if (cell !== targetSymbol && cell !== 'wild') return
+        
+        visited.add(key)
+        cluster.push([row, col])
+        
+        dfs(row - 1, col, targetSymbol, cluster)
+        dfs(row + 1, col, targetSymbol, cluster)
+        dfs(row, col - 1, targetSymbol, cluster)
+        dfs(row, col + 1, targetSymbol, cluster)
+      }
+      
+      for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+          const key = `${row},${col}`
+          const cell = this.gridData[row][col]
+          
+          if (!visited.has(key) && cell !== 'wild' && cell !== 'warrior') {
+            const cluster: [number, number][] = []
+            dfs(row, col, cell, cluster)
+            
+            if (cluster.length >= 5) {
+              clusters.push({ symbol: cell, cells: cluster })
             }
           }
         }
       }
       
-      // Process keys - unlock adjacent cells
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-          if (newGrid[row][col].hasKey) {
+      return clusters
+    }
+    
+    calculateWin(clusters: { symbol: SymbolType; cells: [number, number][] }[]): number {
+      let total = 0
+      for (const cluster of clusters) {
+        const config = SYMBOLS[cluster.symbol]
+        const size = cluster.cells.length
+        
+        let payout = 0
+        if (size >= 30) payout = config.payouts[30] || config.payouts[20] || 0
+        else if (size >= 20) payout = config.payouts[20] || 0
+        else if (size >= 12) payout = config.payouts[12] || 0
+        else if (size >= 8) payout = config.payouts[8] || 0
+        else if (size >= 5) payout = config.payouts[5] || 0
+        
+        total += payout * betAmount
+      }
+      return total
+    }
+    
+    checkWarriorTrigger(clusters: { symbol: SymbolType; cells: [number, number][] }[]): EnemyType | null {
+      const winningCells = new Set<string>()
+      for (const cluster of clusters) {
+        for (const [row, col] of cluster.cells) {
+          winningCells.add(`${row},${col}`)
+        }
+      }
+      
+      for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+          if (this.gridData[row][col] === 'warrior') {
             const adjacents = [[row-1,col],[row+1,col],[row,col-1],[row,col+1]]
             for (const [ar, ac] of adjacents) {
-              if (ar >= 0 && ar < 8 && ac >= 0 && ac < 8) {
-                newGrid[ar][ac].unlocked = true
-              }
-            }
-            newGrid[row][col].hasKey = false // Key consumed
-          }
-        }
-      }
-      
-      // Merge adjacent coins
-      const merged = new Set<string>()
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-          const cell = newGrid[row][col]
-          if (cell.coin && !merged.has(`${row},${col}`)) {
-            // Check for 2x2 merge opportunity
-            if (row < 7 && col < 7) {
-              const canMerge = [[row,col+1],[row+1,col],[row+1,col+1]].every(([r,c]) => 
-                newGrid[r][c].coin && !merged.has(`${r},${c}`)
-              )
-              if (canMerge) {
-                const totalValue = cell.coin.value + 
-                  newGrid[row][col+1].coin!.value +
-                  newGrid[row+1][col].coin!.value +
-                  newGrid[row+1][col+1].coin!.value
-                
-                // Upgrade to size 2
-                cell.coin = { ...cell.coin, value: totalValue * 2, size: 2 }
-                newGrid[row][col+1].coin = null
-                newGrid[row+1][col].coin = null
-                newGrid[row+1][col+1].coin = null
-                merged.add(`${row},${col}`)
-                merged.add(`${row},${col+1}`)
-                merged.add(`${row+1},${col}`)
-                merged.add(`${row+1},${col+1}`)
+              if (winningCells.has(`${ar},${ac}`)) {
+                if (Math.random() < 0.4) {
+                  const enemies: EnemyType[] = ['nightwing', 'nightfang', 'elderwing', 'elderfang']
+                  const weights = [40, 30, 20, 10]
+                  let roll = Math.random() * 100
+                  for (let i = 0; i < enemies.length; i++) {
+                    roll -= weights[i]
+                    if (roll <= 0) return enemies[i]
+                  }
+                  return 'nightwing'
+                }
               }
             }
           }
         }
       }
+      return null
+    }
+    
+    async cascade(winningCells: Set<string>) {
+      // Clear winning symbols
+      for (const key of winningCells) {
+        const [row, col] = key.split(',').map(Number)
+        this.symbols[row][col].setWinning(false)
+      }
       
-      return newGrid
-    })
-    
-    // Calculate total
-    let total = 0
-    let unlockedCount = 0
-    treasureGrid.forEach(row => row.forEach(cell => {
-      if (cell.coin) total += cell.coin.value
-      if (cell.unlocked) unlockedCount++
-    }))
-    setTreasureTotal(total * betAmount)
-    
-    if (landedSomething) {
-      setTreasureLives(3) // Reset lives
-    } else {
-      setTreasureLives(prev => {
-        const newLives = prev - 1
-        if (newLives <= 0) {
-          // Check for Old One trigger
-          if (unlockedCount >= 48 || Math.random() < 0.15) {
-            setGameState(prev => ({ ...prev, phase: 'oldOne' }))
-            setMessage('THE OLD ONE AWAKENS!')
+      // For each column, drop symbols down
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const remaining: SymbolType[] = []
+        for (let row = GRID_SIZE - 1; row >= 0; row--) {
+          if (!winningCells.has(`${row},${col}`)) {
+            remaining.push(this.gridData[row][col])
+          }
+        }
+        
+        // Fill from bottom
+        const needed = GRID_SIZE - remaining.length
+        for (let i = 0; i < needed; i++) {
+          remaining.unshift(this.getWeightedSymbol(true))
+        }
+        
+        // Update grid and animate
+        for (let row = 0; row < GRID_SIZE; row++) {
+          const newSymbol = remaining[row]
+          this.gridData[row][col] = newSymbol
+          this.symbols[row][col].setSymbol(newSymbol)
+          
+          if (row < needed) {
+            this.symbols[row][col].startDrop(row, needed - row)
           } else {
-            completeTreasureHall()
+            // Slide down existing
+            this.symbols[row][col].container.y = GRID_OFFSET_Y + row * CELL_SIZE
           }
         }
-        return newLives
+      }
+      
+      await new Promise(r => setTimeout(r, 500))
+    }
+    
+    applySpectralEffect(reward: { type: 'transform' | 'wilds'; count: number }) {
+      const positions: [number, number][] = []
+      for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+          if (this.gridData[row][col] !== 'wild' && this.gridData[row][col] !== 'warrior') {
+            positions.push([row, col])
+          }
+        }
+      }
+      
+      const shuffled = positions.sort(() => Math.random() - 0.5).slice(0, reward.count)
+      
+      if (reward.type === 'transform') {
+        const targetSymbol = ['portrait1', 'portrait2'][Math.floor(Math.random() * 2)] as SymbolType
+        for (const [row, col] of shuffled) {
+          this.gridData[row][col] = targetSymbol
+          this.symbols[row][col].setSymbol(targetSymbol)
+          
+          const effect = new ParticleEffect(
+            this.effectsContainer,
+            GRID_OFFSET_X + col * CELL_SIZE + CELL_SIZE / 2,
+            GRID_OFFSET_Y + row * CELL_SIZE + CELL_SIZE / 2,
+            0x8B5CF6,
+            10
+          )
+          this.particles.push(effect)
+        }
+      } else {
+        for (const [row, col] of shuffled) {
+          this.gridData[row][col] = 'wild'
+          this.symbols[row][col].setSymbol('wild')
+          
+          const effect = new ParticleEffect(
+            this.effectsContainer,
+            GRID_OFFSET_X + col * CELL_SIZE + CELL_SIZE / 2,
+            GRID_OFFSET_Y + row * CELL_SIZE + CELL_SIZE / 2,
+            0xFBBF24,
+            10
+          )
+          this.particles.push(effect)
+        }
+      }
+    }
+    
+    setHero(hero: HeroType) {
+      this.hero.setHero(hero)
+    }
+    
+    destroy() {
+      this.app.destroy(true, { children: true, texture: true })
+    }
+  }
+  
+  // Initialize Pixi.js
+  useEffect(() => {
+    if (!canvasRef.current || appRef.current) return
+    
+    const initPixi = async () => {
+      const app = new PIXI.Application()
+      
+      await app.init({
+        width: GAME_WIDTH,
+        height: GAME_HEIGHT,
+        backgroundColor: 0x0A0A0A,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true
       })
-    }
-  }, [treasureGrid, betAmount, getRandomCoinValue])
-
-  const defeatOldOne = useCallback(() => {
-    setOldOneDefeated(true)
-    setTreasureMultiplier(2)
-    
-    // Add 4x4 colossal coin (worth 1000x bet)
-    const colossalValue = 1000 * betAmount
-    setTreasureTotal(prev => prev + colossalValue)
-    setMessage(`THE OLD ONE DEFEATED! 4x4 Colossal Coin: $${colossalValue.toFixed(2)} + 2x Multiplier!`)
-    
-    setTimeout(() => completeTreasureHall(), 3000)
-  }, [betAmount])
-
-  const completeTreasureHall = useCallback(() => {
-    const finalWin = treasureTotal * treasureMultiplier
-    setGameState(prev => ({ 
-      ...prev, 
-      phase: 'idle',
-      totalWin: prev.totalWin + finalWin
-    }))
-    setBalance(balance + finalWin)
-    setSessionWins(prev => prev + finalWin)
-    
-    if (finalWin >= betAmount * 50) {
-      setBigWinAmount(finalWin)
-      setShowBigWin(true)
-      setTimeout(() => setShowBigWin(false), 4000)
+      
+      canvasRef.current!.appendChild(app.canvas as HTMLCanvasElement)
+      
+      // Responsive scaling
+      const resize = () => {
+        const parent = canvasRef.current!
+        const scale = Math.min(parent.clientWidth / GAME_WIDTH, parent.clientHeight / GAME_HEIGHT)
+        ;(app.canvas as HTMLCanvasElement).style.width = `${GAME_WIDTH * scale}px`
+        ;(app.canvas as HTMLCanvasElement).style.height = `${GAME_HEIGHT * scale}px`
+      }
+      
+      resize()
+      window.addEventListener('resize', resize)
+      
+      appRef.current = app
+      gameRef.current = new GameEngine(app)
     }
     
-    setMessage(`Treasure Hall Complete! Won: $${finalWin.toFixed(2)}`)
-  }, [treasureTotal, treasureMultiplier, betAmount, balance, setBalance])
-
-  // Treasure Hall automation
+    initPixi()
+    
+    return () => {
+      gameRef.current?.destroy()
+      appRef.current = null
+      gameRef.current = null
+    }
+  }, [])
+  
+  // Update hero when selection changes
   useEffect(() => {
-    if (gameState.phase === 'treasureHall' && treasureLives > 0) {
-      const timeout = setTimeout(processTreasureSpin, 1500)
-      return () => clearTimeout(timeout)
-    }
-  }, [gameState.phase, treasureLives, processTreasureSpin])
-
+    gameRef.current?.setHero(selectedHero)
+  }, [selectedHero])
+  
+  // Auto play
   useEffect(() => {
-    if (gameState.phase === 'oldOne') {
-      const timeout = setTimeout(defeatOldOne, 3000)
-      return () => clearTimeout(timeout)
-    }
-  }, [gameState.phase, defeatOldOne])
-
-  // ============== MAIN SPIN LOGIC ==============
-  const spin = useCallback(async () => {
-    if (gameState.phase !== 'idle' || betAmount > balance) return
+    autoPlayRef.current = autoPlay
+  }, [autoPlay])
+  
+  // Spin handler
+  const handleSpin = useCallback(async () => {
+    if (phase !== 'idle' || betAmount > balance || !gameRef.current) return
     
-    setGameState(prev => ({ ...prev, phase: 'spinning', totalWin: 0, spinWin: 0, cascadeLevel: 0 }))
+    setPhase('spinning')
+    setMessage('')
+    setTotalWin(0)
+    
+    // Deduct bet
     setBalance(balance - betAmount)
     recordBet(betAmount)
-    setSessionSpins(prev => prev + 1)
-    setMessage('')
     
-    // Generate new grid
-    let grid = initializeGrid()
-    setGameState(prev => ({ ...prev, grid }))
+    // Perform spin
+    const result = await gameRef.current.spin()
     
-    await new Promise(r => setTimeout(r, animationSpeed * 2))
-    
-    // Process cascades
-    let cascadeLevel = 0
-    let totalSpinWin = 0
-    let battleTriggered = false
-    
-    while (true) {
-      const clusters = findClusters(grid)
-      if (clusters.length === 0) break
+    // Apply win
+    if (result.win > 0) {
+      const cappedWin = Math.min(result.win, betAmount * 20000)
+      setTotalWin(cappedWin)
+      setBalance(balance - betAmount + cappedWin)
       
-      cascadeLevel++
-      const winAmount = calculateClusterWin(clusters)
-      totalSpinWin += winAmount
-      
-      // Collect power relics from wins
-      const relicGain = Math.floor(winAmount / betAmount / 10)
+      // Collect power relics
+      const relicGain = Math.floor(result.win / betAmount / 10)
       if (relicGain > 0) {
         setPowerRelics(prev => ({
           vitality: prev.vitality + relicGain,
@@ -753,281 +1004,335 @@ export default function EldritchDungeon() {
           crit: prev.crit + Math.floor(relicGain / 3),
           guard: prev.guard + Math.floor(relicGain / 4)
         }))
-        setTotalRelicsCollected(prev => prev + relicGain)
-      }
-      
-      // Mark winning cells
-      const winningCells = new Set<string>()
-      for (const cluster of clusters) {
-        for (const [row, col] of cluster.cells) {
-          winningCells.add(`${row},${col}`)
-          grid[row][col] = { ...grid[row][col], isWinning: true }
-        }
-      }
-      
-      setGameState(prev => ({ 
-        ...prev, 
-        grid: [...grid.map(r => [...r])], 
-        cascadeLevel,
-        spinWin: totalSpinWin,
-        phase: 'cascading'
-      }))
-      
-      // Check for warrior battle trigger
-      if (!battleTriggered && checkWarriorBattle(grid, winningCells)) {
-        battleTriggered = true
-      }
-      
-      await new Promise(r => setTimeout(r, animationSpeed))
-      
-      // Cascade
-      grid = await performCascade(grid)
-      setGameState(prev => ({ ...prev, grid: [...grid.map(r => [...r])] }))
-      
-      await new Promise(r => setTimeout(r, animationSpeed))
-    }
-    
-    // Apply wins
-    if (totalSpinWin > 0) {
-      const cappedWin = Math.min(totalSpinWin, betAmount * 20000)
-      setBalance(balance + cappedWin)
-      setSessionWins((prev: number) => prev + cappedWin)
-      setGameState(prev => ({ ...prev, totalWin: cappedWin }))
-      
-      if (cappedWin >= betAmount * 50) {
-        setBigWinAmount(cappedWin)
-        setShowBigWin(true)
-        setTimeout(() => setShowBigWin(false), 3000)
       }
     }
     
-    // Trigger battle if warrior was adjacent to a win
-    if (battleTriggered && Math.random() < 0.4) {
-      const enemies: EnemyType[] = ['nightwing', 'nightfang', 'elderwing', 'elderfang']
-      const weights = [40, 30, 20, 10]
-      let roll = Math.random() * 100
-      let enemyType: EnemyType = 'nightwing'
-      for (let i = 0; i < enemies.length; i++) {
-        roll -= weights[i]
-        if (roll <= 0) { enemyType = enemies[i]; break }
-      }
-      
-      await new Promise(r => setTimeout(r, 500))
-      startBattle(enemyType)
+    // Check for battle
+    if (result.battleTriggered) {
+      setPhase('battle')
+      const enemy = ENEMIES[result.battleTriggered]
+      const stats = HEROES[selectedHero].baseStats
+      setBattleState({
+        enemy: result.battleTriggered,
+        enemyHp: enemy.hp,
+        heroHp: stats.vitality + powerRelics.vitality,
+        log: [`A ${enemy.name} emerges from the shadows!`]
+      })
       return
     }
     
-    setGameState(prev => ({ ...prev, phase: 'idle' }))
+    setPhase('idle')
     
     // Auto play
     if (autoPlayRef.current && balance >= betAmount) {
-      setTimeout(() => spin(), 1000)
+      setTimeout(() => handleSpin(), 1500)
     }
-  }, [gameState.phase, betAmount, balance, initializeGrid, findClusters, calculateClusterWin, checkWarriorBattle, performCascade, startBattle, animationSpeed, recordBet, setBalance])
-
-  // ============== FEATURE BUY ==============
-  const buyFeature = useCallback((tier: number) => {
-    const costs = [17.3, 45.5, 83.6, 143.7, 218]
-    const cost = costs[tier - 1] * betAmount
+  }, [phase, betAmount, balance, setBalance, recordBet, selectedHero, powerRelics])
+  
+  // Battle processing
+  useEffect(() => {
+    if (phase !== 'battle' || !battleState || !gameRef.current) return
     
-    if (balance >= cost) {
-      setBalance(balance - cost)
-      recordBet(cost)
-      setShowFeatureBuy(false)
-      setMessage('Entering the Dungeon directly...')
-      setTimeout(() => startTreasureHall(), 1000)
+    const timeout = setTimeout(() => {
+      const stats = HEROES[selectedHero].baseStats
+      const totalForce = stats.force + powerRelics.force
+      const totalCrit = stats.crit + powerRelics.crit
+      const totalGuard = stats.guard + powerRelics.guard
+      
+      const isCrit = Math.random() * 100 < totalCrit
+      const damage = Math.floor(totalForce * (isCrit ? 2 : 1))
+      const newEnemyHp = Math.max(0, battleState.enemyHp - damage)
+      
+      setBattleState(prev => {
+        if (!prev) return null
+        const newLog = [...prev.log, `You deal ${damage} damage${isCrit ? ' (CRITICAL!)' : ''}!`]
+        
+        if (newEnemyHp <= 0) {
+          newLog.push('Victory!')
+          return { ...prev, enemyHp: 0, log: newLog }
+        }
+        
+        // Enemy attacks
+        const enemy = ENEMIES[prev.enemy]
+        const blocked = Math.random() * 100 < totalGuard * 2
+        const enemyDamage = blocked ? Math.floor(enemy.damage * 0.3) : enemy.damage
+        const newHeroHp = Math.max(0, prev.heroHp - enemyDamage)
+        newLog.push(`${enemy.name} deals ${enemyDamage} damage${blocked ? ' (BLOCKED!)' : ''}!`)
+        
+        return { ...prev, enemyHp: newEnemyHp, heroHp: newHeroHp, log: newLog }
+      })
+    }, 1200)
+    
+    return () => clearTimeout(timeout)
+  }, [phase, battleState, selectedHero, powerRelics])
+  
+  // Battle end check
+  useEffect(() => {
+    if (!battleState) return
+    
+    if (battleState.enemyHp <= 0) {
+      const timeout = setTimeout(() => {
+        const enemy = ENEMIES[battleState.enemy]
+        gameRef.current?.applySpectralEffect(enemy.reward)
+        setMessage(`${enemy.name} defeated! ${enemy.reward.type === 'transform' ? `${enemy.reward.count} symbols transform!` : `${enemy.reward.count} Wilds added!`}`)
+        setBattleState(null)
+        
+        // Unlock heroes
+        if (!heroUnlocks.ranger && Math.random() < 0.3) {
+          setHeroUnlocks(prev => ({ ...prev, ranger: true }))
+        }
+        if (heroUnlocks.ranger && !heroUnlocks.mauler && Math.random() < 0.2) {
+          setHeroUnlocks(prev => ({ ...prev, mauler: true }))
+        }
+        
+        // Start Treasure Hall
+        setTimeout(() => {
+          setPhase('treasureHall')
+          const grid = []
+          for (let row = 0; row < 8; row++) {
+            const r = []
+            for (let col = 0; col < 8; col++) {
+              const isCenter = row >= 2 && row <= 5 && col >= 2 && col <= 5
+              r.push({ unlocked: isCenter, coin: null })
+            }
+            grid.push(r)
+          }
+          setTreasureState({ lives: 3, total: 0, multiplier: 1, grid })
+        }, 2000)
+      }, 1500)
+      
+      return () => clearTimeout(timeout)
     }
-  }, [balance, betAmount, setBalance, recordBet, startTreasureHall])
-
-  // ============== RENDER ==============
-  const renderCell = (cell: GridCell, row: number, col: number) => {
-    const config = SYMBOLS[cell.symbol]
-    return (
-      <div
-        key={cell.id}
-        className={`
-          aspect-square rounded-md flex items-center justify-center font-bold text-white
-          bg-gradient-to-br ${config.gradient}
-          transition-all duration-200
-          ${cell.isWinning ? `ring-2 ring-yellow-400 animate-pulse shadow-lg ${config.glow}` : ''}
-          ${cell.isNew ? 'animate-bounce' : ''}
-          ${cell.isTransformed ? 'ring-2 ring-purple-400' : ''}
-          ${config.tier === 'special' ? 'ring-1 ring-white/30' : ''}
-          text-xs sm:text-sm md:text-base
-        `}
-      >
-        {config.label}
-      </div>
-    )
-  }
-
-  const stats = getHeroStats()
-  const hero = HEROES[selectedHero]
-
+    
+    if (battleState.heroHp <= 0) {
+      const timeout = setTimeout(() => {
+        setMessage('Battle lost...')
+        setBattleState(null)
+        setPhase('idle')
+      }, 1500)
+      
+      return () => clearTimeout(timeout)
+    }
+  }, [battleState, heroUnlocks])
+  
+  // Treasure Hall processing
+  useEffect(() => {
+    if (phase !== 'treasureHall' || !treasureState) return
+    
+    const timeout = setTimeout(() => {
+      let landed = false
+      const newGrid = treasureState.grid.map(row => row.map(cell => ({ ...cell })))
+      
+      // Place coins/keys
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if (newGrid[row][col].unlocked && newGrid[row][col].coin === null) {
+            const rand = Math.random()
+            if (rand < 0.12) {
+              const values = [1, 2, 3, 5, 10, 25, 50, 100]
+              const weights = [30, 25, 20, 12, 8, 3, 1.5, 0.5]
+              let roll = Math.random() * 100
+              let value = 1
+              for (let i = 0; i < values.length; i++) {
+                roll -= weights[i]
+                if (roll <= 0) { value = values[i]; break }
+              }
+              newGrid[row][col].coin = value * betAmount
+              landed = true
+            } else if (rand < 0.15) {
+              // Key - unlock adjacent
+              const adj = [[row-1,col],[row+1,col],[row,col-1],[row,col+1]]
+              for (const [ar, ac] of adj) {
+                if (ar >= 0 && ar < 8 && ac >= 0 && ac < 8) {
+                  newGrid[ar][ac].unlocked = true
+                }
+              }
+              landed = true
+            }
+          }
+        }
+      }
+      
+      // Calculate total
+      let total = 0
+      let unlockedCount = 0
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if (newGrid[row][col].coin) total += newGrid[row][col].coin!
+          if (newGrid[row][col].unlocked) unlockedCount++
+        }
+      }
+      
+      const newLives = landed ? 3 : treasureState.lives - 1
+      
+      if (newLives <= 0) {
+        // End or Old One
+        if (unlockedCount >= 48 || Math.random() < 0.15) {
+          // Old One
+          setPhase('oldOne')
+          setMessage('THE OLD ONE AWAKENS!')
+          setTimeout(() => {
+            const finalTotal = (total + 1000 * betAmount) * 2
+            setTotalWin(finalTotal)
+            setBalance(balance + finalTotal)
+            setMessage(`The Old One defeated! Won: $${finalTotal.toFixed(2)}`)
+            setTreasureState(null)
+            setPhase('idle')
+          }, 3000)
+        } else {
+          const finalTotal = total * treasureState.multiplier
+          setTotalWin(finalTotal)
+          setBalance(balance + finalTotal)
+          setMessage(`Treasure Hall complete! Won: $${finalTotal.toFixed(2)}`)
+          setTreasureState(null)
+          setPhase('idle')
+        }
+        return
+      }
+      
+      setTreasureState({ ...treasureState, lives: newLives, total, grid: newGrid })
+    }, 1200)
+    
+    return () => clearTimeout(timeout)
+  }, [phase, treasureState, betAmount, balance, setBalance])
+  
   return (
-    <div className={`min-h-screen flex flex-col bg-gradient-to-b from-gray-950 via-slate-900 to-gray-950`}>
+    <div className="min-h-screen bg-black flex flex-col">
       {/* Header */}
-      <header className="flex-shrink-0 bg-gradient-to-r from-gray-900/90 via-purple-900/30 to-gray-900/90 px-3 py-2 border-b border-purple-500/30">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <button onClick={() => router.push('/casino')} className="text-white/70 hover:text-white text-sm">
-            Exit
+      <header className="flex-shrink-0 bg-gradient-to-r from-gray-900 via-purple-900/30 to-gray-900 px-4 py-2 border-b border-purple-500/30 flex items-center justify-between">
+        <button onClick={() => router.push('/casino')} className="text-white/70 hover:text-white px-4 py-2">
+          Exit
+        </button>
+        <h1 className="text-xl font-bold bg-gradient-to-r from-red-400 via-purple-400 to-red-400 bg-clip-text text-transparent">
+          ELDRITCH DUNGEON
+        </h1>
+        <div className="flex gap-2">
+          <button onClick={() => setShowHeroSelect(true)} className="text-xs px-3 py-1 bg-purple-900/50 rounded text-purple-300">
+            {HEROES[selectedHero].name}
           </button>
-          <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-red-400 via-purple-400 to-red-400 bg-clip-text text-transparent">
-            ELDRITCH DUNGEON
-          </h1>
-          <div className="flex gap-2">
-            <button onClick={() => setShowHeroSelect(true)} className="text-xs px-2 py-1 bg-purple-900/50 rounded text-purple-300 hover:bg-purple-800/50">
-              {hero.name}
-            </button>
-            <button onClick={() => setShowPaytable(true)} className="text-xs px-2 py-1 bg-gray-800/50 rounded text-gray-300 hover:bg-gray-700/50">
-              Info
-            </button>
-          </div>
+          <button onClick={() => setShowPaytable(true)} className="text-xs px-3 py-1 bg-gray-800/50 rounded text-gray-300">
+            Info
+          </button>
         </div>
       </header>
 
-      {/* Stats Bar */}
-      <div className="flex-shrink-0 bg-black/40 px-3 py-1 border-b border-gray-800">
-        <div className="max-w-5xl mx-auto flex items-center justify-between text-xs">
-          <div className="flex gap-3">
-            <span className="text-red-400">HP:{stats.vitality}</span>
-            <span className="text-orange-400">ATK:{stats.force}</span>
-            <span className="text-yellow-400">CRT:{stats.crit}%</span>
-            <span className="text-blue-400">DEF:{stats.guard}</span>
-          </div>
-          <div className="text-purple-400">
-            Relics: {totalRelicsCollected}
-          </div>
+      {/* Power Relics HUD */}
+      <div className="absolute top-16 left-4 bg-black/60 rounded-lg p-3 border border-gray-700 z-10">
+        <div className="text-xs text-purple-400 font-bold mb-2">POWER RELICS</div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="text-red-400">HP: +{powerRelics.vitality}</div>
+          <div className="text-orange-400">ATK: +{powerRelics.force}</div>
+          <div className="text-yellow-400">CRT: +{powerRelics.crit}%</div>
+          <div className="text-blue-400">DEF: +{powerRelics.guard}</div>
         </div>
       </div>
 
-      {/* Main Game Area */}
-      <main className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 gap-2">
-        {/* Win Display */}
-        <div className="text-center min-h-[3rem]">
-          {gameState.spinWin > 0 && (
-            <div className="text-xl sm:text-2xl font-bold text-yellow-400">
-              WIN: ${gameState.spinWin.toFixed(2)}
-            </div>
-          )}
-          {gameState.cascadeLevel > 0 && (
-            <div className="text-xs text-cyan-400">Cascade x{gameState.cascadeLevel}</div>
-          )}
-          {message && (
-            <div className="text-sm text-purple-300 animate-pulse">{message}</div>
-          )}
-        </div>
-
-        {/* Grid */}
-        <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl">
-          <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-2 shadow-2xl border border-gray-700">
-            <div className="grid grid-cols-8 gap-0.5 sm:gap-1">
-              {gameState.grid.map((row, ri) =>
-                row.map((cell, ci) => (
-                  <div key={`${ri}-${ci}`}>{renderCell(cell, ri, ci)}</div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Total Win */}
-        {gameState.totalWin > 0 && gameState.phase === 'idle' && (
-          <div className="text-lg font-bold text-yellow-300">
-            TOTAL: ${gameState.totalWin.toFixed(2)}
-          </div>
-        )}
+      {/* Game Canvas */}
+      <main className="flex-1 flex items-center justify-center overflow-hidden">
+        <div ref={canvasRef} className="relative w-full h-full flex items-center justify-center" />
       </main>
 
-      {/* Controls */}
-      <footer className="flex-shrink-0 bg-gray-900/95 border-t border-purple-500/30 px-3 py-2">
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
-          <button
-            onClick={() => setShowFeatureBuy(true)}
-            disabled={gameState.phase !== 'idle'}
-            className="px-3 py-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 rounded-lg text-xs font-bold text-white"
-          >
-            BUY
-          </button>
+      {/* Win Display */}
+      {totalWin > 0 && (
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 text-center z-20">
+          <div className="text-4xl font-bold text-yellow-400 animate-bounce drop-shadow-lg">
+            WIN: ${totalWin.toFixed(2)}
+          </div>
+        </div>
+      )}
 
-          <div className="text-center flex-1">
-            <div className="text-[10px] text-gray-500">BALANCE</div>
-            <div className="text-sm font-bold text-white">${balance.toLocaleString()}</div>
+      {/* Message Display */}
+      {message && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 text-center z-20">
+          <div className="text-2xl font-bold text-purple-400 animate-pulse drop-shadow-lg">
+            {message}
+          </div>
+        </div>
+      )}
+
+      {/* Controls */}
+      <footer className="flex-shrink-0 bg-gradient-to-t from-gray-950 to-gray-900 border-t border-purple-500/30 px-4 py-3">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          {/* Balance */}
+          <div className="text-center">
+            <div className="text-xs text-gray-500">BALANCE</div>
+            <div className="text-lg font-bold text-white">${balance.toLocaleString()}</div>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-800 rounded-lg px-2 py-1">
+          {/* Bet Controls */}
+          <div className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-2">
             <button
               onClick={() => setBetAmount(Math.max(0.1, +(betAmount / 2).toFixed(2)))}
-              disabled={gameState.phase !== 'idle'}
-              className="w-6 h-6 rounded bg-purple-700 text-white text-sm disabled:opacity-50"
+              disabled={phase !== 'idle'}
+              className="w-8 h-8 rounded bg-purple-700 text-white font-bold disabled:opacity-50"
             >-</button>
-            <div className="w-14 text-center">
-              <div className="text-[10px] text-gray-500">BET</div>
-              <div className="text-sm font-bold text-white">${betAmount.toFixed(2)}</div>
+            <div className="w-20 text-center">
+              <div className="text-xs text-gray-500">BET</div>
+              <div className="text-lg font-bold text-white">${betAmount.toFixed(2)}</div>
             </div>
             <button
               onClick={() => setBetAmount(Math.min(50, +(betAmount * 2).toFixed(2)))}
-              disabled={gameState.phase !== 'idle'}
-              className="w-6 h-6 rounded bg-purple-700 text-white text-sm disabled:opacity-50"
+              disabled={phase !== 'idle'}
+              className="w-8 h-8 rounded bg-purple-700 text-white font-bold disabled:opacity-50"
             >+</button>
           </div>
 
+          {/* Spin Button */}
           <button
-            onClick={spin}
-            disabled={gameState.phase !== 'idle' || betAmount > balance}
-            className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 disabled:opacity-50 rounded-xl font-bold text-white border border-purple-400"
+            onClick={handleSpin}
+            disabled={phase !== 'idle' || betAmount > balance}
+            className="px-12 py-3 bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 disabled:opacity-50 rounded-xl font-bold text-xl text-white border-2 border-purple-400 shadow-lg shadow-purple-500/30"
           >
-            {gameState.phase === 'idle' ? 'SPIN' : '...'}
+            {phase === 'idle' ? 'SPIN' : phase.toUpperCase()}
           </button>
 
-          <div className="flex flex-col gap-1">
-            <button
-              onClick={() => setAutoPlay(!autoPlay)}
-              className={`px-2 py-1 rounded text-[10px] font-bold ${autoPlay ? 'bg-green-600' : 'bg-gray-700'} text-white`}
-            >
-              {autoPlay ? 'STOP' : 'AUTO'}
-            </button>
-            <button
-              onClick={() => setTurboMode(!turboMode)}
-              className={`px-2 py-1 rounded text-[10px] font-bold ${turboMode ? 'bg-yellow-600' : 'bg-gray-700'} text-white`}
-            >
-              FAST
-            </button>
-          </div>
+          {/* Auto Play */}
+          <button
+            onClick={() => setAutoPlay(!autoPlay)}
+            className={`px-4 py-2 rounded-lg font-bold ${autoPlay ? 'bg-green-600' : 'bg-gray-700'} text-white`}
+          >
+            {autoPlay ? 'STOP' : 'AUTO'}
+          </button>
         </div>
       </footer>
 
       {/* Battle Overlay */}
       {battleState && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl p-6 max-w-md w-full border border-red-500/50">
-            <h2 className="text-2xl font-bold text-center text-red-400 mb-4">DUNGEON BATTLE</h2>
+          <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl p-8 max-w-lg w-full border-2 border-red-500/50">
+            <h2 className="text-3xl font-bold text-center text-red-400 mb-6">DUNGEON BATTLE</h2>
             
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-6">
               <div className="text-center flex-1">
-                <div className="text-3xl font-bold text-white mb-1">{HEROES[selectedHero].name[0]}</div>
-                <div className="text-xs text-white/70">{HEROES[selectedHero].name}</div>
-                <div className="w-full h-2 bg-gray-700 rounded-full mt-2">
-                  <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${(battleState.heroHp / battleState.heroMaxHp) * 100}%` }} />
+                <div className="text-5xl font-bold text-white mb-2">{HEROES[selectedHero].name[0]}</div>
+                <div className="text-sm text-white/70">{HEROES[selectedHero].name}</div>
+                <div className="w-full h-4 bg-gray-700 rounded-full mt-2">
+                  <div 
+                    className="h-full bg-green-500 rounded-full transition-all"
+                    style={{ width: `${(battleState.heroHp / (HEROES[selectedHero].baseStats.vitality + powerRelics.vitality)) * 100}%` }}
+                  />
                 </div>
-                <div className="text-xs text-green-400 mt-1">{battleState.heroHp}/{battleState.heroMaxHp}</div>
+                <div className="text-sm text-green-400 mt-1">{battleState.heroHp} HP</div>
               </div>
               
-              <div className="text-2xl text-yellow-400 font-bold px-4">VS</div>
+              <div className="text-4xl text-yellow-400 font-bold px-6">VS</div>
               
               <div className="text-center flex-1">
-                <div className="text-3xl font-bold text-white mb-1">{ENEMIES[battleState.enemy].name[0]}</div>
-                <div className="text-xs text-white/70">{ENEMIES[battleState.enemy].name}</div>
-                <div className="w-full h-2 bg-gray-700 rounded-full mt-2">
-                  <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${(battleState.enemyHp / battleState.enemyMaxHp) * 100}%` }} />
+                <div className="text-5xl font-bold text-white mb-2">{ENEMIES[battleState.enemy].name[0]}</div>
+                <div className="text-sm text-white/70">{ENEMIES[battleState.enemy].name}</div>
+                <div className="w-full h-4 bg-gray-700 rounded-full mt-2">
+                  <div 
+                    className="h-full bg-red-500 rounded-full transition-all"
+                    style={{ width: `${(battleState.enemyHp / ENEMIES[battleState.enemy].hp) * 100}%` }}
+                  />
                 </div>
-                <div className="text-xs text-red-400 mt-1">{battleState.enemyHp}/{battleState.enemyMaxHp}</div>
+                <div className="text-sm text-red-400 mt-1">{battleState.enemyHp} HP</div>
               </div>
             </div>
             
-            <div className="bg-black/50 rounded-lg p-3 h-32 overflow-y-auto">
+            <div className="bg-black/50 rounded-lg p-4 h-40 overflow-y-auto">
               {battleState.log.map((log, i) => (
-                <div key={i} className="text-xs text-gray-300 mb-1">{log}</div>
+                <div key={i} className="text-sm text-gray-300 mb-1">{log}</div>
               ))}
             </div>
           </div>
@@ -1035,43 +1340,38 @@ export default function EldritchDungeon() {
       )}
 
       {/* Treasure Hall Overlay */}
-      {(gameState.phase === 'treasureHall' || gameState.phase === 'oldOne') && (
+      {treasureState && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-b from-amber-900/50 to-gray-950 rounded-2xl p-4 max-w-lg w-full border border-amber-500/50">
-            <h2 className="text-xl font-bold text-center text-amber-400 mb-2">
-              {gameState.phase === 'oldOne' ? 'THE OLD ONE' : 'TREASURE HALL'}
+          <div className="bg-gradient-to-b from-amber-900/50 to-gray-950 rounded-2xl p-6 max-w-xl w-full border-2 border-amber-500/50">
+            <h2 className="text-2xl font-bold text-center text-amber-400 mb-4">
+              {phase === 'oldOne' ? 'THE OLD ONE' : 'TREASURE HALL'}
             </h2>
             
-            <div className="flex justify-between mb-2 text-sm">
-              <div className="text-white">Lives: {'O'.repeat(treasureLives)}{'X'.repeat(3 - treasureLives)}</div>
-              <div className="text-amber-400 font-bold">
-                Total: ${(treasureTotal * treasureMultiplier).toFixed(2)}
-                {treasureMultiplier > 1 && <span className="text-yellow-300"> (x{treasureMultiplier})</span>}
-              </div>
+            <div className="flex justify-between mb-4">
+              <div className="text-white">Lives: {'O'.repeat(treasureState.lives)}{'X'.repeat(3 - treasureState.lives)}</div>
+              <div className="text-amber-400 font-bold">Total: ${treasureState.total.toFixed(2)}</div>
             </div>
             
             <div className="grid grid-cols-8 gap-1 bg-black/50 rounded-lg p-2">
-              {treasureGrid.map((row, ri) =>
+              {treasureState.grid.map((row, ri) =>
                 row.map((cell, ci) => (
                   <div
                     key={`${ri}-${ci}`}
-                    className={`aspect-square rounded flex items-center justify-center text-[10px] font-bold
+                    className={`aspect-square rounded flex items-center justify-center text-xs font-bold transition-all
                       ${!cell.unlocked ? 'bg-gray-800 text-gray-600' : 
-                        cell.coin ? 'bg-gradient-to-br from-yellow-500 to-amber-600 text-white' :
-                        cell.hasKey ? 'bg-gradient-to-br from-purple-500 to-purple-700 text-white' :
+                        cell.coin ? 'bg-gradient-to-br from-yellow-500 to-amber-600 text-white animate-pulse' :
                         'bg-gray-700'}
                     `}
                   >
                     {!cell.unlocked && 'X'}
-                    {cell.coin && cell.coin.value}
-                    {cell.hasKey && 'K'}
+                    {cell.coin && `$${cell.coin}`}
                   </div>
                 ))
               )}
             </div>
             
-            {gameState.phase === 'oldOne' && (
-              <div className="text-center mt-4 text-red-400 animate-pulse text-lg font-bold">
+            {phase === 'oldOne' && (
+              <div className="text-center mt-4 text-2xl font-bold text-red-400 animate-pulse">
                 Defeating The Old One...
               </div>
             )}
@@ -1079,50 +1379,12 @@ export default function EldritchDungeon() {
         </div>
       )}
 
-      {/* Big Win */}
-      {showBigWin && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="text-center animate-bounce">
-            <div className="text-5xl sm:text-7xl font-bold text-yellow-400">BIG WIN!</div>
-            <div className="text-4xl sm:text-6xl font-bold text-white mt-4">${bigWinAmount.toFixed(2)}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Feature Buy Modal */}
-      {showFeatureBuy && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowFeatureBuy(false)}>
-          <div className="bg-gray-900 rounded-2xl p-4 max-w-sm w-full border border-amber-500/50" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-amber-400 text-center mb-4">FEATURE BET</h2>
-            <p className="text-xs text-gray-400 text-center mb-4">Buy direct entry to Treasure Hall</p>
-            <div className="grid grid-cols-5 gap-2 mb-4">
-              {[1, 2, 3, 4, 5].map(tier => {
-                const costs = [17.3, 45.5, 83.6, 143.7, 218]
-                const cost = costs[tier - 1] * betAmount
-                return (
-                  <button
-                    key={tier}
-                    onClick={() => buyFeature(tier)}
-                    disabled={balance < cost}
-                    className="p-2 bg-gray-800 rounded-lg border border-gray-700 hover:border-amber-500 disabled:opacity-50"
-                  >
-                    <div className="text-lg font-bold text-amber-400">{tier}</div>
-                    <div className="text-[10px] text-gray-400">${cost.toFixed(2)}</div>
-                  </button>
-                )
-              })}
-            </div>
-            <button onClick={() => setShowFeatureBuy(false)} className="w-full py-2 bg-gray-800 text-gray-400 rounded-lg">Cancel</button>
-          </div>
-        </div>
-      )}
-
       {/* Hero Select Modal */}
       {showHeroSelect && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowHeroSelect(false)}>
-          <div className="bg-gray-900 rounded-2xl p-4 max-w-md w-full border border-purple-500/50" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-purple-400 text-center mb-4">SELECT HERO</h2>
-            <div className="grid grid-cols-3 gap-3">
+          <div className="bg-gray-900 rounded-2xl p-6 max-w-lg w-full border border-purple-500/50" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-purple-400 text-center mb-6">SELECT HERO</h2>
+            <div className="grid grid-cols-3 gap-4">
               {(Object.keys(HEROES) as HeroType[]).map(key => {
                 const h = HEROES[key]
                 const unlocked = heroUnlocks[key]
@@ -1131,7 +1393,7 @@ export default function EldritchDungeon() {
                     key={key}
                     onClick={() => { if (unlocked) { setSelectedHero(key); setShowHeroSelect(false) } }}
                     disabled={!unlocked}
-                    className={`p-3 rounded-xl border transition-all ${
+                    className={`p-4 rounded-xl border-2 transition-all ${
                       unlocked
                         ? selectedHero === key
                           ? 'border-yellow-400 bg-yellow-400/10'
@@ -1139,16 +1401,16 @@ export default function EldritchDungeon() {
                         : 'border-gray-800 opacity-50'
                     }`}
                   >
-                    <div className={`text-3xl font-bold mb-1 bg-gradient-to-br ${h.color} bg-clip-text text-transparent`}>{h.name[0]}</div>
+                    <div className="text-4xl font-bold text-white mb-2">{h.name[0]}</div>
                     <div className="text-sm font-bold text-white">{h.name}</div>
-                    <div className="text-[10px] text-gray-400">{h.title}</div>
-                    <div className="text-[10px] text-purple-400 mt-1">{h.ability}</div>
-                    {!unlocked && <div className="text-[10px] text-red-400 mt-1">LOCKED</div>}
+                    <div className="text-xs text-gray-400">{h.title}</div>
+                    <div className="text-xs text-purple-400 mt-2">{h.ability}</div>
+                    {!unlocked && <div className="text-xs text-red-400 mt-1">LOCKED</div>}
                   </button>
                 )
               })}
             </div>
-            <button onClick={() => setShowHeroSelect(false)} className="w-full mt-4 py-2 bg-gray-800 text-gray-400 rounded-lg">Close</button>
+            <button onClick={() => setShowHeroSelect(false)} className="w-full mt-6 py-2 bg-gray-800 text-gray-400 rounded-lg">Close</button>
           </div>
         </div>
       )}
@@ -1156,16 +1418,18 @@ export default function EldritchDungeon() {
       {/* Paytable Modal */}
       {showPaytable && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={() => setShowPaytable(false)}>
-          <div className="bg-gray-900 rounded-2xl p-4 max-w-lg w-full border border-purple-500/50 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-purple-400 text-center mb-4">GAME INFO</h2>
+          <div className="bg-gray-900 rounded-2xl p-6 max-w-lg w-full border border-purple-500/50 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-purple-400 text-center mb-4">GAME INFO</h2>
             
             <div className="space-y-4 text-sm">
               <div>
                 <h3 className="text-amber-400 font-bold mb-2">Cluster Pays (5+ adjacent)</h3>
                 {REGULAR_SYMBOLS.map(sym => (
-                  <div key={sym} className="flex justify-between bg-gray-800/50 rounded p-1 mb-1">
-                    <span className={`font-bold bg-gradient-to-r ${SYMBOLS[sym].gradient} bg-clip-text text-transparent`}>{SYMBOLS[sym].label}</span>
-                    <span className="text-[10px] text-gray-400">
+                  <div key={sym} className="flex justify-between bg-gray-800/50 rounded p-2 mb-1">
+                    <span className="font-bold" style={{ color: `#${SYMBOLS[sym].color.toString(16).padStart(6, '0')}` }}>
+                      {SYMBOLS[sym].label}
+                    </span>
+                    <span className="text-xs text-gray-400">
                       5:{SYMBOLS[sym].payouts[5]}x | 8:{SYMBOLS[sym].payouts[8]}x | 12:{SYMBOLS[sym].payouts[12]}x | 20+:{SYMBOLS[sym].payouts[20]}x
                     </span>
                   </div>
@@ -1173,22 +1437,13 @@ export default function EldritchDungeon() {
               </div>
               
               <div>
-                <h3 className="text-amber-400 font-bold mb-2">Special Symbols</h3>
-                <div className="text-xs text-gray-400">
-                  <p><span className="text-yellow-400 font-bold">W</span> - Wild: Substitutes all symbols</p>
-                  <p><span className="text-orange-400 font-bold">+</span> - Warrior: Triggers battle when adjacent to wins</p>
-                </div>
-              </div>
-              
-              <div>
                 <h3 className="text-amber-400 font-bold mb-2">Features</h3>
                 <div className="text-xs text-gray-400 space-y-1">
-                  <p><strong>Cascading Wins:</strong> Winning symbols vanish, new ones drop</p>
+                  <p><strong>Cascading Wins:</strong> Winning symbols shatter, new ones drop</p>
                   <p><strong>Dungeon Battle:</strong> Warrior adjacent to win triggers RPG battle</p>
                   <p><strong>Spectral Effects:</strong> Win battles to transform symbols or add Wilds</p>
-                  <p><strong>Treasure Hall:</strong> Hold and Win bonus with coin merging</p>
-                  <p><strong>The Old One:</strong> Final boss awards 4x4 Colossal + 2x Multiplier</p>
-                  <p><strong>Power Relics:</strong> Collect stats from wins to boost hero</p>
+                  <p><strong>Treasure Hall:</strong> Hold and Win with coin merging</p>
+                  <p><strong>The Old One:</strong> Final boss - 4x4 Colossal Coin + 2x Multiplier</p>
                 </div>
               </div>
               
