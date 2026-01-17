@@ -252,6 +252,10 @@ export default function Casino() {
                         <span className="text-2xl sm:text-3xl mb-1">🃏</span>
                         <span className="text-[10px] sm:text-xs text-white font-medium">V.Poker</span>
                       </button>
+                      <button onClick={() => router.push('/casino/eldritch-dungeon')} className="flex flex-col items-center p-2 bg-black/40 rounded-xl border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                        <span className="text-2xl sm:text-3xl mb-1">🏰</span>
+                        <span className="text-[10px] sm:text-xs text-white font-medium">Eldritch</span>
+                      </button>
                     </>
                   ) : (
                     <>
@@ -507,6 +511,20 @@ export default function Casino() {
                           </div>
                         </div>
                         <button onClick={() => router.push('/casino/video-poker')} className="w-full py-1.5 bg-gradient-to-r from-red-500/30 to-red-600/20 hover:from-red-500/50 text-white rounded-lg font-medium text-xs transition-all border border-red-500/30">🃏 Play Video Poker</button>
+                      </div>
+                    </div>
+
+                    {/* Eldritch Dungeon */}
+                    <div className="group relative bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-2xl">🏰⚔️</div>
+                          <div>
+                            <h2 className="text-base font-bold text-white">Eldritch Dungeon</h2>
+                            <p className="text-white/40 text-xs">8x8 cluster pays RPG slot</p>
+                          </div>
+                        </div>
+                        <button onClick={() => router.push('/casino/eldritch-dungeon')} className="w-full py-1.5 bg-gradient-to-r from-purple-500/30 to-purple-600/20 hover:from-purple-500/50 text-white rounded-lg font-medium text-xs transition-all border border-purple-500/30">🏰 Enter Dungeon</button>
                       </div>
                     </div>
 
