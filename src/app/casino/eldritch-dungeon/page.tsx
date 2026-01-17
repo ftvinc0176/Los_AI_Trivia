@@ -1,6 +1,43 @@
+'use client'
+
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useCasino } from '../CasinoContext'
+import { useRouter } from 'next/navigation'
+
+type SymbolType = 'redGem' | 'blueGem' | 'greenGem' | 'purpleGem' | 'orangeGem' | 'skull' | 'eye' | 'rune1' | 'rune2' | 'rune3' | 'wild' | 'warrior'
+type HeroType = 'arcanist' | 'ranger' | 'mauler'
+type EnemyType = 'nightwing' | 'elderwing' | 'nightfang' | 'elderfang'
+
+interface SymbolConfig {
+  emoji: string
+  color: string
+  gradient: string
+  payouts: Record<number, number>
 }
 
-// Enemy configurations
+const SYMBOLS: Record<SymbolType, SymbolConfig> = {
+  redGem: { emoji: 'R', color: '#EF4444', gradient: 'from-red-600 to-red-900', payouts: { 5: 0.5, 8: 2, 12: 8, 20: 25 } },
+  blueGem: { emoji: 'B', color: '#3B82F6', gradient: 'from-blue-500 to-blue-800', payouts: { 5: 0.5, 8: 2, 12: 8, 20: 25 } },
+  greenGem: { emoji: 'G', color: '#22C55E', gradient: 'from-green-500 to-green-800', payouts: { 5: 0.4, 8: 1.5, 12: 6, 20: 20 } },
+  purpleGem: { emoji: 'P', color: '#A855F7', gradient: 'from-purple-500 to-purple-900', payouts: { 5: 0.4, 8: 1.5, 12: 6, 20: 20 } },
+  orangeGem: { emoji: 'O', color: '#F97316', gradient: 'from-orange-500 to-orange-800', payouts: { 5: 0.3, 8: 1, 12: 4, 20: 15 } },
+  skull: { emoji: 'S', color: '#9CA3AF', gradient: 'from-gray-400 to-gray-700', payouts: { 5: 0.8, 8: 3, 12: 12, 20: 40 } },
+  eye: { emoji: 'E', color: '#8B5CF6', gradient: 'from-violet-500 to-violet-800', payouts: { 5: 0.6, 8: 2.5, 12: 10, 20: 35 } },
+  rune1: { emoji: 'X', color: '#6B7280', gradient: 'from-gray-500 to-gray-800', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 10 } },
+  rune2: { emoji: 'Y', color: '#4B5563', gradient: 'from-gray-600 to-gray-900', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 10 } },
+  rune3: { emoji: 'Z', color: '#374151', gradient: 'from-gray-700 to-gray-950', payouts: { 5: 0.2, 8: 0.8, 12: 3, 20: 10 } },
+  wild: { emoji: 'W', color: '#FBBF24', gradient: 'from-yellow-400 to-amber-600', payouts: { 5: 5, 8: 25, 12: 100, 20: 500 } },
+  warrior: { emoji: '+', color: '#F59E0B', gradient: 'from-amber-500 to-amber-800', payouts: {} }
+}
+
+const REGULAR_SYMBOLS: SymbolType[] = ['redGem', 'blueGem', 'greenGem', 'purpleGem', 'orangeGem', 'skull', 'eye', 'rune1', 'rune2', 'rune3']
+
+const HEROES: Record<HeroType, { name: string; emoji: string; description: string; color: string }> = {
+  arcanist: { name: 'Arcanist', emoji: 'A', description: 'Master of arcane magic', color: 'from-purple-600 to-indigo-800' },
+  ranger: { name: 'Ranger', emoji: 'R', description: 'Swift and deadly', color: 'from-green-600 to-teal-800' },
+  mauler: { name: 'Mauler', emoji: 'M', description: 'Brutal warrior', color: 'from-red-600 to-orange-800' }
+}
+
 const ENEMIES: Record<EnemyType, { name: string; emoji: string; hp: number; reward: string; symbolTransform: number; wildAdd: number }> = {
   nightwing: { name: 'Nightwing', emoji: 'N', hp: 30, reward: '10 symbol transform', symbolTransform: 10, wildAdd: 0 },
   elderwing: { name: 'Elderwing', emoji: 'D', hp: 50, reward: '19 symbol transform', symbolTransform: 19, wildAdd: 0 },
@@ -376,7 +413,7 @@ export default function EldritchDungeon() {
         setBalance(balance + bonusWin)
         
         setMessage(`THE OLD ONE DEFEATED! Total Win: $${bonusWin.toFixed(2)}`)
-        
+
         setTimeout(() => {
           setShowTreasureHall(false)
           setFightingOldOne(false)
@@ -918,7 +955,7 @@ export default function EldritchDungeon() {
               {fightingOldOne ? 'THE OLD ONE' : 'TREASURE HALL'}
             </h2>
             
-            <div className="flex justify-between items-center mb-2 text-sm">
+            <div className="flex justify-between mb-2 text-sm">
               <div className="text-white">Lives: {bonusLives}</div>
               <div className="text-amber-400 font-bold">Total: ${bonusTotal.toFixed(2)}</div>
             </div>
