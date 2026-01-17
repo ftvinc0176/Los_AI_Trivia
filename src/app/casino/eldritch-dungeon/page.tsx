@@ -790,8 +790,8 @@ export default function EldritchDungeon() {
     // Apply wins
     if (totalSpinWin > 0) {
       const cappedWin = Math.min(totalSpinWin, betAmount * 20000)
-      setBalance(prev => prev + cappedWin)
-      setSessionWins(prev => prev + cappedWin)
+      setBalance(balance + cappedWin)
+      setSessionWins((prev: number) => prev + cappedWin)
       setGameState(prev => ({ ...prev, totalWin: cappedWin }))
       
       if (cappedWin >= betAmount * 50) {
